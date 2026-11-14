@@ -6,7 +6,7 @@ import {
   progressOf, resourceKinds, schedule, validateSession, type DurationKey, type Pace, type Passage, type Resource, type SessionInput,
 } from "../lib/studyPlans";
 
-// P2P PLANS (owner brief 2026-11-14; tables: docs/proposals/249_p2p_plans_PROPOSED.sql), mounted at /study-plans.
+// P2P PLANS (owner brief 2026-11-14; tables: migrations/249_p2p_plans.sql), mounted at /study-plans.
 // One plan system that ORGANISES existing resources — Bible passages (by reference), Kingdom School lessons,
 // Kingdom Stories, Scripture topics, Deep Study, commentaries, the dictionary. The resources stay the content.
 //   GET    /                                   catalogue: published P2P plans + my own plans (filters: collection, focus, q)

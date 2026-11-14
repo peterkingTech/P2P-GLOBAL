@@ -1,4 +1,5 @@
 // P2P PLANS — prepared plans (data/study-plans/*.json) → checked, then written as a PROPOSED seed of DRAFTS.
+// NOTE (2026-11-14): the generated SQL was APPLIED as migrations/250_p2p_plans_prepared_drafts.sql. Re-running writes a fresh copy to docs/proposals/ for a NEW migration — never edit the applied file.
 //   node scripts/build-study-plans.mjs [--offline]
 // 1. Every session goes through the SAME rules as the API (src/lib/studyPlans.ts validateSession).
 // 2. Every Scripture reference (main passages and passage-type supporting resources) is checked against a

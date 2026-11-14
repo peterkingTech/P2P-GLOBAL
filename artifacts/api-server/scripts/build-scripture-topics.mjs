@@ -1,4 +1,5 @@
 // Build the Explore Scripture by Topic outputs from the editorial collection (data/scripture-topics/*.json):
+// NOTE (2026-11-14): the generated SQL was APPLIED as migrations/248_scripture_topics_expansion.sql. Re-running writes a fresh copy to docs/proposals/ for a NEW migration — never edit the applied file.
 //   • data/scripture-topics/categories.json   — category list + topic title → category (bundled by the API)
 //   • docs/proposals/248_scripture_topics_expansion_PROPOSED.sql — the database change, NOT applied
 //   • docs/scripture-topics-review.md         — the editorial review report (counts, shared passages, validation)

@@ -1,3 +1,5 @@
+-- APPLIED TO PRODUCTION 2026-11-14 14:38:53 UTC (owner approval 2026-11-14; guarded single-transaction apply with in-transaction checks; backup C:/Users/offic/P2P-Backups/prod-c5e1812c-2026-11-14T14-38-14-679Z-tables-247-250 (JSON of every touched table)).
+-- The notes below were written before applying; "PROPOSED" there is historical.
 -- 249 (PROPOSED — NOT APPLIED; needs owner approval, a restore test and the guarded production apply):
 -- P2P PLANS — one plan system that ORGANISES existing P2P resources (owner brief "Unified Plans System",
 -- 2026-11-14). Additive only: four new tables and one widened check. No existing row changes meaning.

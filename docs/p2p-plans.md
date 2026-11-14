@@ -1,9 +1,9 @@
 # P2P Plans — one plan system
 
-**Status (2026-11-14):** built and tested locally. Nothing is committed, deployed or migrated.
+**Status (2026-11-14):** committed and deployed (API); migrations 249 + 250 applied to production 14:38 UTC. The 4 prepared plans are drafts until editors approve and publish them. The app screens need an app build.
 
-- The tables are a proposal: `docs/proposals/249_p2p_plans_PROPOSED.sql`.
-- The prepared plans are drafts awaiting review: `docs/proposals/250_p2p_plans_prepared_drafts_PROPOSED.sql` and `docs/p2p-plans-review.md`.
+- Tables: `migrations/249_p2p_plans.sql`.
+- Prepared plans (drafts awaiting review): `migrations/250_p2p_plans_prepared_drafts.sql` and `docs/p2p-plans-review.md`.
 
 ## The idea
 

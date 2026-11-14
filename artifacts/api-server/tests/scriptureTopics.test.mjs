@@ -55,8 +55,9 @@ try {
   ok("Old and New Testament both represented", all.some((x) => x.p.code === "GEN") && all.some((x) => x.p.code === "REV"));
   const report = JSON.parse(readFileSync(path.join(dataDir, "validation-report.json"), "utf8"));
   ok("the latest online validation found every reference valid", report.failed.length === 0 && report.valid === report.references && report.references === all.length, JSON.stringify({ v: report.valid, n: report.references, all: all.length }));
-  const sql = readFileSync(path.join(root, "..", "..", "docs", "proposals", "248_scripture_topics_expansion_PROPOSED.sql"), "utf8");
-  ok("the database change is a PROPOSAL outside migrations/, new topics draft and passages needs_review", sql.includes("PROPOSED — NOT APPLIED") && sql.includes("'draft'") && sql.includes("'needs_review'") && !readdirSync(path.join(root, "..", "..", "migrations")).some((f) => f.startsWith("248_")));
+  const sql = readFileSync(path.join(root, "..", "..", "migrations", "248_scripture_topics_expansion.sql"), "utf8");
+  // Applied 2026-11-14 (owner approval) as migrations/248: still additive — new topics draft, new passages needs_review.
+ok("migration 248 (applied 2026-11-14): new topics draft and passages needs_review", sql.startsWith("-- APPLIED TO PRODUCTION") && sql.includes("'draft'") && sql.includes("'needs_review'") && readdirSync(path.join(root, "..", "..", "migrations")).filter((f) => f.startsWith("248_")).length === 1);
   ok("the proposal appends after existing passages (Pray the Word positions never move)", sql.includes("'supporting',") && sql.includes("max(x.display_order)"));
 
   // ── Routes ──

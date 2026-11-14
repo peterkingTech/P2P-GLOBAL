@@ -1,3 +1,5 @@
+-- APPLIED TO PRODUCTION 2026-11-14 14:38:26 UTC (owner approval 2026-11-14; guarded single-transaction apply with in-transaction checks; backup C:/Users/offic/P2P-Backups/prod-c5e1812c-2026-11-14T14-38-14-679Z-tables-247-250 (JSON of every touched table)).
+-- The notes below were written before applying; "PROPOSED" there is historical.
 -- ╔══════════════════════════════════════════════════════════════════════════╗
 -- ║ PROPOSED — NOT APPLIED. Do not run without the owner's explicit approval.  ║
 -- ║ Kept outside migrations/ on purpose so no apply script can pick it up.     ║

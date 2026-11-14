@@ -1,6 +1,6 @@
 # Explore Scripture by Topic — editorial review (2026-11-14)
 
-Status: **needs editorial review**. Nothing here is visible to participants until a P2P editor approves it and the owner approves the database change (`docs/proposals/248_scripture_topics_expansion_PROPOSED.sql`).
+Status: **needs editorial review**. Nothing here is visible to participants until a P2P editor approves it and the owner approves the database change (`migrations/248_scripture_topics_expansion.sql`).
 
 ## Summary
 
