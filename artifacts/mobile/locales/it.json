@@ -571,5 +571,9 @@
     "question": "Domanda {{n}}",
     "lessonItem": "Lezione {{n}}",
     "personalReflections": "Riflessioni personali"
+  },
+  "languages": {
+    "search": "Cerca lingue",
+    "noMatch": "Nessuna lingua corrisponde alla ricerca."
   }
 }

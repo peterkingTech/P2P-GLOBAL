@@ -4,6 +4,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
+import LivingTreeView from "@/components/growth/LivingTreeView";
+import { STAGES, PERSONAL_STAGE_COUNT } from "@/constants/stages";
 
 interface ModuleCelebrationModalProps {
   label: string;
@@ -14,6 +16,7 @@ interface ModuleCelebrationModalProps {
 }
 
 export function ModuleCelebrationModal({ label, onWatchGrowth, onDismiss, stage }: ModuleCelebrationModalProps) {
+  const stageIndex = stage ? STAGES.findIndex((s) => s.name === stage.name) : -1;
   const insets = useSafeAreaInsets();
 
   return (
@@ -28,7 +31,14 @@ export function ModuleCelebrationModal({ label, onWatchGrowth, onDismiss, stage 
         </TouchableOpacity>
 
         <View style={styles.content}>
-          <Text style={styles.emoji}>{stage ? stage.emoji : "🌳"}</Text>
+          {/* A new stage: its real Meshy model in 3D. A finished module (no stage change): a ribbon. */}
+          {stageIndex >= 0 && stageIndex < PERSONAL_STAGE_COUNT ? (
+            <View style={styles.tree}>
+              <LivingTreeView stageIndex={stageIndex} mode="stage" compact background="#10291c" />
+            </View>
+          ) : (
+            <Ionicons name="ribbon" size={56} color="#F4C95D" style={{ marginBottom: 12 }} />
+          )}
           <Text style={styles.congrats}>Congratulations!</Text>
           {stage ? (
             <Text style={styles.message} accessibilityRole="header">
@@ -66,6 +76,7 @@ const styles = StyleSheet.create({
   content: {
     alignItems: "center",
   },
+  tree: { width: 220, height: 220, borderRadius: 20, overflow: "hidden", marginBottom: 12 },
   emoji: {
     fontSize: 64,
     marginBottom: 18,

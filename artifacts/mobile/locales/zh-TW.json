@@ -562,5 +562,9 @@
     "errorTitle": "無法載入結果",
     "errorBody": "請檢查網路連線後再試一次。",
     "retry": "再試一次"
+  },
+  "languages": {
+    "search": "搜尋語言",
+    "noMatch": "沒有符合搜尋的語言。"
   }
 }

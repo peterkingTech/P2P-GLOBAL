@@ -539,5 +539,9 @@
     "manageTranslations": "Phatha Ukuhumusha",
     "translationJobs": "Imisebenzi Yokuhumusha",
     "contentManagement": "Ukuphathwa Kokuqukethwe"
+  },
+  "languages": {
+    "search": "Sesha izilimi",
+    "noMatch": "Alukho ulimi oluhambisana nosesho lwakho."
   }
 }

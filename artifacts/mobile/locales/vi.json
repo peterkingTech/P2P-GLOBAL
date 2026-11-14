@@ -562,5 +562,9 @@
     "errorTitle": "Không thể tải kết quả",
     "errorBody": "Vui lòng kiểm tra kết nối và thử lại.",
     "retry": "Thử lại"
+  },
+  "languages": {
+    "search": "Tìm ngôn ngữ",
+    "noMatch": "Không có ngôn ngữ nào phù hợp."
   }
 }

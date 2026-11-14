@@ -1,13 +1,6 @@
-import { stageStillUrl } from "@/lib/growthModels";
-
-export type StageImageSource = { uri: string };
-
-// The five personal stages are stills of their 3D models (transparent background — show them with
-// resizeMode "contain"); Forest of Nations is the collective landscape scene.
-export const STAGE_IMAGES: StageImageSource[] = [
-  ...[0, 1, 2, 3, 4].map((i) => ({ uri: stageStillUrl(i)! })),
-  { uri: "https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/Forest%20of%20nations.jpeg" },
-];
+// A stage is SHOWN only as its real Meshy 3D model (components/growth/LivingTreeView, owner decision
+// 2026-11-13) — never a picture, illustration or emoji. `emoji` stays for older data and text-only places
+// (e.g. notifications) and is not used to represent a person's tree.
 
 export interface Stage {
   name: string;

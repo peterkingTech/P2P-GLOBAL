@@ -1,18 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { AppButton, ChipRow, FilterChip, IconButton } from "@/components/ui";
 import { getGrowthTree, type GrowthTree } from "@/lib/growthApi";
-import { stageStillUrl } from "@/lib/growthModels";
 
-// GROWTH STORY & TIMELINE — my development over time, from RECORDED events only: each stage change
-// (with its date and how it was recorded) and each verified contribution. The tree pictures beside a
-// stage change are RECONSTRUCTED from the recorded stage (no picture of anyone's tree was ever saved),
-// and say so. Choose a year to see that period. Nothing is inferred or invented.
-type Event = { date: string; kind: "stage" | "fruit"; title: string; detail: string; stage?: number };
+// GROWTH STORY & TIMELINE — my development over time, from RECORDED events only, in three kinds that are
+// always labelled apart: Growth Stage changes (verified milestones), contribution fruit (one per verified
+// contribution) and botanical events (how the tree looks — only where the data has a date: the first fruit).
+// A stage opens its real 3D model on request. Choose a year to see that period. Nothing is inferred or invented.
+type Event = { date: string; kind: "stage" | "fruit" | "botany"; title: string; detail: string; stage?: number };
+const KIND_LABEL: Record<Event["kind"], string> = { stage: "Growth Stage", fruit: "Contribution fruit", botany: "Botanical" };
 
 export default function GrowthTimelineScreen() {
   const router = useRouter();
@@ -30,6 +30,9 @@ export default function GrowthTimelineScreen() {
     const e: Event[] = d.history.map((h) => ({ date: h.achievedAt.slice(0, 10), kind: "stage", stage: h.stage, title: `Became ${h.name}`,
       detail: h.kind === "legacy_import" ? "Recognised from the earlier growth system" : "Verified milestone" }));
     for (const f of d.fruits) if (f.countsTowardMilestone) e.push({ date: f.date, kind: "fruit", title: f.label, detail: `${f.areaLabel}${f.kind === "group" ? " · group" : ""}` });
+    // Botanical: the day the tree first bore fruit (appearance only — it counts for nothing extra).
+    const first = d.fruits.filter((f) => f.countsTowardMilestone).sort((a, b) => a.date.localeCompare(b.date))[0];
+    if (first) e.push({ date: first.date, kind: "botany", title: "First fruit on your tree", detail: "How your tree looks — not a milestone and not an extra contribution" });
     return e.sort((a, b) => b.date.localeCompare(a.date));
   }, [d]);
   const years = [...new Set(events.map((e) => e.date.slice(0, 4)))].sort().reverse();
@@ -60,19 +63,19 @@ export default function GrowthTimelineScreen() {
             ) : null}
             {!shown.length ? <Text style={s.muted}>No recorded milestones or verified contributions yet. They appear here as they happen.</Text> : null}
             {shown.map((e, i) => {
-              const still = e.kind === "stage" && e.stage ? stageStillUrl(e.stage - 1) : null;
+              const stageIdx = e.kind === "stage" && e.stage && e.stage <= 5 ? e.stage - 1 : null;
               return (
-                <View key={`${e.date}-${i}`} style={s.event} accessible accessibilityLabel={`${e.date}: ${e.title}. ${e.detail}`}>
-                  <View style={[s.mark, e.kind === "stage" ? s.markStage : s.markFruit]} />
+                <View key={`${e.date}-${i}`} style={s.event} accessible accessibilityLabel={`${e.date}: ${KIND_LABEL[e.kind]}: ${e.title}. ${e.detail}`}>
+                  <View style={[s.mark, e.kind === "stage" ? s.markStage : e.kind === "fruit" ? s.markFruit : s.markBotany]} />
                   <View style={{ flex: 1, gap: 2 }}>
                     <Text style={s.date}>{new Date(e.date + "T12:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}</Text>
+                    <Text style={[s.kind, e.kind === "stage" ? s.kindStage : e.kind === "fruit" ? s.kindFruit : s.kindBotany]}>{KIND_LABEL[e.kind]}</Text>
                     <Text style={s.name}>{e.title}</Text>
                     <Text style={s.meta}>{e.detail}</Text>
-                    {still ? (
-                      <View style={{ gap: 2, marginTop: 4 }}>
-                        <Image source={{ uri: still }} style={s.still} resizeMode="contain" accessibilityIgnoresInvertColors />
-                        <Text style={s.small}>Reconstructed from your recorded stage — not a saved picture of your tree.</Text>
-                      </View>
+                    {stageIdx !== null ? (
+                      // The stage's real Meshy model opens on request (one model at a time, never a picture).
+                      <AppButton label="See this stage in 3D" icon="cube-outline" size="sm" variant="tertiary" style={{ alignSelf: "flex-start", marginTop: 4 }}
+                        onPress={() => router.push({ pathname: "/tree-3d", params: { stage: String(stageIdx) } } as any)} />
                     ) : null}
                   </View>
                 </View>
@@ -107,7 +110,11 @@ function makeStyles(c: AppColors) {
     mark: { width: 12, height: 12, borderRadius: 6, marginTop: 4 },
     markStage: { backgroundColor: c.accentGreen },
     markFruit: { backgroundColor: "#B8322A" },
-    still: { width: 120, height: 120 },
+    markBotany: { backgroundColor: "#8BB174" },
+    kind: { fontSize: 11, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.4 },
+    kindStage: { color: c.accentGreen },
+    kindFruit: { color: "#B8322A" },
+    kindBotany: { color: c.textMuted },
     links: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   });
 }

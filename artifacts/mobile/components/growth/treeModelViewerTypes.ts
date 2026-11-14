@@ -18,7 +18,7 @@ export interface TreeModelViewerProps {
   standardUrl: string;
   /** Null when the model has no detailed copy. */
   detailedUrl: string | null;
-  /** Known limitations, applied openly (see lib/growthModels.ts). */
+  /** Known limitations, applied openly (a flat relief turns only a little; no close-up copy limits zoom). */
   frontOnly?: boolean;
   noCloseUp?: boolean;
   background: string;
@@ -30,9 +30,21 @@ export interface TreeModelViewerProps {
   onSelect?: (id: string | null) => void;
   /** Changing this number re-creates the viewer (used for "Try again"). */
   reloadKey?: number;
+  /** Living tree: wind in the canopy at start (never with reduced motion). */
+  wind?: boolean;
+  /** The body's trunk base / height / canopy radius (its anchors), for the wind; else measured from the model. */
+  windFrame?: TreeViewerConfig["windFrame"];
+  /** A card: no gestures or buttons, framed close (the app handles taps). */
+  compact?: boolean;
+  /** Stop drawing (screen not visible, app in the background). */
+  paused?: boolean;
 }
 
+export type TreeView = "full" | "roots" | "canopy";
 export interface TreeModelViewerHandle {
   zoom: (factor: number) => void;
   reset: () => void;
+  /** Move the camera to the whole tree, its roots or its canopy. */
+  view: (mode: TreeView) => void;
+  setWind: (on: boolean) => void;
 }

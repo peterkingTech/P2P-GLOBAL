@@ -33,7 +33,10 @@ import { Avatar } from "@/components/Avatar";
 import ReadableText from "@/components/ReadableText";
 import { AppButton } from "@/components/ui";
 import { currentModule as currentModuleOf } from "@/lib/learningHome";
-import { STAGES, STAGE_IMAGES, PERSONAL_STAGE_COUNT } from "@/constants/stages";
+import { STAGES, PERSONAL_STAGE_COUNT } from "@/constants/stages";
+import LivingTreeView from "@/components/growth/LivingTreeView";
+import { useGrowthTree } from "@/hooks/useGrowthTree";
+import { botanicalDevelopment } from "@/lib/botanicalDevelopment";
 import { useGrowthStage, nextRequirementsMet } from "@/hooks/useGrowthStage";
 import { withScreenBoundary } from "@/components/ScreenErrorBoundary";
 
@@ -216,12 +219,12 @@ function makeStyles(c: AppColors) {
       borderRadius: 22, overflow: "hidden", marginBottom: 20,
       backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige,
     },
-    treeCard: { aspectRatio: 16 / 9, width: "100%", position: "relative" },
-    treePhoto: { width: "100%", height: "100%" },
-    treeShade: { position: "absolute", left: 0, right: 0, bottom: 0, height: "45%" },
-    treePhotoFallback: { width: "100%", height: "100%", alignItems: "center", justifyContent: "center" },
-    treeFallbackEmoji: { fontSize: 64 },
+    treeCard: { aspectRatio: 1, width: "100%", position: "relative" },
+    treeShade: { position: "absolute", left: 0, right: 0, bottom: 0, height: "30%" },
     growthBody: { padding: 16, gap: 6 },
+    stageLine: { fontSize: 14, color: c.textDark, fontFamily: "Inter_500Medium" },
+    stageLineName: { fontFamily: "Inter_700Bold" },
+    botanyLine: { fontSize: 12.5, color: c.textMuted, fontFamily: "Inter_400Regular", lineHeight: 17, marginBottom: 4 },
     stageOverlay: { position: "absolute", bottom: 14, left: 14, backgroundColor: "rgba(0,0,0,0.45)", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 8 },
     stageOverlayText: { color: "#fff", fontSize: 18, fontFamily: "Inter_700Bold" },
     stageOfText: { color: "rgba(255,255,255,0.75)", fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
@@ -323,10 +326,11 @@ function HomeTab() {
   const { contentMaxWidth, isTablet, screenWidth, screenHeight } = useLayout();
   // The growth MILESTONE (server-calculated) decides the tree shown, everywhere.
   const { stageIndex, journey } = useGrowthStage();
+  // How the tree looks (appearance only), from the same tree data the 3D tree draws — never the stage.
+  const botany = botanicalDevelopment(stageIndex, useGrowthTree().plan);
   const stage = STAGES[stageIndex];
   const nextStage = stageIndex + 1 < PERSONAL_STAGE_COUNT ? STAGES[stageIndex + 1] : null;
   const requirements = nextRequirementsMet(journey);
-  const [treeStillFailed, setTreeStillFailed] = useState(false);
   const { t } = useTranslation();
 
   const { modulesStarted, modulesCompleted, totalModules } = getModuleProgressCounts(modules);
@@ -425,47 +429,38 @@ function HomeTab() {
         styles={styles}
       />
 
-      {/* 2. Current growth stage — a still of the stage's 3D model; opens the Living Tree. */}
+      {/* 2. Current growth stage — the person's own living tree: the real Meshy 3D model of their verified
+          stage (with its verified fruit), leaves moving in the wind. Opens the Living Tree. */}
       <View style={styles.growthCard}>
-        <TouchableOpacity
-          // Tablets: a 21:9 band, made wider (shorter) when that would take
-          // more than ~42% of the window height.
+        <View
+          // Phones: square, so the tree is the centre of the card. Tablets: a 21:9 band, made wider
+          // (shorter) when that would take more than ~42% of the window height.
           style={[styles.treeCard, isTablet && { aspectRatio: Math.max(21 / 9, ((contentMaxWidth ?? screenWidth) - 40) / (screenHeight * 0.42)) }]}
-          onPress={go("/living-tree")}
-          activeOpacity={0.9}
-          accessibilityRole="button"
-          accessibilityLabel={`${stage.name}, ${t("home.stageOf", { stage: stageIndex + 1 })}. ${t("home.livingTree")}`}
         >
-          <LinearGradient colors={[colors.card, colors.lightCream]} style={StyleSheet.absoluteFill} />
-          {!treeStillFailed ? (
-            <Image
-              source={STAGE_IMAGES[stageIndex]}
-              style={styles.treePhoto}
-              resizeMode="contain"
-              onError={() => setTreeStillFailed(true)}
-              accessibilityIgnoresInvertColors
-            />
-          ) : (
-            <View style={styles.treePhotoFallback}><Text style={styles.treeFallbackEmoji}>{stage.emoji}</Text></View>
-          )}
+          {/* The tree is the card's button (Try again, if it can't load, sits beside it — never inside). */}
+          <LivingTreeView stageIndex={stageIndex} mode="tree" compact background={colors.card} style={StyleSheet.absoluteFill}
+            onPress={go("/living-tree")} accessibilityHint={`${t("home.stageOf", { stage: stageIndex + 1 })}. ${t("home.livingTree")}`} />
           <LinearGradient colors={["transparent", "rgba(0,0,0,0.45)"]} style={styles.treeShade} pointerEvents="none" />
-          <View style={styles.stageOverlay}>
-            <Text style={styles.stageOverlayText}>{stage.emoji} {stage.name}</Text>
+          <View style={styles.stageOverlay} pointerEvents="none">
+            <Text style={styles.stageOverlayText}>{stage.name}</Text>
             <Text style={styles.stageOfText}>{t("home.stageOf", { stage: stageIndex + 1 })}</Text>
           </View>
-          <View style={styles.arrowOverlay}>
+          <View style={styles.arrowOverlay} pointerEvents="none">
             <Ionicons name="chevron-forward" size={16} color="#fff" />
           </View>
-        </TouchableOpacity>
+        </View>
 
         <View style={styles.growthBody}>
+          {/* Two separate things: the verified Growth Stage, and how the tree looks (never a rank). */}
+          <Text style={styles.stageLine}>{t("home.yourGrowthStage", { defaultValue: "Your Growth Stage" })}: <Text style={styles.stageLineName}>{stage.name}</Text></Text>
+          <Text style={styles.botanyLine} accessibilityHint={botany.note}>{botany.summary}</Text>
           <View style={styles.progressLabelRow}>
             {nextStage ? (
               <Text style={styles.progressToward} numberOfLines={2}>
-                {t("home.growingToward")} {nextStage.emoji} {nextStage.name}
+                {t("home.growingToward")} {nextStage.name}
               </Text>
             ) : (
-              <Text style={styles.progressToward}>{stage.emoji} {stage.name}</Text>
+              <Text style={styles.progressToward}>{stage.name}</Text>
             )}
             {requirements ? <Text style={styles.progressCount}>{requirements.met} of {requirements.total}</Text> : null}
           </View>
@@ -483,7 +478,7 @@ function HomeTab() {
           </TouchableOpacity>
           <TouchableOpacity style={styles.forestLinkRow} onPress={go("/forest")} activeOpacity={0.85} accessibilityRole="button">
             <Text style={styles.forestLinkText}>
-              🌳 View My Forest — {1 + forestStats.totalDisciples} tree{1 + forestStats.totalDisciples === 1 ? "" : "s"}, {forestStats.countriesReached.length} nation{forestStats.countriesReached.length === 1 ? "" : "s"}
+              View My Forest — {1 + forestStats.totalDisciples} tree{1 + forestStats.totalDisciples === 1 ? "" : "s"}, {forestStats.countriesReached.length} nation{forestStats.countriesReached.length === 1 ? "" : "s"}
             </Text>
             <Ionicons name="chevron-forward" size={15} color={colors.primaryGreen} />
           </TouchableOpacity>

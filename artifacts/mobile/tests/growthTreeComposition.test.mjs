@@ -29,12 +29,12 @@ const A = load("lib/growthTreeAssets.ts");
 ok("manifest: exactly 26 assets, unique ids", A.TREE_ASSETS.length === 26 && new Set(A.TREE_ASSETS.map((x) => x.id)).size === 26);
 ok("manifest: groups 6 body/landscape · 3 modular · 6 apple · 9 micro · 2 variants",
   ["body", "modular", "apple", "micro", "variant"].map((g) => A.TREE_ASSETS.filter((x) => x.group === g).length).join() === "6,3,6,9,2");
-ok("manifest: 25 copies with real measurements; ONLY the 13 hosted (release v2) are integrated, 12 stay validated; Forest of Nations not located",
+ok("manifest: 25 copies with real measurements; all 25 hosted (13 for the tree + 12 lifecycle, release v2) are integrated, 12 stay validated; Forest of Nations not located",
   A.TREE_ASSETS.filter((x) => x.file && /^[0-9a-f]{64}$/.test(x.file.sha256) && x.file.bytes > 0 && x.file.triangles > 0 && x.file.triangles < x.file.sourceTriangles).length === 25
   && A.TREE_ASSETS.every((x) => !x.file || (x.status === "integrated") === (x.release === "v2"))
-  && A.TREE_ASSETS.filter((x) => x.status === "integrated").length === 13 && A.TREE_ASSETS.filter((x) => x.status === "validated").length === 12
+  && A.TREE_ASSETS.filter((x) => x.status === "integrated").length === 25 && A.TREE_ASSETS.filter((x) => x.status === "validated").length === 0
   && A.assetById("forest-of-nations-3d-landscape").status === "not_located" && !A.assetById("forest-of-nations-3d-landscape").file
-  && A.modularTreeReady(Object.values(C.STAGE_BODIES)) && !A.modularTreeReady(["asset-apple-blossoms"]));
+  && A.modularTreeReady(Object.values(C.STAGE_BODIES)) && A.modularTreeReady(["asset-apple-blossoms"]) && !A.modularTreeReady(["special-half-apple-with-seeds"]));
 ok("manifest: matches made by eye are flagged for the owner to confirm", ["asset-micro-7-balloon-stage-bud", "asset-micro-9-golden-autumn-leaf"].every((id) => A.assetById(id).identifiedBy === "visual"));
 ok("manifest: every copy is full 3D (no front-only views claimed)", A.TREE_ASSETS.filter((x) => x.file).every((x) => x.file.views.join() === "full"));
 ok("manifest: dormant bud, June drop and autumn leaf are seasonal-only", ["asset-micro-6-dormant-winter-bud", "asset-micro-8-june-drop-fruitlet", "asset-micro-9-golden-autumn-leaf"].every((id) => A.assetById(id).seasonalOnly));
@@ -98,7 +98,7 @@ const harvest = src("app/fruit-harvest.tsx"), story = src("app/growth-timeline.t
 ok("Fruit Harvest: real ledger data only (GET /growth/me/tree), honest empty state, no sample fruit", harvest.includes("getGrowthTree()") && harvest.includes("No contributions verified yet") && !/sample|dummy|mock|Lorem/i.test(harvest.replace(/^\s*\/\/.*$/gm, "")));
 ok("Fruit Harvest: filters by kind, type and verified/history; details with date, type, area, status, evidence reference", ["Individual", "Group", "Every type", "Full history", "Evidence reference", "Counts toward your milestones"].every((x) => harvest.includes(x)));
 ok("Fruit Harvest: a group fruit says it is ONE fruit for leading it", harvest.includes("Group — one fruit for leading it"));
-ok("Growth Story: recorded events only; tree pictures labelled as reconstructed", story.includes("Reconstructed from your recorded stage — not a saved picture of your tree.") && story.includes("d.history.map(") && story.includes("f.countsTowardMilestone"));
+ok("Growth Story: recorded events only; a stage opens its real 3D model (no tree pictures)", story.includes('label="See this stage in 3D"') && !story.includes("<Image source={{ uri: still }}") && story.includes("d.history.map(") && story.includes("f.countsTowardMilestone"));
 ok("both reachable from the Living Tree, routes registered", src("app/living-tree.tsx").includes('router.push("/fruit-harvest"') && src("app/living-tree.tsx").includes('router.push("/growth-timeline"') && src("app/_layout.tsx").includes('"fruit-harvest", "growth-timeline"'));
 
 console.log(`growthTreeComposition (app): ${pass} passed, ${fail} failed`);

@@ -6,6 +6,7 @@
 import type { BibleTranslation } from "@/lib/bibleReaderApi";
 import { getLanguageName } from "@/lib/languageNames";
 import { LANGUAGE_DISPLAY } from "@/lib/i18n";
+import { languageEntry, languageMatches } from "@/lib/languageRegistry";
 
 export interface BibleLanguage {
   code: string;
@@ -25,12 +26,14 @@ function englishName(code: string, serverName: string | null | undefined): strin
   const known = (LANGUAGE_DISPLAY as Record<string, { label: string } | undefined>)[code]?.label;
   if (known) return known;
   if (code === "en") return "English";
+  const reg = languageEntry(code)?.english;
+  if (reg) return reg;
   const g = getLanguageName(code);
   return g && g !== code ? g : serverName || code;
 }
 /** Native name: the app's own list, else the platform's (Intl.DisplayNames), else null. */
 function nativeName(code: string): string | null {
-  const known = (LANGUAGE_DISPLAY as Record<string, { native: string } | undefined>)[code]?.native;
+  const known = (LANGUAGE_DISPLAY as Record<string, { native: string } | undefined>)[code]?.native ?? languageEntry(code)?.native;
   if (known) return known;
   try {
     const DN = (Intl as unknown as { DisplayNames?: new (l: string[], o: { type: string }) => { of: (c: string) => string | undefined } }).DisplayNames;
@@ -64,10 +67,11 @@ export function suggestedLanguages(langs: BibleLanguage[], prefs: { current?: st
   return out;
 }
 
-/** Search over native and English names and the code. */
+/** Search over native and English names, the code, and the language registry's other codes and names
+ *  (e.g. "Farsi", "Tagalog", "deu") — one result per language, never a duplicate. */
 export function filterLanguages(langs: BibleLanguage[], query: string): BibleLanguage[] {
   const q = norm(query.trim());
-  return q ? langs.filter((l) => [l.native, l.english ?? "", l.code].some((x) => norm(x).includes(q))) : langs;
+  return q ? langs.filter((l) => [l.native, l.english ?? "", l.code].some((x) => norm(x).includes(q)) || languageMatches(l.code, query)) : langs;
 }
 
 /** First letter used for the A–Z index (accents folded, non-Latin scripts under "#"). */
@@ -79,7 +83,7 @@ export function versionSections(list: BibleTranslation[], opts: { query?: string
   const q = norm((opts.query ?? "").trim());
   const matches = list.filter((t) => (!opts.language || t.language === opts.language)
     && (!opts.audioOnly || t.recordedAudio === true)
-    && (!q || [t.name, t.abbreviation ?? "", t.code, langs.get(t.language)?.native ?? "", langs.get(t.language)?.english ?? "", t.language].some((x) => norm(x).includes(q))));
+    && (!q || [t.name, t.abbreviation ?? "", t.code, langs.get(t.language)?.native ?? "", langs.get(t.language)?.english ?? "", t.language].some((x) => norm(x).includes(q)) || languageMatches(t.language, opts.query ?? "")));
   const by = new Map<string, BibleTranslation[]>();
   for (const t of matches) by.set(t.language, [...(by.get(t.language) ?? []), t]);
   const currentLang = list.find((t) => t.code === opts.current)?.language;

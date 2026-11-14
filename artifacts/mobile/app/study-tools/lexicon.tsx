@@ -7,6 +7,9 @@ import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { AppButton, ChipRow, FilterChip, IconButton } from "@/components/ui";
 import { Attribution, OriginalText, StudyState } from "@/components/study/StudyUI";
+import { dictLanguageLabel } from "@/lib/dictionaryLabels";
+import LanguageFlag from "@/components/language/LanguageFlag";
+import { languageFlag } from "@/lib/languageRegistry";
 import { languageName, normaliseStrongs, searchLexicon, type LexiconSearch } from "@/lib/deepStudyApi";
 
 // Lexicon search for Study Tools (Hebrew / Greek / Aramaic lexicons, Strong's lookup, word study): by
@@ -53,8 +56,8 @@ export default function LexiconSearchScreen() {
         {direct ? <AppButton label={`${t("deepStudy.open", { defaultValue: "Open" })} ${direct}`} icon="book-outline" onPress={() => open(direct)} /> : null}
         {!strongsMode ? (
           <ChipRow accessibilityLabel={t("deepStudy.language", { defaultValue: "Language" })} single>
-            {[[null, t("deepStudy.all", { defaultValue: "All" })], ["hebrew", "Hebrew"], ["aramaic", "Aramaic"], ["greek", "Greek"]].map(([k, l]) => (
-              <FilterChip key={String(k)} label={String(l)} selected={language === k} selection="single" onPress={() => setLanguage(k)} />
+            {[[null, t("deepStudy.all", { defaultValue: "All" })], ...(["hebrew", "aramaic", "greek"] as const).map((k) => [k, dictLanguageLabel(t, k)])].map(([k, l]) => (
+              <FilterChip key={String(k)} label={String(l)} leading={k && languageFlag(k) ? <LanguageFlag language={k} size={14} /> : undefined} selected={language === k} selection="single" onPress={() => setLanguage(k)} />
             ))}
           </ChipRow>
         ) : null}

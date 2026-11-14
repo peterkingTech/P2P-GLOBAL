@@ -562,5 +562,9 @@
     "errorTitle": "Tidak dapat memuatkan keputusan",
     "errorBody": "Sila semak sambungan anda dan cuba lagi.",
     "retry": "Cuba lagi"
+  },
+  "languages": {
+    "search": "Cari bahasa",
+    "noMatch": "Tiada bahasa yang sepadan dengan carian anda."
   }
 }

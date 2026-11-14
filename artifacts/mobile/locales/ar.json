@@ -150,6 +150,7 @@
     "continueGrowth": "تابع نموّك",
     "stageOf": "المرحلة {{stage}} من 6",
     "growingToward": "تنمو نحو",
+    "yourGrowthStage": "مرحلة نموك",
     "forestReached": "غابة الأمم التي تم الوصول إليها",
     "morePoints": "{{points}} نقاط أخرى لـ{{name}}",
     "dailyWord": "كلمة اليوم",
@@ -744,5 +745,9 @@
     "hebrew": "العبرية",
     "aramaic": "الآرامية",
     "greek": "اليونانية"
+  },
+  "languages": {
+    "search": "ابحث عن لغة",
+    "noMatch": "لا توجد لغة تطابق بحثك."
   }
 }

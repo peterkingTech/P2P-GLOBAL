@@ -162,6 +162,7 @@
     "continueGrowth": "Continue your growth",
     "stageOf": "Stage {{stage}} of 6",
     "growingToward": "Growing toward",
+    "yourGrowthStage": "Your Growth Stage",
     "forestReached": "Forest of Nations reached",
     "morePoints": "{{points}} more points to {{name}}",
     "dailyWord": "Daily Word",
@@ -767,5 +768,9 @@
     "hebrew": "Hebrew",
     "aramaic": "Aramaic",
     "greek": "Greek"
+  },
+  "languages": {
+    "search": "Search languages",
+    "noMatch": "No language matches your search."
   }
 }

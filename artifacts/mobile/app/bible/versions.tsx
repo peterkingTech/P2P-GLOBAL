@@ -8,6 +8,7 @@ import type { AppColors } from "@/constants/themes";
 import { BibleApiError, getTranslations, type BibleTranslation } from "@/lib/bibleReaderApi";
 import { bibleLanguages, chooseTranslation, setVersionLanguage, versionLanguage, versionSections } from "@/lib/bibleVersions";
 import { AppButton, FilterChip, IconButton } from "@/components/ui";
+import LanguageFlag from "@/components/language/LanguageFlag";
 
 // Bible Versions (owner request 2026-11-09): every translation the server licenses for P2P Global, by
 // language — search, All / Audio Available, a language chooser (Bible Languages screen). Choosing one
@@ -64,7 +65,7 @@ export default function BibleVersions() {
           <View style={{ flex: 1 }} />
           <TouchableOpacity style={s.langButton} onPress={() => router.push({ pathname: "/bible/languages", params: { current: current ?? "" } } as any)}
             accessibilityRole="button" accessibilityLabel={`Language: ${lang ? lang.native : "all languages"}. Choose a language`}>
-            <Ionicons name="globe-outline" size={16} color={c.textDark} />
+            {lang ? <LanguageFlag language={lang.code} size={16} /> : <Ionicons name="globe-outline" size={16} color={c.textDark} />}
             <Text style={s.langButtonText} numberOfLines={1}>{lang ? lang.native : "All languages"}</Text>
             <Ionicons name="chevron-down" size={14} color={c.textMuted} />
           </TouchableOpacity>
@@ -103,6 +104,7 @@ export default function BibleVersions() {
           }
           renderSectionHeader={({ section }) => (
             <View style={s.sectionHeader}>
+              <LanguageFlag language={section.language.code} size={18} />
               <Text style={s.sectionTitle}>{section.language.native}</Text>
               {section.language.english ? <Text style={s.sectionSub}>{section.language.english}</Text> : null}
               <View style={{ flex: 1 }} />

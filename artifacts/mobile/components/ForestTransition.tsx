@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, Modal, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import colors from "@/constants/colors";
+import LivingTreeView from "@/components/growth/LivingTreeView";
 
 const PARTICLE_COUNT = 14;
 
@@ -66,7 +67,10 @@ export function ForestTransition({ onDone }: ForestTransitionProps) {
               />
             );
           })}
-          <Text style={styles.emoji}>🌳</Text>
+          {/* The real Forest Builder model (the stage this transition celebrates), not a drawn tree. */}
+          <View style={styles.tree}>
+            <LivingTreeView stageIndex={4} mode="stage" compact background="#0b1f15" />
+          </View>
         </View>
         <Animated.Text style={[styles.caption, { bottom: SH * 0.18, opacity: textOpacity }]}>
           Your growth is reaching others now…
@@ -87,7 +91,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  emoji: { fontSize: 88 },
+  tree: { width: 240, height: 240, borderRadius: 24, overflow: "hidden" },
   particle: {
     position: "absolute",
     width: 8,

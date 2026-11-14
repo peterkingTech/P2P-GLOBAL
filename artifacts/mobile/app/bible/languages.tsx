@@ -10,6 +10,7 @@ import type { AppColors } from "@/constants/themes";
 import { BibleApiError, getTranslations, type BibleTranslation } from "@/lib/bibleReaderApi";
 import { bibleLanguages, filterLanguages, indexLetter, setVersionLanguage, suggestedLanguages, versionLanguage, type BibleLanguage } from "@/lib/bibleVersions";
 import { AppButton, IconButton, SegmentedControl } from "@/components/ui";
+import LanguageFlag from "@/components/language/LanguageFlag";
 
 // Bible Languages (owner request 2026-11-09): the languages that have at least one licensed Bible
 // version — Suggested (from what this person reads and their languages) and All (A–Z with an index).
@@ -19,7 +20,7 @@ export default function BibleLanguages() {
   const insets = useSafeAreaInsets();
   const { colors: c } = useTheme();
   const s = useMemo(() => makeStyles(c), [c]);
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
   const { profile } = useAuth();
   const { current } = useLocalSearchParams<{ current?: string }>();
   const [list, setList] = useState<BibleTranslation[] | null>(null);
@@ -64,8 +65,8 @@ export default function BibleLanguages() {
       <View style={s.controls}>
         <View style={s.search}>
           <Ionicons name="search" size={16} color={c.textMuted} />
-          <TextInput value={query} onChangeText={setQuery} placeholder="Search languages" placeholderTextColor={c.textMuted} style={s.searchInput}
-            accessibilityLabel="Search languages" autoCorrect={false} autoCapitalize="none" returnKeyType="search" />
+          <TextInput value={query} onChangeText={setQuery} placeholder={t("languages.search", { defaultValue: "Search languages" })} placeholderTextColor={c.textMuted} style={s.searchInput}
+            accessibilityLabel={t("languages.search", { defaultValue: "Search languages" })} autoCorrect={false} autoCapitalize="none" returnKeyType="search" />
           {query ? <IconButton icon="close-circle" size="sm" accessibilityLabel="Clear search" onPress={() => setQuery("")} color={c.textMuted} /> : null}
         </View>
         {!query.trim() ? (
@@ -103,6 +104,7 @@ export default function BibleLanguages() {
               return (
                 <TouchableOpacity style={[s.row, on && s.rowSelected]} onPress={() => pick(l.code)} accessibilityRole="radio" accessibilityState={{ selected: on }}
                   accessibilityLabel={`${l.native}${l.english ? `, ${l.english}` : ""}, ${l.count} ${l.count === 1 ? "version" : "versions"}${l.audio ? ", recorded audio available" : ""}`}>
+                  <LanguageFlag language={l.code} size={22} />
                   <View style={{ flex: 1, gap: 1 }}>
                     <Text style={s.name}>{l.native}</Text>
                     <Text style={s.sub}>{[l.english, `${l.count} ${l.count === 1 ? "version" : "versions"}`].filter(Boolean).join(" · ")}</Text>

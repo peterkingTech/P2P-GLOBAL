@@ -32,14 +32,14 @@ ok("home: essential updates kept, each only when present",
   && home.includes("{showGuideInvitation && (") && home.includes('router.push("/connect/smart-match" as any)')
   && home.includes("{pendingEvaluations.length > 0 && ("));
 for (const gone of ["<MyP2PDashboard", "<GetStartedCard", "<InviteEncouragementCard", "RecommendedCard", "UnreadMessagesCard",
-  "GroveHomeCard", "RegisterChurchPromptCard", "MemberChurchCard", "JourneyTile", "<LivingTree", "/plans/recommended",
+  "GroveHomeCard", "RegisterChurchPromptCard", "MemberChurchCard", "JourneyTile", 'from "@/components/LivingTree"', "/plans/recommended",
   "getGroveData", "getAnnouncements"]) {
   ok(`home: ${gone} removed`, !home.includes(gone));
 }
 
 // Owner decision 2026-11-06: the growth stage is back on Home — the still of the stage's 3D model
 // (growth milestone), the next milestone as requirement counts (never points), opening the Living Tree.
-ok("home: growth-stage card back, showing the 3D still of the person's milestone", home.includes("{/* 2. Current growth stage") && home.includes("source={STAGE_IMAGES[stageIndex]}") && home.includes("useGrowthStage()"));
+ok("home: growth-stage card back, showing the person's living 3D tree (real Meshy model of their milestone)", home.includes("{/* 2. Current growth stage") && home.includes('<LivingTreeView stageIndex={stageIndex} mode="tree" compact') && home.includes("useGrowthStage()"));
 ok("home: growth card opens the Living Tree and the growth journey", home.includes('onPress={go("/living-tree")}') && home.includes('onPress={go("/stages")}'));
 ok("home: next milestone shown as requirements met, never points", home.includes("requirements met for") && !home.includes("morePoints"));
 

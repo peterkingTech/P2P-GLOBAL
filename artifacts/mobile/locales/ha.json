@@ -539,5 +539,9 @@
     "manageTranslations": "Sarrafa Fassara",
     "translationJobs": "Ayyukan Fassara",
     "contentManagement": "Sarrafa Abun Ciki"
+  },
+  "languages": {
+    "search": "Nemo harsuna",
+    "noMatch": "Babu harshen da ya dace da bincikenka."
   }
 }

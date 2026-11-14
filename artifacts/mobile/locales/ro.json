@@ -562,5 +562,9 @@
     "errorTitle": "Rezultatele nu au putut fi încărcate",
     "errorBody": "Verifică-ți conexiunea și încearcă din nou.",
     "retry": "Încearcă din nou"
+  },
+  "languages": {
+    "search": "Caută limbi",
+    "noMatch": "Nicio limbă nu corespunde căutării."
   }
 }

@@ -67,7 +67,7 @@ const T2 = [...T, { code: "AO-tsn_bib", name: "Open Tswana Living NT", language:
 ok("search finds a language the app has no name for, by the server's name", names(P.filterTranslations(T2, "tswana", null)) === "AO-tsn_bib");
 const picker2 = src("components/bible/TranslationPicker.tsx");
 ok("picker: anything that isn't a complete Bible says so (e.g. New Testament only)", picker2.includes('{t.coverage && t.coverage !== "bible" && t.coverageLabel ? <Text style={styles.coverage}>{t.coverageLabel}</Text> : null}'));
-ok("picker: language headings/chips use the server's language names", picker2.includes("<Text style={styles.group}>{nameOf(lang)}</Text>") && picker2.includes("label={nameOf(l)}"));
+ok("picker: language headings/chips use the server's language names (with the language's flag)", picker2.includes("{nameOf(lang)}</Text>") && picker2.includes("<LanguageFlag language={lang}") && picker2.includes("label={nameOf(l)}"));
 const books = src("components/bible/BookChapterPicker.tsx");
 ok("book picker: a New Testament-only translation lists only New Testament books (no OT tab)",
   books.includes("const inTranslation = CANON.filter((b) => testaments.includes(b.testament));") && books.includes("!query && testaments.length > 1 &&")

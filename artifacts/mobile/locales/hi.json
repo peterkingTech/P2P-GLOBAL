@@ -150,6 +150,7 @@
     "continueGrowth": "अपनी वृद्धि जारी रखें",
     "stageOf": "चरण {{stage}} / 6",
     "growingToward": "की ओर बढ़ते हुए",
+    "yourGrowthStage": "आपकी विकास अवस्था",
     "forestReached": "राष्ट्रों के वन तक पहुँचे",
     "morePoints": "{{name}} के लिए {{points}} अंक और चाहिए",
     "dailyWord": "दैनिक वचन",
@@ -744,5 +745,9 @@
     "hebrew": "इब्रानी",
     "aramaic": "अरामी",
     "greek": "यूनानी"
+  },
+  "languages": {
+    "search": "भाषाएँ खोजें",
+    "noMatch": "आपकी खोज से कोई भाषा मेल नहीं खाती।"
   }
 }

@@ -562,5 +562,9 @@
     "errorTitle": "Tidak dapat memuat hasil",
     "errorBody": "Periksa koneksi Anda dan coba lagi.",
     "retry": "Coba lagi"
+  },
+  "languages": {
+    "search": "Cari bahasa",
+    "noMatch": "Tidak ada bahasa yang cocok dengan pencarian Anda."
   }
 }

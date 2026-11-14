@@ -6,7 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
-import StageStill from "@/components/growth/StageStill";
+import LivingTreeView from "@/components/growth/LivingTreeView";
 import { useGrowthStage } from "@/hooks/useGrowthStage";
 import { apiFetch } from "@/lib/apiClient";
 import colors from "@/constants/colors";
@@ -186,7 +186,9 @@ function Phase1TreeTransforms({ treeData, stageIndex, onDone }: { treeData: any;
 
       <Animated.View style={{ transform: [{ scale: treeScale }] }}>
         <Animated.View style={[styles.fruitGlowRing, { opacity: fruitGlow }]} />
-        <StageStill stageIndex={stageIndex} size={260} />
+        <View style={{ width: 260, height: 260, borderRadius: 20, overflow: "hidden" }}>
+          <LivingTreeView stageIndex={stageIndex} mode="stage" compact background={colors.card} />
+        </View>
       </Animated.View>
 
       {particles.map((p, i) => (
@@ -320,7 +322,9 @@ function Phase3ForestReveal({ treeData, stageIndex, mentees, modules, countriesR
   return (
     <Animated.View style={[styles.phaseContainer, { opacity: fadeIn }]}>
       <View style={styles.forestWrap}>
-        <StageStill stageIndex={stageIndex} size={200} />
+        <View style={{ width: 200, height: 200, borderRadius: 18, overflow: "hidden" }}>
+          <LivingTreeView stageIndex={stageIndex} mode="stage" compact background={colors.card} />
+        </View>
         {mentees.length > 0 && (
           <View style={styles.menteeRing}>
             {mentees.slice(0, 6).map((m, i) => (

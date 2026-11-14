@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import LanguageFlag from "@/components/language/LanguageFlag";
 import {
   View,
   Text,
@@ -352,6 +353,7 @@ function Section1Form({
                 style={[styles.pill, selected && styles.pillSelected]}
                 onPress={() => set("primary_language", l.code)}
               >
+                <LanguageFlag language={l.code} size={14} style={{ marginRight: 4 }} />
                 <Text style={[styles.pillText, selected && styles.pillTextSelected]}>
                   {l.name}
                 </Text>
@@ -374,6 +376,7 @@ function Section1Form({
                   onPress={() => toggleOtherLang(l.code)}
                 >
                   {selected && <Ionicons name="checkmark" size={12} color={colors.cream} style={{ marginRight: 3 }} />}
+                  <LanguageFlag language={l.code} size={14} style={{ marginRight: 4 }} />
                   <Text style={[styles.pillText, selected && styles.pillTextSelected]}>
                     {l.name}
                   </Text>

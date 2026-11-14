@@ -1,7 +1,8 @@
 // The 26 botanical assets for the modular Growth Tree (owner brief 2026-11-12) — a VERSIONED MANIFEST.
 // An asset counts as integrated only after its file has been located, validated (format, size, textures,
 // orientation, scale, polygon count, rendering from every side) and given a hosted URL. Until then its
-// status says so, and the app keeps using the validated v1 models (lib/growthModels.ts).
+// status says so. The v1 models (Forests/models/v1/) were never hosted and are no longer referenced;
+// every Growth Tree view uses these v2 copies (components/growth/LivingTreeView).
 //
 // 2026-11-13: the owner's exports were found in iCloudDrive\Meshy AI\Meshy Models (25 of 26). Each was
 // validated (GLB 2.0, one fused mesh, one PBR material, 3 JPEG textures, upright, ~1.9 units tall,
@@ -16,7 +17,9 @@
 //   • Meshy splits its meshes at every texture seam; the two largest trees are WELDED before decimation
 //     (Blender: merge by distance, then collapse) — without that, heavy reduction tears the bark.
 // 2026-11-13 (owner approval): the 13 release-"v2" files + anchors + close-ups were uploaded to
-// Forests/models/v2/ and verified from their public URLs → status "integrated"; the rest stay "validated" (local).
+// Forests/models/v2/ and verified from their public URLs → status "integrated". Later the same day (owner
+// approval) the 17 lifecycle models followed (LIFECYCLE_UPLOAD below): 30 hosted in all. Only the two
+// special apples stay local ("validated", reserved), and Forest of Nations has no 3D file.
 // Owner decisions 2026-11-13: both by-eye matches CONFIRMED (the model, not its filename, decides; the
 // original filenames stay recorded); first upload = only the assets the tree uses now (release "v2");
 // leaves and buds re-made at 1024 px (leaves at 20k triangles so the veins survive); close-up copies
@@ -67,8 +70,19 @@ const f = (name: string, source: string, sha256: string, sourceBytes: number, so
   ({ name, source, version: V, bytes, sourceBytes, sha256, triangles, sourceTriangles, lods: ["standard"], views: ["full"] });
 /** A large tree with a close-up copy (made from the same original; same coordinates as the standard copy). */
 const withClose = (file: AssetFile, close: { name: string; bytes: number; triangles: number }): AssetFile => ({ ...file, lods: ["standard", "close"], close });
-const a = (id: string, group: TreeAsset["group"], attachment: AttachmentType, depicts: string, file?: AssetFile, extra: Partial<TreeAsset> = {}): TreeAsset =>
-  ({ id, group, attachment, depicts, status: file ? (extra.release === "v2" ? "integrated" : "validated") : "not_located", ...(file ? { file, identifiedBy: "filename" as const } : {}), ...extra });
+/** Second upload (owner approval 2026-11-13): the 17 lifecycle models — fruit development, leaves, blossom
+ *  and buds, root sets — uploaded to Forests/models/v2/ (nothing existing overwritten) and verified byte for
+ *  byte from their public URLs. Used by "How an apple tree grows" (lib/botanicalLifecycle.ts) only: they are
+ *  never put on a person's tree (the composition doesn't use them; the stage trees carry their own leaves and roots). */
+const LIFECYCLE_UPLOAD = new Set([
+  "asset-apple-stage-1-fruitlet", "asset-apple-stage-2-green", "asset-apple-stage-3-yellow-green", "asset-apple-stage-4-golden-yellow", "asset-04c-young-green-applelet",
+  "asset-micro-4-petal-fall-fruitlet", "asset-micro-8-june-drop-fruitlet", "asset-07-single-leaf-particle", "extra-leaf-cluster-small", "extra-leaf-cluster-dense",
+  "asset-micro-9-golden-autumn-leaf", "asset-apple-blossoms", "asset-micro-2-pink-bud-cluster", "asset-micro-6-dormant-winter-bud", "extra-roots-young", "extra-roots-established", "extra-roots-deep",
+]);
+const a = (id: string, group: TreeAsset["group"], attachment: AttachmentType, depicts: string, file?: AssetFile, extra: Partial<TreeAsset> = {}): TreeAsset => {
+  const release = extra.release ?? (file && LIFECYCLE_UPLOAD.has(id) ? "v2" as const : undefined);
+  return { id, group, attachment, depicts, status: file ? (release === "v2" ? "integrated" : "validated") : "not_located", ...(file ? { file, identifiedBy: "filename" as const } : {}), ...extra, ...(release ? { release } : {}) };
+};
 
 export const TREE_ASSET_MANIFEST_VERSION = 4;
 export const TREE_ASSETS: TreeAsset[] = [
@@ -143,7 +157,17 @@ export const EXTRA_ASSETS: TreeAsset[] = [
     f("extra-roots-deep.glb", "P2P - Deep Roots_.glb", "813757c15e69db27e19469dd19895b7c2a8a82de39a7822f7943115df3e0e965", 257912740, 7664126, 57848, 1145900)),
 ];
 
-export const assetById = (id: string) => TREE_ASSETS.find((x) => x.id === id) ?? EXTRA_ASSETS.find((x) => x.id === id);
+/** Two exports found after the first register (2026-11-13 audit): validated and optimised LOCALLY (originals
+ *  untouched; checked by eye against the original from three sides). Not integrated, never hosted — owner
+ *  approval needed before either is used anywhere. ("Stall" in the export name means the apple's stalk.) */
+export const SPECIAL_ASSETS: TreeAsset[] = [
+  a("special-half-apple-with-seeds", "extra", "fruit", "Apple cut in half: cream flesh, star-shaped core, dark seeds",
+    f("special-half-apple-seeds.glb", "P2P - Half Apple with Seeds_.glb", "666981bc2f4d0bdeee31c5be3bfe4d70b2003f9827971acc4e98aabd73e86cb2", 28293888, 264528, 7398, 446992)),
+  a("special-single-apple-on-stalk", "extra", "fruit", "Single ripe apple on its stalk with one leaf",
+    f("special-single-apple-stalk.glb", "P2P - Single Apple on Stall_.glb", "055ef17be6564f08784d9382b0e95421d38186e1d346baf739043ccbb3a00e76", 29688104, 141168, 5157, 410716)),
+];
+
+export const assetById = (id: string) => TREE_ASSETS.find((x) => x.id === id) ?? EXTRA_ASSETS.find((x) => x.id === id) ?? SPECIAL_ASSETS.find((x) => x.id === id);
 /** True only when every asset a plan needs is integrated (hosted) — until then the viewer keeps the v1 models. */
 export const modularTreeReady = (ids: string[]) => ids.every((id) => assetById(id)?.status === "integrated");
 
@@ -167,4 +191,80 @@ export function modularCloseUrl(id: string): string | null {
 export function anchorsUrl(bodyId: string): string | null {
   const file = usable(bodyId);
   return MODULAR_TREE_BASE_URL && file && assetById(bodyId)?.group === "body" ? MODULAR_TREE_BASE_URL + file.name.replace(/\.glb$/, ".anchors.json") : null;
+}
+
+// ── BOTANICAL ASSET SYSTEM (owner brief 2026-11-13) ────────────────────────────────────────────────────
+// One register for every Meshy model, used by every feature (the Growth Tree is one user of it). Each asset
+// has a botanical CATEGORY, an intended USE and an INTEGRATION state. A category is never a participant
+// stage: the six Growth Matrix stages are fixed (constants/stages.ts) and only the stage trees stand for them.
+export type BotanicalCategory =
+  | "stage_tree"          // the five participant stage models (Seed … Forest Builder)
+  | "collective"          // Forest of Nations (shared environment, never a person's stage)
+  | "contribution_fruit"  // one per verified contribution on a person's tree
+  | "fruit_development"   // fruitlet → green → yellow-green → golden (appearance only)
+  | "bud_blossom"         // buds, shoot tips, blossoms
+  | "leaf"
+  | "root"
+  | "structure"           // fruiting spur (where blossom and fruit attach)
+  | "special";            // special teaching close-ups (not integrated)
+/** live = hosted and used; local_review = optimised copy on this computer only; reserved = validated, owner
+ *  approval needed before any use; missing = no 3D file exists. */
+export type Integration = "live" | "local_review" | "reserved" | "missing";
+const BOTANY: Record<string, { category: BotanicalCategory; use: string; integration: Integration; wind?: boolean }> = {
+  "asset-00-germinating-seed": { category: "stage_tree", use: "Seed stage tree (Home, My Tree, stage cards)", integration: "live", wind: true },
+  "asset-02-sprout": { category: "stage_tree", use: "Sprout stage tree", integration: "live", wind: true },
+  "asset-03-young-apple-tree": { category: "stage_tree", use: "Young Tree stage tree", integration: "live", wind: true },
+  "asset-04-fruitful-apple-tree": { category: "stage_tree", use: "Fruitful Tree stage tree", integration: "live", wind: true },
+  "asset-05-forest-builder-apple-tree": { category: "stage_tree", use: "Forest Builder stage tree", integration: "live", wind: true },
+  "forest-of-nations-3d-landscape": { category: "collective", use: "Global Forest environment — no 3D model exists (2D image only)", integration: "missing" },
+  "asset-apple-stage-5-ripe-red": { category: "contribution_fruit", use: "Contribution fruit on the tree; ripe apple in the lifecycle", integration: "live" },
+  "asset-apple-stage-6-striped-red": { category: "contribution_fruit", use: "Contribution fruit (variety only — it carries no meaning)", integration: "live" },
+  "asset-04d-blushed-apple": { category: "contribution_fruit", use: "Contribution fruit; blushed apple in the lifecycle", integration: "live" },
+  "asset-micro-7-balloon-stage-bud": { category: "bud_blossom", use: "Contribution awaiting verification (closed bud); balloon bud in the lifecycle", integration: "live" },
+  "asset-micro-1-green-tip-bud": { category: "bud_blossom", use: "Recent verified contribution (new growth); green tip in the lifecycle", integration: "live" },
+  "asset-micro-3-unfurling-shoot-tip": { category: "bud_blossom", use: "Recent milestone (new shoot); shoot tip in the lifecycle", integration: "live" },
+  "asset-micro-5-active-root-tip": { category: "root", use: "Learning under way (active root tip) on the tree; root tip in the lifecycle", integration: "live" },
+  "asset-06-fruiting-spur-socket": { category: "structure", use: "Branch areas with verified evidence; fruiting spur in the lifecycle", integration: "live" },
+  "asset-micro-2-pink-bud-cluster": { category: "bud_blossom", use: "Apple lifecycle: tight pink buds before blossom", integration: "live", wind: true },
+  "asset-apple-blossoms": { category: "bud_blossom", use: "Apple lifecycle: blossom", integration: "live", wind: true },
+  "asset-micro-6-dormant-winter-bud": { category: "bud_blossom", use: "Apple lifecycle: dormant winter bud (a season — never inactivity)", integration: "live" },
+  "asset-micro-4-petal-fall-fruitlet": { category: "fruit_development", use: "Apple lifecycle: petal fall and young fruitlet", integration: "live" },
+  "asset-apple-stage-1-fruitlet": { category: "fruit_development", use: "Apple lifecycle: tiny green fruitlet", integration: "live" },
+  "asset-micro-8-june-drop-fruitlet": { category: "fruit_development", use: "Apple lifecycle: June drop (natural thinning — never removed fruit)", integration: "live" },
+  "asset-04c-young-green-applelet": { category: "fruit_development", use: "Apple lifecycle: young green applelet", integration: "live" },
+  "asset-apple-stage-2-green": { category: "fruit_development", use: "Apple lifecycle: grown green apple", integration: "live" },
+  "asset-apple-stage-3-yellow-green": { category: "fruit_development", use: "Apple lifecycle: turning yellow-green", integration: "live" },
+  "asset-apple-stage-4-golden-yellow": { category: "fruit_development", use: "Apple lifecycle: golden yellow", integration: "live" },
+  "asset-07-single-leaf-particle": { category: "leaf", use: "Apple lifecycle: one leaf, close up (the stage trees carry their own leaves)", integration: "live", wind: true },
+  "extra-leaf-cluster-small": { category: "leaf", use: "Apple lifecycle: leaves on a twig", integration: "live", wind: true },
+  "extra-leaf-cluster-dense": { category: "leaf", use: "Apple lifecycle: dense foliage", integration: "live", wind: true },
+  "asset-micro-9-golden-autumn-leaf": { category: "leaf", use: "Apple lifecycle: autumn leaf (a season — never decline)", integration: "live", wind: true },
+  "extra-roots-young": { category: "root", use: "Root development: young roots (the stage trees carry their own roots)", integration: "live" },
+  "extra-roots-established": { category: "root", use: "Root development: established roots", integration: "live" },
+  "extra-roots-deep": { category: "root", use: "Root development: deep roots", integration: "live" },
+  "special-half-apple-with-seeds": { category: "special", use: "Reserved: seed-in-the-fruit teaching close-up (not integrated)", integration: "reserved" },
+  "special-single-apple-on-stalk": { category: "special", use: "Reserved: single-fruit close-up (not integrated)", integration: "reserved" },
+};
+export interface BotanicalAsset extends TreeAsset { category: BotanicalCategory; use: string; integration: Integration; wind: boolean }
+/** Every Meshy model P2P has, one entry per unique model, with its category, use and integration. */
+export const BOTANICAL_REGISTRY: BotanicalAsset[] = [...TREE_ASSETS, ...EXTRA_ASSETS, ...SPECIAL_ASSETS].map((x) => ({ ...x, ...BOTANY[x.id], wind: !!BOTANY[x.id]?.wind }));
+export const botanicalAsset = (id: string) => BOTANICAL_REGISTRY.find((x) => x.id === id);
+
+/** LOCAL REVIEW ONLY: the optimised copies served from this computer (EXPO_PUBLIC_BOTANICAL_LOCAL_BASE_URL),
+ *  so prepared-but-unhosted assets can be reviewed before any upload. Never set for a release build: there,
+ *  only hosted assets resolve and everything else is honestly "not available yet". Reserved assets never resolve. */
+export const BOTANICAL_LOCAL_BASE_URL: string | null = process.env.EXPO_PUBLIC_BOTANICAL_LOCAL_BASE_URL
+  ? process.env.EXPO_PUBLIC_BOTANICAL_LOCAL_BASE_URL.replace(/\/?$/, "/") : null;
+export type Availability = "hosted" | "local_review" | "unavailable";
+export function botanicalAvailability(id: string): Availability {
+  const x = botanicalAsset(id);
+  if (!x?.file || x.integration === "reserved" || x.integration === "missing") return "unavailable";
+  if (x.release === "v2" && MODULAR_TREE_BASE_URL) return "hosted";
+  return BOTANICAL_LOCAL_BASE_URL && x.integration === "local_review" ? "local_review" : "unavailable";
+}
+/** Where to load an asset from: its hosted v2 copy, a local review copy, or null (never a guess). */
+export function botanicalAssetUrl(id: string): string | null {
+  const x = botanicalAsset(id), av = botanicalAvailability(id);
+  if (!x?.file || av === "unavailable") return null;
+  return av === "hosted" ? modularFileUrl(id) : BOTANICAL_LOCAL_BASE_URL + x.file.name;
 }

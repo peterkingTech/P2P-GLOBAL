@@ -1,12 +1,16 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Modal, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Modal, Alert, TextInput } from "react-native";
+import { useTranslation } from "react-i18next";
+import LanguageFlag from "@/components/language/LanguageFlag";
+import LanguageOption from "@/components/language/LanguageOption";
+import { languageMatches } from "@/lib/languageRegistry";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
-import { SUPPORTED_LANGUAGES, BIBLE_STUDY_LANGUAGES, LANGUAGE_DISPLAY } from "@/lib/i18n";
+import { SUPPORTED_LANGUAGES, LANGUAGE_DISPLAY } from "@/lib/i18n";
 
 import { useSheetWidth } from "@/hooks/useLayout";
 import { showAlert } from "@/lib/alerts";
@@ -26,18 +30,13 @@ const LANGUAGES = SUPPORTED_LANGUAGES
   .map((code) => ({ code, label: LANGUAGE_DISPLAY[code].native }))
   .sort((a, b) => LANGUAGE_DISPLAY[a.code].label.localeCompare(LANGUAGE_DISPLAY[b.code].label));
 
-// Stage 3 — Content (Bible Study) Language is a genuinely different list
-// from App Language: it must never offer a language with no confirmed
-// Bible source, regardless of whether that language's UI menus happen to
-// be translated (zh/zh-TW are the concrete example — full UI translation,
-// zero confirmed Bible translation). Previously this screen reused
-// `LANGUAGES` for both pickers, which both over- and under-served users:
-// it could offer zh/zh-TW for Bible study (no real Scripture behind it)
-// while never offering some content languages that don't need UI
-// translation to be a valid Bible Study Language choice.
-const BIBLE_LANGUAGES = BIBLE_STUDY_LANGUAGES
-  .map((code) => ({ code, label: LANGUAGE_DISPLAY[code].native }))
-  .sort((a, b) => LANGUAGE_DISPLAY[a.code].label.localeCompare(LANGUAGE_DISPLAY[b.code].label));
+// Content Language offers the SAME languages as App Language (owner decision 2026-11-14). It governs every
+// kind of content except the Bible — lessons, plans, Kingdom Stories, Listen signposts — and each falls back
+// to English where no translation exists yet. The Bible has its own language and version choice (Bible ›
+// Languages / Versions) and never depends on this setting. (Before: only languages with a confirmed Bible
+// translation, enforced by migration 155's trigger; migration 246 removes that trigger. Until 246 is
+// applied, the database refuses such a language and this screen shows the error.)
+const CONTENT_LANGUAGES = LANGUAGES;
 
 const DATE_FORMATS: { value: "DD.MM.YYYY" | "MM/DD/YYYY"; label: string; example: string }[] = [
   { value: "DD.MM.YYYY", label: "DD.MM.YYYY", example: "e.g. 25.12.1998" },
@@ -52,6 +51,9 @@ export default function LanguageSettingsScreen() {
   const styles = makeStyles(colors);
 
   const [langPickerOpen, setLangPickerOpen] = useState<"app" | "content" | null>(null);
+  const [query, setQuery] = useState("");
+  const { t } = useTranslation();
+  const pickerList = (langPickerOpen === "app" ? LANGUAGES : CONTENT_LANGUAGES).filter((l) => languageMatches(l.code, query));
 
   // Pre-integration audit finding: this used to close the picker before
   // the write even started and discarded updateProfile()'s result — once
@@ -68,6 +70,7 @@ export default function LanguageSettingsScreen() {
       return;
     }
     setLangPickerOpen(null);
+    setQuery("");
   }
 
   async function setDateFormat(value: "DD.MM.YYYY" | "MM/DD/YYYY") {
@@ -85,6 +88,7 @@ export default function LanguageSettingsScreen() {
               <Text style={styles.rowSub}>Changes the language of the app's interface</Text>
             </View>
             <View style={styles.linkRowRight}>
+              <LanguageFlag language={profile?.appLanguage ?? "en"} size={15} />
               <Text style={styles.linkRowValue}>{LANGUAGES.find((l) => l.code === profile?.appLanguage)?.label ?? "English"}</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
             </View>
@@ -95,7 +99,8 @@ export default function LanguageSettingsScreen() {
               <Text style={styles.rowSub}>Changes the language curriculum is delivered in</Text>
             </View>
             <View style={styles.linkRowRight}>
-              <Text style={styles.linkRowValue}>{BIBLE_LANGUAGES.find((l) => l.code === profile?.contentLanguage)?.label ?? "English"}</Text>
+              <LanguageFlag language={profile?.contentLanguage ?? "en"} size={15} />
+              <Text style={styles.linkRowValue}>{CONTENT_LANGUAGES.find((l) => l.code === profile?.contentLanguage)?.label ?? "English"}</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
             </View>
           </TouchableOpacity>
@@ -122,12 +127,12 @@ export default function LanguageSettingsScreen() {
         </View>
       </ScrollView>
 
-      <Modal visible={!!langPickerOpen} animationType="slide" transparent onRequestClose={() => setLangPickerOpen(null)}>
+      <Modal visible={!!langPickerOpen} animationType="slide" transparent onRequestClose={() => { setLangPickerOpen(null); setQuery(""); }}>
         <View style={styles.overlay}>
           <View style={[styles.sheet, sheetWidth, { paddingBottom: insets.bottom + 24 }]}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>{langPickerOpen === "app" ? "App Language" : "Content Language"}</Text>
-              <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => setLangPickerOpen(null)} style={styles.closeBtn}>
+              <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => { setLangPickerOpen(null); setQuery(""); }} style={styles.closeBtn}>
                 <Ionicons name="close" size={20} color={colors.textMid} />
               </TouchableOpacity>
             </View>
@@ -136,15 +141,17 @@ export default function LanguageSettingsScreen() {
                 reached with so few rows, so this was never wrapped in a
                 scroll container. Without it, anything past the visible
                 area would be unreachable with no indication more exists. */}
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {(langPickerOpen === "app" ? LANGUAGES : BIBLE_LANGUAGES).map((l) => (
-                <TouchableOpacity accessibilityRole="button" key={l.code} style={styles.optionRow} onPress={() => setLanguage(langPickerOpen!, l.code)}>
-                  <Text style={styles.optionLabel}>{l.label}</Text>
-                  {(langPickerOpen === "app" ? profile?.appLanguage : profile?.contentLanguage) === l.code && (
-                    <Ionicons name="checkmark" size={18} color={colors.accentGreen} />
-                  )}
-                </TouchableOpacity>
+            {/* Search by native name, English name, code or another name (lib/languageRegistry.ts). */}
+            <TextInput value={query} onChangeText={setQuery} placeholder={t("languages.search", { defaultValue: "Search languages" })} placeholderTextColor={colors.textMuted}
+              style={styles.search} accessibilityLabel={t("languages.search", { defaultValue: "Search languages" })} autoCorrect={false} autoCapitalize="none" returnKeyType="search" />
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {pickerList.map((l) => (
+                <LanguageOption key={l.code} language={l.code} name={l.label} style={styles.optionRow}
+                  selected={(langPickerOpen === "app" ? profile?.appLanguage : profile?.contentLanguage) === l.code}
+                  onPress={() => setLanguage(langPickerOpen!, l.code)}
+                  colors={{ text: colors.textDark, muted: colors.textMuted, accent: colors.accentGreen }} />
               ))}
+              {!pickerList.length ? <Text style={styles.noMatch}>{t("languages.noMatch", { defaultValue: "No language matches your search." })}</Text> : null}
             </ScrollView>
           </View>
         </View>
@@ -182,5 +189,7 @@ function makeStyles(c: AppColors) {
       paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: c.borderBeige,
     },
     optionLabel: { fontSize: 15, color: c.textDark, fontFamily: "Inter_500Medium" },
+    search: { minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: c.borderBeige, backgroundColor: c.card, paddingHorizontal: 12, fontSize: 15, color: c.textDark, fontFamily: "Inter_400Regular", marginBottom: 8 },
+    noMatch: { fontSize: 14, color: c.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", paddingVertical: 20 },
   });
 }

@@ -66,24 +66,28 @@ const A1 = load("lib/growthTreeAssets.ts", { EXPO_PUBLIC_GROWTH_MODEL_V2_BASE_UR
 ok("v2 configured → validated files resolve under that base", A1.modularFileUrl("asset-04-fruitful-apple-tree") === "http://127.0.0.1:8797/body-04-fruitful-tree.glb" && A1.anchorsUrl("asset-04-fruitful-apple-tree") === "http://127.0.0.1:8797/body-04-fruitful-tree.anchors.json");
 ok("a missing asset never gets a URL (Forest of Nations: only a 2D image exists)", A1.modularFileUrl("forest-of-nations-3d-landscape") === null && A1.anchorsUrl("asset-apple-stage-5-ripe-red") === null);
 ok("bodies that carry their own leaves get no leaf clusters on top", P.placeTree(plan, anchors, { bodyHasFoliage: true }).filter((p) => p.id.startsWith("leaf:")).length === 0 && placed.some((p) => p.id.startsWith("leaf:")));
-ok("ModularTreeView respects the body's own foliage", src("components/growth/ModularTreeView.tsx").includes("bodyHasFoliage: !!assetById(plan.body)?.hasFoliage"));
-// Owner 2026-11-13: the first hosted upload holds ONLY what the tree uses now; nothing else is ever requested.
+ok("LivingTreeView respects the body's own foliage", src("components/growth/LivingTreeView.tsx").includes("bodyHasFoliage: !!assetById(plan.body)?.hasFoliage"));
+// Owner 2026-11-13: the first upload held the 13 the tree uses; the second (same day) the 17 lifecycle models.
 const used = [...Object.values(C.STAGE_BODIES), "asset-06-fruiting-spur-socket", "asset-apple-stage-5-ripe-red", "asset-apple-stage-6-striped-red", "asset-04d-blushed-apple",
   "asset-micro-7-balloon-stage-bud", "asset-micro-1-green-tip-bud", "asset-micro-3-unfurling-shoot-tip", "asset-micro-5-active-root-tip"];
-ok("release v2 = exactly the 13 assets the tree uses", JSON.stringify(A1.TREE_ASSETS.filter((x) => x.release === "v2").map((x) => x.id).sort()) === JSON.stringify([...used].sort()));
-ok("assets kept for later are never requested (no URL)", ["asset-apple-stage-1-fruitlet", "asset-apple-blossoms", "asset-07-single-leaf-particle", "asset-micro-9-golden-autumn-leaf", "extra-leaf-cluster-small", "extra-roots-deep"].every((id) => A1.modularFileUrl(id) === null));
+const hosted = [...A1.TREE_ASSETS, ...A1.EXTRA_ASSETS].filter((x) => x.release === "v2").map((x) => x.id);
+ok("hosted v2 = the 13 the tree uses + the 17 lifecycle models (30); nothing else", hosted.length === 30 && used.every((id) => hosted.includes(id)) && A1.TREE_ASSETS.filter((x) => !x.release && x.file).length === 0);
+ok("the tree itself only ever draws its 13 (lifecycle models never go on a person's tree)", [1, 2, 3, 4, 5].every((st) => C.composeTree(tree([fruit("a", "2026-11-10"), fruit("b", "2026-10-01"), fruit("p", "2026-11-11", { status: "pending_review", countsTowardMilestone: false })],
+    { stage: { stage: st, name: "x" }, history: [{ stage: st, name: "x", achievedAt: "2026-11-08T00:00:00Z", kind: "verified" }] }), "2026-11-12").attachments.every((x) => used.includes(x.asset)))
+  && P.placeTree(plan, anchors, { bodyHasFoliage: true }).every((p) => used.includes(p.asset)));
+ok("assets held back are never requested (no URL): the two special apples", ["special-half-apple-with-seeds", "special-single-apple-on-stalk"].every((id) => A1.modularFileUrl(id) === null));
 ok("owner-confirmed visual matches keep their original filenames", A1.assetById("asset-micro-7-balloon-stage-bud").confirmedByOwner && A1.assetById("asset-micro-7-balloon-stage-bud").file.source === "P2P - Tight Pink Bud Cluster (Early Spring)_.glb"
   && A1.assetById("asset-micro-9-golden-autumn-leaf").confirmedByOwner && A1.assetById("asset-micro-9-golden-autumn-leaf").file.source === "P2P - Petal to  Fruitlet Transition_.glb");
 ok("close-up URL only where a close-up copy exists (else null → zoom limited, never faked)", A1.TREE_ASSETS.every((x) => (A1.modularCloseUrl(x.id) !== null) === !!(x.release && x.file?.close && x.file.lods.includes("close"))));
-ok("ModularTreeView: close-up copy when there is one, otherwise noCloseUp", src("components/growth/ModularTreeView.tsx").includes("detailedUrl={closeUrl} noCloseUp={!closeUrl}"));
+ok("LivingTreeView: close-up copy when there is one, otherwise noCloseUp", src("components/growth/LivingTreeView.tsx").includes("detailedUrl={closeUrl} noCloseUp={!closeUrl}"));
 ok("every asset the placement can use is resolvable or honestly missing", [...new Set(placed.map((p) => p.asset))].every((a) => A1.modularFileUrl(a) !== undefined));
 
 // ── Viewer + wiring ──
 const html = load("lib/treeViewerHtml.ts").treeViewerHtml({ standardUrl: "b.glb", detailedUrl: null, background: "#fff", reduceMotion: true, parts: { urls: { x: "x.glb" }, instances: { x: [[0, 1, 0, 0, 1, 0, 0.1, 0, 1]] }, ids: { x: ["fruit:e1"] } } });
 ok("viewer: parts drawn as instanced meshes, tap reports the record id, cleanup on pagehide", html.includes("new THREE.InstancedMesh(") && html.includes('type: "select"') && html.includes('addEventListener("pagehide"') && html.includes("__p2pStats"));
 ok("viewer: the parts config is embedded safely (no raw '<')", !/"urls":\{"x":"x.glb"\}[^]*<\/script>[^]*"ids"/.test(html.split("const CFG = ")[1].split(";\n")[0]) && !html.split("const CFG = ")[1].split(";\n")[0].includes("<"));
-ok("both viewer wrappers pass parts and selection through", ["components/growth/TreeModelViewer.web.tsx", "components/growth/TreeModelViewer.native.tsx"].every((f) => src(f).includes("parts }), [") && src(f).includes('"select"')));
-ok("Living Tree uses the modular tree with the v1 model as its fallback", /<ModularTreeView[\s\S]*fallback=\{/.test(src("app/living-tree.tsx")));
+ok("both viewer wrappers pass parts and selection through", ["components/growth/TreeModelViewer.web.tsx", "components/growth/TreeModelViewer.native.tsx"].every((f) => src(f).includes("noCloseUp, parts, wind, windFrame, compact }),") && src(f).includes('"select"')));
+ok("Living Tree uses the shared living tree (no v1 fallback, no picture)", src("app/living-tree.tsx").includes("<LivingTreeView") && !src("app/living-tree.tsx").includes("fallback="));
 
 console.log(`growthTreePlacement (app): ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

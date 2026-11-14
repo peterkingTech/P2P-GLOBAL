@@ -9,7 +9,6 @@ import {
   Platform,
   Modal,
   ActivityIndicator,
-  Image,
 } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -29,7 +28,8 @@ import { Avatar } from "@/components/Avatar";
 import { GrainExplanationSheet } from "@/components/GrainExplanationSheet";
 import SkillsMultiSelect from "@/components/SkillsMultiSelect";
 import { skillLabel } from "@/constants/skillsTaxonomy";
-import { STAGES, STAGE_IMAGES } from "@/constants/stages";
+import { STAGES } from "@/constants/stages";
+import LivingTreeView from "@/components/growth/LivingTreeView";
 import { useGrowthStage } from "@/hooks/useGrowthStage";
 import "@/lib/i18n";
 import { publicLocationLabel, calledToValue } from "@/lib/publicIdentity";
@@ -103,7 +103,7 @@ function makeStyles(c: AppColors) {
       alignItems: "center", backgroundColor: c.card, borderRadius: 14,
       borderWidth: 1, borderColor: c.borderBeige, paddingVertical: 14, marginBottom: 16,
     },
-    treeMiniImage: { width: "100%", height: 200 },
+    treeMiniImage: { width: "100%", height: 240, borderRadius: 14, overflow: "hidden" },
     treeMiniLabel: { fontSize: 15, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", marginTop: 6 },
     completionBadgeCard: {
       backgroundColor: "rgba(224,164,65,0.1)", borderRadius: 14, borderWidth: 1, borderColor: "rgba(224,164,65,0.3)",
@@ -421,13 +421,15 @@ function ProfileScreen() {
           displayName={profile?.displayName || "This person"}
         />
 
-        {/* Growth stage — a still of the stage's 3D model; the picture and the label are
-            the same growth milestone. Opens the Living Tree (live 3D). */}
-        <TouchableOpacity style={styles.treeMiniCard} onPress={() => router.push("/living-tree" as any)} activeOpacity={0.88}
-          accessibilityRole="button" accessibilityLabel={`${STAGES[growthStage].name}. Open the Living Tree`}>
-          <Image source={STAGE_IMAGES[growthStage]} style={styles.treeMiniImage} resizeMode="contain" accessibilityIgnoresInvertColors />
-          <Text style={styles.treeMiniLabel}>{STAGES[growthStage].emoji} {STAGES[growthStage].name}</Text>
-        </TouchableOpacity>
+        {/* Growth stage — the person's living tree (the real Meshy model of their verified stage, the
+            same renderer as Home); the tree and the label are the same milestone. Opens the Living Tree. */}
+        <View style={styles.treeMiniCard}>
+          <LivingTreeView stageIndex={growthStage} mode="tree" compact background={colors.card} style={styles.treeMiniImage}
+            onPress={() => router.push("/living-tree" as any)} accessibilityHint="Opens the Living Tree" />
+          <TouchableOpacity onPress={() => router.push("/living-tree" as any)} accessibilityRole="button" accessibilityLabel={`${STAGES[growthStage].name}. Open the Living Tree`}>
+            <Text style={styles.treeMiniLabel}>{STAGES[growthStage].name}</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Completion badge */}
         {profile?.curriculumCompletedAt && (

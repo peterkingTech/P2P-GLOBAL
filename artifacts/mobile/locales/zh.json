@@ -562,5 +562,9 @@
     "errorTitle": "无法加载结果",
     "errorBody": "请检查网络连接后重试。",
     "retry": "重试"
+  },
+  "languages": {
+    "search": "搜索语言",
+    "noMatch": "没有与搜索匹配的语言。"
   }
 }

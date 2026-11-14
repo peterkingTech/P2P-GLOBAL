@@ -40,8 +40,10 @@ export function Chip({ label, onPress, icon, disabled, accessibilityLabel, style
   );
 }
 
-export function FilterChip({ label, selected, onPress, selection = "multiple", disabled, icon, accessibilityLabel, style }: {
+export function FilterChip({ label, selected, onPress, selection = "multiple", disabled, icon, leading, accessibilityLabel, style }: {
   label: string; selected: boolean; onPress: () => void; selection?: "single" | "multiple"; disabled?: boolean; icon?: IconName; accessibilityLabel?: string; style?: StyleProp<ViewStyle>;
+  /** Shown before the label (e.g. a language's flag, components/language/LanguageFlag); decorative. */
+  leading?: React.ReactNode;
 }) {
   const t = useButtonTokens();
   const c = t.chip;
@@ -52,6 +54,7 @@ export function FilterChip({ label, selected, onPress, selection = "multiple", d
       accessibilityState={{ checked: selected, selected, disabled: !!disabled }} aria-checked={selected} aria-selected={selected}
       style={chipStyle(selected ? c.selectedBg : c.bg, selected ? c.selectedBg : c.border, selected ? c.selectedBg : c.pressedBg, t.focus, disabled, style)}>
       {selected ? <Ionicons name="checkmark" size={15} color={fg} /> : icon ? <Ionicons name={icon} size={15} color={fg} /> : null}
+      {leading}
       <Text style={{ color: fg, fontSize: 13, fontFamily: LABEL_FONT }} numberOfLines={1}>{label}</Text>
     </Pressable>
   );

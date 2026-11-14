@@ -7,6 +7,7 @@ import { getLanguageName } from "@/lib/languageNames";
 import type { BibleTranslation } from "@/lib/bibleReaderApi";
 import { MAX_TRANSLATIONS } from "@/lib/bibleCompare";
 import { IconButton, AppButton } from "@/components/ui";
+import LanguageFlag from "@/components/language/LanguageFlag";
 
 // Choose up to three more licensed translations to read beside the current
 // one. Only translations the server lists can be chosen.
@@ -50,7 +51,7 @@ export default function CompareSheet({ visible, onClose, translations, primary, 
                   <View style={styles.abbr}><Text style={styles.abbrText}>{t.code}</Text></View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.name} numberOfLines={1}>{t.name}</Text>
-                    <Text style={styles.lang}>{langName(t.language)}</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}><LanguageFlag language={t.language} size={12} /><Text style={styles.lang}>{langName(t.language)}</Text></View>
                   </View>
                 </TouchableOpacity>
               );

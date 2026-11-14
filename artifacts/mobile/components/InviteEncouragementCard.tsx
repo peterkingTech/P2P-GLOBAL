@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from "react-native";
-import { STAGE_IMAGES } from "@/constants/stages";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
@@ -81,8 +80,7 @@ export function InviteEncouragementCard({ modulesCompleted }: { modulesCompleted
   return (
     <View style={styles.card} accessibilityRole="summary">
       <View style={styles.headerRow}>
-        {/* The Sprout growth-stage still (from its 3D model). */}
-        <Image source={STAGE_IMAGES[1]} style={styles.image} resizeMode="contain" accessibilityIgnoresInvertColors />
+        <View style={styles.image}><Ionicons name="person-add-outline" size={30} color={colors.primaryGreen} /></View>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>{message.title} 🌱</Text>
           <Text style={styles.body}>{message.body}</Text>
@@ -122,7 +120,7 @@ function makeStyles(c: AppColors) {
       padding: 16, marginBottom: 16,
     },
     headerRow: { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 14 },
-    image: { width: 72, height: 72, borderRadius: 14 },
+    image: { width: 56, height: 56, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(29,158,117,0.10)" },
     title: { fontSize: 16, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", marginBottom: 4 },
     body: { fontSize: 14, color: c.textDark, opacity: 0.85, lineHeight: 20, fontFamily: "Inter_400Regular" },
     actions: { flexDirection: "row", gap: 10 },

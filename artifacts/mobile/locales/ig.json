@@ -539,5 +539,9 @@
     "manageTranslations": "Jikwaa Nsụgharị",
     "translationJobs": "Ọrụ Nsụgharị",
     "contentManagement": "Njikwa Ọdịnaya"
+  },
+  "languages": {
+    "search": "Chọọ asụsụ",
+    "noMatch": "Enweghị asụsụ dabara na ọchụchọ gị."
   }
 }

@@ -539,5 +539,9 @@
     "manageTranslations": "అనువాదాలను నిర్వహించండి",
     "translationJobs": "అనువాద పనులు",
     "contentManagement": "విషయ నిర్వహణ"
+  },
+  "languages": {
+    "search": "భాషలను వెతకండి",
+    "noMatch": "మీ శోధనకు సరిపోయే భాష లేదు."
   }
 }

@@ -562,5 +562,9 @@
     "errorTitle": "Nie udało się wczytać wyników",
     "errorBody": "Sprawdź połączenie i spróbuj ponownie.",
     "retry": "Spróbuj ponownie"
+  },
+  "languages": {
+    "search": "Szukaj języków",
+    "noMatch": "Żaden język nie pasuje do wyszukiwania."
   }
 }

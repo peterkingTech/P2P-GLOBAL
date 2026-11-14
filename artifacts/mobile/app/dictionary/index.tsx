@@ -8,6 +8,8 @@ import type { AppColors } from "@/constants/themes";
 import { ChipRow, FilterChip, IconButton } from "@/components/ui";
 import { Attribution, OriginalText, StudyState } from "@/components/study/StudyUI";
 import { dictLanguageLabel } from "@/lib/dictionaryLabels";
+import LanguageFlag from "@/components/language/LanguageFlag";
+import { languageFlag } from "@/lib/languageRegistry";
 import {
   dictionaryArticles, dictionaryBrowse, dictionaryOverview, dictionarySearch,
   type DictArticleSummary, type DictLanguage, type DictOverview, type DictSearchItem, type DictTermSummary,
@@ -121,7 +123,7 @@ export default function DictionaryScreen() {
       ) : null}
       {searching || !browsingArticles ? <ChipRow accessibilityLabel={t("deepStudy.language", { defaultValue: "Language" })} single>
         {([[null, t("deepStudy.all", { defaultValue: "All" })], ...(["hebrew", "aramaic", "greek"] as const).map((k) => [k, dictLanguageLabel(t, k)] as const)] as const).map(([k, l]) => (
-          <FilterChip key={String(k)} label={String(l)} selected={language === k} selection="single" onPress={() => setLanguage(k as DictLanguage | null)} />
+          <FilterChip key={String(k)} label={String(l)} leading={k && languageFlag(k) ? <LanguageFlag language={k} size={14} /> : undefined} selected={language === k} selection="single" onPress={() => setLanguage(k as DictLanguage | null)} />
         ))}
       </ChipRow> : null}
       {!searching ? (

@@ -14,6 +14,7 @@ import { withAlpha } from "@/lib/colorUtils";
 import { ARTWORK_FILL } from "@/constants/artwork";
 import { LARGE_TABLET_BREAKPOINT, TABLET_BREAKPOINT } from "@/hooks/useLayout";
 import ReadAlongText from "./ReadAlongText";
+import LanguageFlag from "@/components/language/LanguageFlag";
 import PlaylistControls from "./PlaylistControls";
 import { listenTime, playbackTiming, progressLine } from "@/lib/listen/timing";
 
@@ -284,7 +285,10 @@ function ListenScreen({ st, c, s, dark }: { st: ListenState; c: AppColors; s: St
       <View key={v.identifier} style={[s.voiceRow, selected && s.voiceRowOn]}>
         <Pressable style={{ flex: 1, minHeight: 44, justifyContent: "center" }} onPress={() => listen.setVoice(v.identifier)} accessibilityRole="radio" accessibilityState={{ checked: selected }}
           accessibilityLabel={`${v.name}${tier ? `, ${tier}` : ""}${showLang ? `, ${v.language}` : ""}`}>
-          <Text style={s.voiceName}>{v.name}{showLang ? ` (${v.language})` : ""}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            {showLang ? <LanguageFlag language={v.language} size={14} /> : null}
+            <Text style={s.voiceName}>{v.name}{showLang ? ` (${v.language})` : ""}</Text>
+          </View>
           {!!tier && <Text style={s.voiceTier}>{tier}</Text>}
         </Pressable>
         <IconButton icon={st.previewing === v.identifier ? "volume-high" : "play-circle-outline"} size="sm" accessibilityLabel={`Preview ${v.name}`} onPress={() => listen.previewVoice(v.identifier)} />
@@ -300,7 +304,10 @@ function ListenScreen({ st, c, s, dark }: { st: ListenState; c: AppColors; s: St
       <SegmentedControl accessibilityLabel="Speaking speed" value={String(st.rate)} onChange={(v) => listen.setRate(Number(v))}
         options={RATES.map((r) => ({ value: String(r), label: `${r}×` }))} />
 
-      <Text style={[s.label, { marginTop: 6 }]}>Voice · {langName(content.language)}</Text>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 }}>
+        <LanguageFlag language={content.language} size={14} />
+        <Text style={s.label}>Voice · {langName(content.language)}</Text>
+      </View>
       {st.voices.length > 0 ? (
         <View accessibilityRole="radiogroup" accessibilityLabel="Voices">{st.voices.slice(0, 12).map((v) => voiceRow(v, false))}</View>
       ) : st.allVoices.length === 0 ? (

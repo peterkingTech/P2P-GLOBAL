@@ -539,5 +539,9 @@
     "manageTranslations": "Ṣàkóso Àwọn Ìtumọ̀",
     "translationJobs": "Àwọn Iṣẹ́ Ìtumọ̀",
     "contentManagement": "Ìṣàkóso Àkóónú"
+  },
+  "languages": {
+    "search": "Wá àwọn èdè",
+    "noMatch": "Kò sí èdè tó bá ìwádìí rẹ mu."
   }
 }

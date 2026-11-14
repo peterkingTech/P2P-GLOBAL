@@ -76,7 +76,7 @@ export default function ForestScreen() {
   const openPerson = (p: ForestPerson) => {
     if (p.username) { router.push(`/profile/${p.username}` as any); return; }
     const st = stageOf(p.growthLevel);
-    showAlert(p.displayName || "A disciple", `${getFlagEmoji(p.country)} ${p.country ?? "Location not shared"}\n${st.emoji} ${st.name}`);
+    showAlert(p.displayName || "A disciple", `${getFlagEmoji(p.country)} ${p.country ?? "Location not shared"}\n${st.name}`);
   };
 
   return (
@@ -131,7 +131,7 @@ function MyForest({ data, reveal, onPerson, onLineage, onRelationships }: {
     <>
       <Animated.View style={[s.hero, { opacity: reveal, transform: [{ scale }] }]}>
         <View style={s.heroTop}>
-          <View style={s.heroBadge}><Text style={s.heroEmoji}>{me.emoji}</Text></View>
+          <View style={s.heroBadge} accessible accessibilityLabel={`Stage ${STAGES.indexOf(me) + 1}: ${me.name}`}><Text style={s.heroStage}>{STAGES.indexOf(me) + 1}</Text></View>
           <View style={{ flex: 1 }}>
             <Text style={s.heroKicker}>YOUR FOREST</Text>
             <Text style={s.heroTitle}>{data.stats.totalInLineage ? `${data.stats.totalInLineage} ${data.stats.totalInLineage === 1 ? "person" : "people"} growing from your walk` : "Your forest begins with you"}</Text>
@@ -162,7 +162,7 @@ function MyForest({ data, reveal, onPerson, onLineage, onRelationships }: {
         <Avatar photoUrl={data.self.photoUrl} name={data.self.displayName} size={48} />
         <View style={{ flex: 1 }}>
           <Text style={s.youName}>You</Text>
-          <Text style={s.meta}>{me.emoji} {me.name}{data.self.country ? ` · ${getFlagEmoji(data.self.country)} ${data.self.country}` : ""}</Text>
+          <Text style={s.meta}>{me.name}{data.self.country ? ` · ${getFlagEmoji(data.self.country)} ${data.self.country}` : ""}</Text>
         </View>
         <Ionicons name="location" size={18} color={colors.accentGreen} />
       </View>
@@ -208,7 +208,7 @@ function PathRow({ person, label, onPress }: { person: ForestPerson; label: stri
       <Avatar photoUrl={person.photoUrl} name={person.displayName} size={36} />
       <View style={{ flex: 1 }}>
         <View style={s.nameRow}><Text style={s.name} numberOfLines={1}>{person.displayName}</Text><VerificationBadge isVerified={person.isVerified} size="small" /></View>
-        <Text style={s.meta} numberOfLines={1}>{label} · {st.emoji} {st.name}{person.country ? ` · ${getFlagEmoji(person.country)}` : ""}</Text>
+        <Text style={s.meta} numberOfLines={1}>{label} · {st.name}{person.country ? ` · ${getFlagEmoji(person.country)}` : ""}</Text>
       </View>
       <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
     </TouchableOpacity>
@@ -226,7 +226,7 @@ function PersonChip({ person, onPress }: { person: ForestPerson; onPress: () => 
         {active ? <View style={s.activeDot} /> : null}
       </View>
       <Text style={s.chipName} numberOfLines={1}>{firstName(person.displayName)}</Text>
-      <Text style={s.chipStage} numberOfLines={1}>{st.emoji} {st.name}</Text>
+      <Text style={s.chipStage} numberOfLines={1}>{st.name}</Text>
       {person.country ? <Text style={s.chipFlag}>{getFlagEmoji(person.country)}</Text> : null}
     </TouchableOpacity>
   );
@@ -278,7 +278,6 @@ function GlobalForest({ collective, failed, mine }: { collective: Collective | n
               <Text style={s.meta}>Totals only. Groups smaller than {collective.minimumGroup ?? 5} are not shown, so no one can be identified.</Text>
               {collective.stages.map((st) => (
                 <View key={st.stage} style={s.barRow} accessible accessibilityLabel={`${st.name}: ${st.people == null ? (st.fewerThan ? few(st.fewerThan) : "none") : st.people} people`}>
-                  <Text style={s.barEmoji}>{STAGES[st.stage - 1]?.emoji}</Text>
                   <Text style={s.barLabel} numberOfLines={1}>{st.name}</Text>
                   <View style={s.barTrack}><View style={[s.barFill, { flex: (st.people ?? 0) / total }]} /><View style={{ flex: 1 - (st.people ?? 0) / total }} /></View>
                   <Text style={s.barN}>{st.people ?? (st.fewerThan ? `<${st.fewerThan}` : 0)}</Text>
@@ -349,7 +348,7 @@ const s = StyleSheet.create({
   hero: { padding: 16, borderRadius: 20, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, gap: 14 },
   heroTop: { flexDirection: "row", alignItems: "center", gap: 12 },
   heroBadge: { width: 56, height: 56, borderRadius: 18, backgroundColor: "rgba(29,158,117,0.10)", alignItems: "center", justifyContent: "center" },
-  heroEmoji: { fontSize: 30 },
+  heroStage: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#1D9E75" },
   heroKicker: { fontSize: 10, letterSpacing: 1.5, color: colors.amber, fontFamily: "Inter_600SemiBold" },
   heroTitle: { fontSize: 17, fontFamily: "Inter_700Bold", color: colors.textDark, lineHeight: 23 },
   heroSub: { fontSize: 13, fontFamily: "Inter_500Medium", color: colors.accentGreen, marginTop: 2 },
@@ -391,7 +390,6 @@ const s = StyleSheet.create({
   card: { padding: 14, borderRadius: 16, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, gap: 8 },
   cardTitle: { fontSize: 15, fontFamily: "Inter_700Bold", color: colors.textDark },
   barRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  barEmoji: { width: 20, fontSize: 14 },
   barLabel: { width: 100, fontSize: 12, fontFamily: "Inter_500Medium", color: colors.textMid },
   barTrack: { flex: 1, height: 10, borderRadius: 5, backgroundColor: colors.lightCream, flexDirection: "row", overflow: "hidden" },
   barFill: { backgroundColor: colors.accentGreen, borderRadius: 5 },

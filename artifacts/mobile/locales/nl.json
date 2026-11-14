@@ -571,5 +571,9 @@
     "question": "Vraag {{n}}",
     "lessonItem": "Les {{n}}",
     "personalReflections": "Persoonlijke reflecties"
+  },
+  "languages": {
+    "search": "Talen zoeken",
+    "noMatch": "Geen taal komt overeen met je zoekopdracht."
   }
 }

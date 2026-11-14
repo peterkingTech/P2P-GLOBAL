@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import LanguageFlag from "@/components/language/LanguageFlag";
 import {
   View,
   Text,
@@ -213,7 +214,7 @@ export default function TranslationsDashboard() {
           return (
             <View key={lang.code} style={styles.tableRow}>
               <View style={[styles.tableCell, styles.tableCellLang, { flexDirection: "row", alignItems: "center", gap: 6 }]}>
-                {lang.flag_emoji ? <Text style={{ fontSize: 16 }}>{lang.flag_emoji}</Text> : null}
+                <LanguageFlag language={lang.code} size={16} />
                 <Text style={styles.langName}>{lang.name_en}</Text>
                 <Text style={styles.langCode}>({lang.code})</Text>
               </View>
@@ -275,9 +276,10 @@ export default function TranslationsDashboard() {
                     style={[styles.pickerItem, triggerLang === l.code && styles.pickerItemActive]}
                     onPress={() => setTriggerLang(l.code)}
                   >
-                    <Text style={[styles.pickerItemText, triggerLang === l.code && styles.pickerItemTextActive]}>
-                      {l.flag_emoji} {l.name_en}
-                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <LanguageFlag language={l.code} size={16} />
+                      <Text style={[styles.pickerItemText, triggerLang === l.code && styles.pickerItemTextActive]}>{l.name_en}</Text>
+                    </View>
                   </TouchableOpacity>
                 ))}
               </ScrollView>

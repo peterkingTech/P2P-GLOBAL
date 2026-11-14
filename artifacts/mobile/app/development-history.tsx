@@ -38,7 +38,7 @@ export default function DevelopmentHistoryScreen() {
     <TouchableOpacity disabled={!p.id} onPress={() => openPerson(p)} accessibilityRole={p.id ? "button" : "text"} accessibilityLabel={`${p.name}${p.stage ? `, ${p.stage.name}` : ""}${sub ? `. ${sub}` : ""}`} style={s.person}>
       <Ionicons name="person-circle-outline" size={22} color={c.primaryGreen} />
       <View style={{ flex: 1 }}>
-        <Text style={s.title}>{p.name}{p.stage ? `  ${p.stage.emoji} ${p.stage.name}` : ""}</Text>
+        <Text style={s.title}>{p.name}{p.stage ? `  · ${p.stage.name}` : ""}</Text>
         {sub ? <Text style={s.meta}>{sub}</Text> : null}
       </View>
       {p.id ? <Ionicons name="chevron-forward" size={15} color={c.textMuted} /> : null}

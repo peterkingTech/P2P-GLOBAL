@@ -6,6 +6,8 @@ import type { AppColors } from "@/constants/themes";
 import { getLanguageName } from "@/lib/languageNames";
 import type { BibleTranslation } from "@/lib/bibleReaderApi";
 import { AppButton, ChipRow, FilterChip, IconButton } from "@/components/ui";
+import LanguageFlag from "@/components/language/LanguageFlag";
+import { languageMatches } from "@/lib/languageRegistry";
 
 // Only translations the server allows: API.Bible ones our plan licenses, and
 // Free Use Bible API (AO Lab) ones whose own licence has been approved —
@@ -31,7 +33,7 @@ const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,
 export function filterTranslations(list: BibleTranslation[], query: string, language: string | null): BibleTranslation[] {
   const q = norm(query.trim());
   return list.filter((t) => (!language || t.language === language)
-    && (!q || [t.name, t.abbreviation ?? "", t.code, t.languageName ?? "", langName(t.language), t.language].some((x) => norm(x).includes(q))));
+    && (!q || [t.name, t.abbreviation ?? "", t.code, t.languageName ?? "", langName(t.language), t.language].some((x) => norm(x).includes(q)) || languageMatches(t.language, query)));
 }
 
 /** Names (or abbreviations) offered by more than one source — those rows say where they come from. */
@@ -89,7 +91,7 @@ export default function TranslationPicker({ visible, onClose, translations, curr
                   </View>
                   <ChipRow accessibilityLabel="Filter by language">
                     <FilterChip label="All languages" selected={!language} onPress={() => setLanguage(null)} />
-                    {languages.map((l) => <FilterChip key={l} label={nameOf(l)} selected={language === l} onPress={() => setLanguage(language === l ? null : l)} />)}
+                    {languages.map((l) => <FilterChip key={l} label={nameOf(l)} leading={<LanguageFlag language={l} size={14} />} selected={language === l} onPress={() => setLanguage(language === l ? null : l)} />)}
                   </ChipRow>
                 </View>
               ) : null}
@@ -97,7 +99,7 @@ export default function TranslationPicker({ visible, onClose, translations, curr
                 {!groups.length ? <Text style={[styles.muted, { padding: 16 }]}>No translation matches “{query}”.</Text> : null}
                 {groups.map(([lang, list]) => (
                   <View key={lang}>
-                    <Text style={styles.group}>{nameOf(lang)}</Text>
+                    <View style={styles.groupRow}><LanguageFlag language={lang} size={14} /><Text style={[styles.group, { paddingHorizontal: 0 }]}>{nameOf(lang)}</Text></View>
                     {list.map((t) => {
                       const selected = t.code === current;
                       const showSource = shared.has(`${t.language}:${norm(t.abbreviation ?? t.code)}`) || t.provider === "helloao";
@@ -136,6 +138,7 @@ function makeStyles(c: AppColors) {
     title: { flex: 1, fontSize: 17, color: c.textDark, fontFamily: "Inter_700Bold" },
     search: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 44, paddingHorizontal: 12, borderRadius: 12, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige },
     searchInput: { flex: 1, fontSize: 15, color: c.textDark, fontFamily: "Inter_400Regular", paddingVertical: 8 },
+    groupRow: { flexDirection: "row", alignItems: "flex-end", gap: 6, paddingHorizontal: 16 },
     group: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_700Bold", letterSpacing: 0.5, textTransform: "uppercase", paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4 },
     row: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 6, minHeight: 52 },
     rowSelected: { backgroundColor: c.card },

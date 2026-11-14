@@ -537,5 +537,9 @@
     "manageTranslations": "Hwɛ Kasa Nsesa So",
     "translationJobs": "Kasa Nsesa Nnwuma",
     "contentManagement": "Nsɛm a Ɛwɔ Mu no So Hwɛ"
+  },
+  "languages": {
+    "search": "Hwehwɛ kasa",
+    "noMatch": "Kasa biara nhyia wo nhwehwɛmu no."
   }
 }

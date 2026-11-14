@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import LanguageFlag from "@/components/language/LanguageFlag";
 import {
   View,
   Text,
@@ -176,7 +177,8 @@ export default function TranslationReviewScreen() {
       {/* ── Filters ── */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterBar} contentContainerStyle={{ gap: 6, paddingHorizontal: 16 }}>
         {["all", ...langs].map((l) => (
-          <TouchableOpacity accessibilityRole="button" key={l} style={[styles.chip, filterLang === l && styles.chipActive]} onPress={() => setFilterLang(l)}>
+          <TouchableOpacity accessibilityRole="button" key={l} style={[styles.chip, { flexDirection: "row", alignItems: "center", gap: 4 }, filterLang === l && styles.chipActive]} onPress={() => setFilterLang(l)}>
+            {l !== "all" ? <LanguageFlag language={l} size={13} /> : null}
             <Text style={[styles.chipText, filterLang === l && styles.chipTextActive]}>
               {l === "all" ? "All Languages" : (LANG_NAMES[l] ?? l.toUpperCase())}
             </Text>

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import LanguageFlag from "@/components/language/LanguageFlag";
 import {
   View,
   Text,
@@ -128,7 +129,7 @@ export default function OnboardingScreen() {
           onPress={() => setLangPickerOpen(true)}
           activeOpacity={0.8}
         >
-          <Text style={styles.langBtnFlag}>{selectedLang.flag}</Text>
+          <LanguageFlag language={selectedLang.code} size={15} />
           <Text style={styles.langBtnLabel}>{selectedLang.label}</Text>
           <Ionicons name="chevron-down" size={12} color={colors.accentGreen} />
         </TouchableOpacity>
@@ -233,7 +234,7 @@ export default function OnboardingScreen() {
                   onPress={() => selectLanguage(lang)}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.langOptionFlag}>{lang.flag}</Text>
+                  <LanguageFlag language={lang.code} size={22} style={styles.langOptionFlag} />
                   <Text style={[
                     styles.langOptionLabel,
                     selectedLang.code === lang.code && styles.langOptionLabelActive,

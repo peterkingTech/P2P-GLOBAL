@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image,
   Platform,
   ActivityIndicator,
 } from "react-native";
@@ -15,11 +14,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
-import { STAGES, STAGE_IMAGES, PERSONAL_STAGE_COUNT, COLLECTIVE_STAGE_INDEX, getStageFromPoints } from "@/constants/stages";
+import { STAGES, PERSONAL_STAGE_COUNT, COLLECTIVE_STAGE_INDEX, getStageFromPoints } from "@/constants/stages";
+import LivingTreeView from "@/components/growth/LivingTreeView";
 import ReadableText from "@/components/ReadableText";
 import { AppButton } from "@/components/ui";
 import { confirmAction } from "@/lib/alerts";
-import { STAGE_MODELS } from "@/lib/growthModels";
 import {
   MILESTONE_DISCLAIMER, MILESTONE_EXPLANATION, endGrowthPause, getGrowthJourney, localDate, percentOf, progressText, setShareCountryInCollective,
   startGrowthPause, timeInStage, type GrowthJourney,
@@ -95,12 +94,12 @@ export default function StagesScreen() {
         <Text style={styles.disclaimerText}>{journey?.disclaimer ?? t("growthMilestones.disclaimer", MILESTONE_DISCLAIMER)}</Text>
       </View>
 
-      {/* Where you are */}
+      {/* Where you are — the stage's real Meshy model, in 3D (only this one model is loaded here) */}
       <View style={[styles.stageRow, styles.stageRowCurrent]}>
-        <Image source={STAGE_IMAGES[stageIndex]} style={styles.thumb} resizeMode="contain" accessibilityIgnoresInvertColors />
+        <LivingTreeView stageIndex={stageIndex} mode="stage" compact background={colors.card} style={styles.thumb}
+          onPress={() => router.push({ pathname: "/tree-3d", params: { stage: String(stageIndex) } } as any)} accessibilityHint="Opens this stage in 3D" />
         <View style={styles.stageInfo}>
           <View style={styles.stageNameRow}>
-            <Text style={styles.stageEmoji}>{STAGES[stageIndex].emoji}</Text>
             <Text style={styles.stageName}>{STAGES[stageIndex].name}</Text>
             <View style={[styles.badge, styles.badgeCurrent]}><Text style={[styles.badgeText, styles.badgeCurrentText]}>You are here</Text></View>
           </View>
@@ -110,10 +109,8 @@ export default function StagesScreen() {
           {journey?.stage.verification === "legacy_unverified" ? (
             <Text style={styles.meta}>Recognised from your growth before this journey began. It stays yours; the milestones confirm it as you continue.</Text>
           ) : null}
-          {STAGE_MODELS[stageIndex] ? (
-            <AppButton label="View in 3D" icon="cube-outline" size="sm" variant="secondary" palette="fixedLight" style={{ marginTop: 8, alignSelf: "flex-start" }}
-              onPress={() => router.push({ pathname: "/tree-3d", params: { model: STAGE_MODELS[stageIndex] } } as any)} />
-          ) : null}
+          <AppButton label="View in 3D" icon="cube-outline" size="sm" variant="secondary" palette="fixedLight" style={{ marginTop: 8, alignSelf: "flex-start" }}
+            onPress={() => router.push({ pathname: "/tree-3d", params: { stage: String(stageIndex) } } as any)} />
         </View>
       </View>
 
@@ -177,7 +174,7 @@ export default function StagesScreen() {
       {/* What the next stage asks for */}
       {journey?.next ? (
         <View style={styles.nextCard}>
-          <Text style={styles.nextTitle} accessibilityRole="header">Growing toward {journey.next.emoji} {journey.next.name}</Text>
+          <Text style={styles.nextTitle} accessibilityRole="header">Growing toward {journey.next.name}</Text>
           {journey.milestones === "draft" ? (
             <Text style={styles.meta}>These milestones are being finalised by P2P Global. Verified evidence is already being recorded.</Text>
           ) : null}
@@ -263,10 +260,12 @@ export default function StagesScreen() {
           const when = journey?.history.find((h) => h.stage === i + 1);
           return (
             <View key={stage.name} style={[styles.stageRow, current && styles.stageRowCurrent, ahead && styles.stageRowLocked]}>
-              <Image source={STAGE_IMAGES[i]} style={[styles.thumbSmall, ahead && styles.thumbLocked]} resizeMode="contain" accessibilityIgnoresInvertColors />
+              {/* Stage number only — each stage's 3D model opens on request (never five models at once) */}
+              <View style={[styles.stageNumber, current && styles.stageNumberCurrent, ahead && styles.thumbLocked]}>
+                <Text style={[styles.stageNumberText, current && styles.stageNumberTextCurrent]}>{i + 1}</Text>
+              </View>
               <View style={styles.stageInfo}>
                 <View style={styles.stageNameRow}>
-                  <Text style={styles.stageEmoji}>{stage.emoji}</Text>
                   <Text style={[styles.stageName, ahead && styles.stageNameLocked]}>{stage.name}</Text>
                   {reached ? <View style={styles.badge}><Text style={styles.badgeText}>Reached</Text></View> : null}
                   {current ? <View style={[styles.badge, styles.badgeCurrent]}><Text style={[styles.badgeText, styles.badgeCurrentText]}>You are here</Text></View> : null}
@@ -274,10 +273,8 @@ export default function StagesScreen() {
                 <Text style={[styles.desc, ahead && styles.descLocked]} numberOfLines={3}>{stage.description}</Text>
                 <ReadableText style={styles.verse}>{stage.verse} — {stage.verseRef}</ReadableText>
                 {when ? <Text style={styles.meta}>Reached {new Date(when.achievedAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}{when.kind === "legacy_import" ? " (recognised from your earlier growth)" : ""}</Text> : null}
-                {reached && STAGE_MODELS[i] ? (
-                  <AppButton label={`View ${stage.name}`} icon="cube-outline" size="sm" variant="tertiary" palette="fixedLight" style={{ alignSelf: "flex-start" }}
-                    onPress={() => router.push({ pathname: "/tree-3d", params: { model: STAGE_MODELS[i] } } as any)} />
-                ) : null}
+                <AppButton label={`View ${stage.name} in 3D`} icon="cube-outline" size="sm" variant="tertiary" palette="fixedLight" style={{ alignSelf: "flex-start" }}
+                  onPress={() => router.push({ pathname: "/tree-3d", params: { stage: String(i) } } as any)} />
               </View>
             </View>
           );
@@ -286,12 +283,13 @@ export default function StagesScreen() {
 
       {/* Together: Forest of Nations */}
       <View style={styles.collectiveCard}>
-        <Image source={STAGE_IMAGES[COLLECTIVE_STAGE_INDEX]} style={styles.collectiveImage} resizeMode="cover" accessibilityIgnoresInvertColors />
         <Text style={styles.collectiveLabel}>TOGETHER</Text>
-        <Text style={styles.collectiveTitle} accessibilityRole="header">{collective.emoji} {collective.name}</Text>
+        <Text style={styles.collectiveTitle} accessibilityRole="header">{collective.name}</Text>
         <Text style={styles.desc}>{collective.description}</Text>
         <ReadableText style={styles.verse}>{collective.verse} — {collective.verseRef}</ReadableText>
         <Text style={styles.meta}>Not a personal stage: it is what P2P Global&apos;s participants build together, shown only as totals — never names or rankings.</Text>
+        {/* Only a 2D picture of the Forest of Nations exists; its 3D scene is not available yet (no picture stands in for it). */}
+        <Text style={styles.meta}>The 3D Forest of Nations scene isn&apos;t available yet.</Text>
         {journey ? (
           <TouchableOpacity accessibilityRole="switch" accessibilityState={{ checked: !!journey.shareCountryInCollective }} style={styles.toggleRow}
             onPress={() => act(() => setShareCountryInCollective(!journey.shareCountryInCollective), journey.shareCountryInCollective ? "Your country is no longer counted." : "Your country is now counted in the totals.")}>
@@ -369,8 +367,11 @@ const styles = StyleSheet.create({
     opacity: 0.65,
   },
 
-  thumb: { width: 88, height: 88, borderRadius: 14 },
-  thumbSmall: { width: 64, height: 64, borderRadius: 12 },
+  thumb: { width: 120, height: 150, borderRadius: 14, overflow: "hidden" },
+  stageNumber: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: colors.primaryGreen },
+  stageNumberCurrent: { backgroundColor: colors.primaryGreen },
+  stageNumberText: { fontSize: 16, fontFamily: "Inter_700Bold", color: colors.primaryGreen },
+  stageNumberTextCurrent: { color: "#fff" },
   thumbLocked: { opacity: 0.6 },
 
   stageInfo: { flex: 1, gap: 6 },
@@ -380,7 +381,6 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 6,
   },
-  stageEmoji: { fontSize: 16 },
   stageName: {
     fontSize: 16,
     fontWeight: "700",
@@ -445,7 +445,6 @@ const styles = StyleSheet.create({
   toggleRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
 
   collectiveCard: { marginTop: 24, backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.borderBeige, padding: 14, gap: 6 },
-  collectiveImage: { width: "100%", aspectRatio: 16 / 9, borderRadius: 12, marginBottom: 6 },
   collectiveLabel: { fontSize: 10, letterSpacing: 1.5, color: colors.amber, fontFamily: "Inter_600SemiBold" },
   collectiveTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: colors.primaryGreen },
 });

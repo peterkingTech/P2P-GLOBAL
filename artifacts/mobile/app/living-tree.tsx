@@ -22,10 +22,10 @@ import { getTreeStage } from "@/constants/treeStages";
 import { getWatchGrowthPlan } from "@/constants/growthVideo";
 import { GrowthVideoModal } from "@/components/GrowthVideoModal";
 import { ForestTransition } from "@/components/ForestTransition";
-import GrowthModelView from "@/components/growth/GrowthModelView";
-import ModularTreeView from "@/components/growth/ModularTreeView";
+import LivingTreeView from "@/components/growth/LivingTreeView";
+import { useGrowthTree } from "@/hooks/useGrowthTree";
+import { botanicalDevelopment } from "@/lib/botanicalDevelopment";
 import { useGrowthStage, nextRequirementsMet } from "@/hooks/useGrowthStage";
-import { GROWTH_MODELS, STAGE_MODELS, limitNote } from "@/lib/growthModels";
 import FruitDetailCard from "@/components/tree/FruitDetailCard";
 import TreeAccessibleSummary from "@/components/tree/TreeAccessibleSummary";
 import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
@@ -114,9 +114,9 @@ export default function LivingTreeScreen() {
   const [showForestTransition, setShowForestTransition] = useState(false);
   const autoTriggeredRef = useRef(false);
 
-  // The tree is the 3D model of the person's growth MILESTONE (server-calculated), the same stage
-  // the label shows. Earned fruit is listed (tap for its details); the old drawn tree's roots view,
-  // seasons and per-person branches don't exist on a 3D model.
+  // The tree is the real Meshy 3D model of the person's growth MILESTONE (server-calculated), the same
+  // stage the label shows, with one fruit per verified contribution (components/growth/LivingTreeView —
+  // the same renderer as Home). Full tree / Roots / Canopy move the camera over the real model.
   const [selectedFruitKey, setSelectedFruitKey] = useState<string | null>(null);
   const [showAccessibleSummary, setShowAccessibleSummary] = useState(false);
   const selectedCatalogEntry = selectedFruitKey ? fruitCatalog.find((c) => c.fruitKey === selectedFruitKey) ?? null : null;
@@ -132,9 +132,9 @@ export default function LivingTreeScreen() {
   const nextStage = stageIndex + 1 < PERSONAL_STAGE_COUNT ? STAGES[stageIndex + 1] : null;
   // Progress toward the next milestone: verified requirements met (counts, never points).
   const requirements = nextRequirementsMet(journey);
+  // How the tree looks (appearance only) — from the same tree data the 3D tree draws; never the stage.
+  const botany = botanicalDevelopment(stageIndex, useGrowthTree().plan);
   const progressPct = requirements && requirements.total ? Math.round((requirements.met / requirements.total) * 100) : nextStage ? 0 : 100;
-  const modelId = STAGE_MODELS[stageIndex];
-  const note = limitNote(GROWTH_MODELS[modelId]);
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
@@ -205,23 +205,18 @@ export default function LivingTreeScreen() {
 
       {tab === "tree" && (
         <View style={[styles.videoHero, { width: screenWidth, height: heroHeight }]}>
-          {/* The modular tree (your verified fruit on your stage's body) where the v2 models are set up;
-              otherwise — and whenever it can't load — the stage model as before. */}
-          <ModularTreeView
+          {/* Your living tree: your verified stage's Meshy model with your verified fruit, in the wind. */}
+          <LivingTreeView
+            stageIndex={stageIndex}
+            mode="tree"
+            showViewControls
             style={{ width: screenWidth, height: heroHeight }}
-            fallback={
-              <GrowthModelView
-                modelId={modelId}
-                style={{ width: screenWidth, height: heroHeight }}
-                extraControls={
-                  <IconButton variant="tinted" palette="fixedLight" icon="expand-outline" accessibilityLabel="Open full screen"
-                    onPress={() => router.push({ pathname: "/tree-3d", params: { model: modelId } } as any)} />
-                }
-              />
+            extraControls={
+              <IconButton variant="tinted" palette="fixedLight" icon="expand-outline" accessibilityLabel="Open full screen"
+                onPress={() => router.push({ pathname: "/tree-3d", params: { stage: String(stageIndex), mine: "1" } } as any)} />
             }
           />
           <View style={styles.videoHeroLabel} pointerEvents="none">
-            <Text style={styles.videoHeroEmoji}>{stage.emoji}</Text>
             <Text style={styles.videoHeroText}>{stage.name}</Text>
           </View>
           <AppButton label="Watch full growth story" onPress={() => handleWatchGrowth()} size="sm" icon="play" style={{ position: "absolute", top: 14, right: 14 }} palette="fixedLight" />
@@ -249,18 +244,11 @@ export default function LivingTreeScreen() {
           {/* The interactive tree — real fruit, real growth, explorable */}
           {treeData && (
             <View style={styles.treeSceneCard}>
-              <Text style={styles.treeStageName}>{stage.emoji} {stage.name}</Text>
+              <Text style={styles.treeStageName}>{stage.name}</Text>
               <Text style={styles.treeStageDesc}>{stage.description}</Text>
               <TouchableOpacity accessibilityRole="button" accessibilityLabel="Your growth journey: what the next stage asks for" onPress={() => router.push("/stages")} style={{ alignSelf: "flex-start", paddingVertical: 6 }}>
                 <Text style={{ color: colors.accentGreen, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>Your growth journey →</Text>
               </TouchableOpacity>
-
-              {note ? (
-                <View style={styles.limitNote} accessible accessibilityRole="text">
-                  <Ionicons name="information-circle-outline" size={15} color={colors.amber} />
-                  <Text style={styles.limitNoteText}>{note}</Text>
-                </View>
-              ) : null}
 
               {!showAccessibleSummary ? (
                 <View style={styles.fruitSection}>
@@ -304,6 +292,22 @@ export default function LivingTreeScreen() {
             onClose={() => setSelectedFruitKey(null)}
           />
 
+          {/* Botanical development — kept apart from the Growth Stage: how the tree looks, never a rank */}
+          <View style={styles.botanyCard}>
+            <Text style={styles.botanyStage}>Your Growth Stage: <Text style={{ fontFamily: "Inter_700Bold" }}>{stage.name}</Text></Text>
+            <Text style={styles.botanyTitle} accessibilityRole="header">Botanical development</Text>
+            <Text style={styles.botanyText}>{botany.appearance}.</Text>
+            {botany.features.map((f) => (
+              <View key={f.id} style={styles.botanyRow} accessible accessibilityLabel={`${f.label}: ${f.explains}`}>
+                <Text style={styles.botanyItem}>{f.label.charAt(0).toUpperCase() + f.label.slice(1)}</Text>
+                <Text style={styles.botanyExplain}>{f.explains}</Text>
+              </View>
+            ))}
+            <Text style={styles.botanyNote}>{botany.note}</Text>
+            <AppButton label="How an apple tree grows" icon="leaf-outline" size="sm" variant="secondary" palette="fixedLight" style={{ alignSelf: "flex-start", marginTop: 4 }}
+              onPress={() => router.push("/botanical" as any)} />
+          </View>
+
           {/* Vertical stat rows */}
           <View style={styles.statRowsCard}>
             <View style={styles.statRow}>
@@ -338,14 +342,13 @@ export default function LivingTreeScreen() {
             </View>
 
             <View style={styles.stageNameRow}>
-              <Text style={styles.stageEmoji}>{stage.emoji}</Text>
               <Text style={styles.stageName}>{stage.name}</Text>
             </View>
 
             {nextStage && (
               <View style={styles.progressSection}>
                 <View style={styles.progressLabelRow}>
-                  <Text style={styles.progressToward}>Growing toward {nextStage.emoji} {nextStage.name}</Text>
+                  <Text style={styles.progressToward}>Growing toward {nextStage.name}</Text>
                   {requirements ? <Text style={styles.progressPct}>{requirements.met} of {requirements.total}</Text> : null}
                 </View>
                 <View style={styles.progressBarBg}>
@@ -358,7 +361,7 @@ export default function LivingTreeScreen() {
 
           {treeData && (
             <View style={styles.treeDataCard}>
-              <Text style={styles.treeStageLabel}>{stage.emoji} {stage.name}</Text>
+              <Text style={styles.treeStageLabel}>{stage.name}</Text>
               <View style={styles.treeStatsRow}>
                 <Text style={styles.treeStatItem}>{treeData.fruitCount} fruit</Text>
                 <Text style={styles.treeStatDot}>·</Text>
@@ -401,7 +404,7 @@ export default function LivingTreeScreen() {
           <View style={styles.forestHeader}>
             {(isForestBuilder || isForestOfNations) && (
               <View style={[styles.stageBanner, isForestOfNations && styles.stageBannerNations]}>
-                <Text style={styles.stageBannerEmoji}>{isForestOfNations ? "🌍" : "🌲"}</Text>
+                <Ionicons name={isForestOfNations ? "globe-outline" : "people-outline"} size={26} color={colors.primaryGreen} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.stageBannerTitle}>{isForestOfNations ? "Forest of Nations" : "Forest Builder"}</Text>
                   <Text style={styles.stageBannerText}>
@@ -534,12 +537,19 @@ const styles = StyleSheet.create({
 
   videoHero: { position: "relative", backgroundColor: "#0B0B0B", alignSelf: "center" },
   videoHeroLabel: {
-    position: "absolute", bottom: 14, left: 14, flexDirection: "row", alignItems: "center", gap: 6,
+    position: "absolute", top: 14, left: 14, flexDirection: "row", alignItems: "center", gap: 6,
     backgroundColor: "rgba(0,0,0,0.48)", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6,
   },
-  videoHeroEmoji: { fontSize: 16 },
   videoHeroText: { color: "#fff", fontSize: 14, fontFamily: "Inter_600SemiBold" },
 
+  botanyCard: { borderRadius: 16, marginBottom: 20, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, padding: 16, gap: 6 },
+  botanyStage: { fontSize: 14, color: colors.textDark, fontFamily: "Inter_500Medium" },
+  botanyTitle: { fontSize: 12, letterSpacing: 0.6, color: colors.textMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", marginTop: 6 },
+  botanyText: { fontSize: 14, color: colors.textMid, fontFamily: "Inter_400Regular", lineHeight: 20 },
+  botanyRow: { gap: 1, paddingVertical: 4 },
+  botanyItem: { fontSize: 14, color: colors.textDark, fontFamily: "Inter_600SemiBold" },
+  botanyExplain: { fontSize: 12.5, color: colors.textMuted, fontFamily: "Inter_400Regular", lineHeight: 17 },
+  botanyNote: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_500Medium", lineHeight: 17, marginTop: 4 },
   treeDataCard: {
     borderRadius: 16, marginBottom: 20, backgroundColor: colors.card,
     borderWidth: 1, borderColor: colors.borderBeige, alignItems: "center", paddingVertical: 16,

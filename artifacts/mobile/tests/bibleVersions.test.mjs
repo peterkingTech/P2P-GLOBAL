@@ -28,6 +28,8 @@ const load = (f, mocks = {}) => {
 const V = load("lib/bibleVersions.ts", {
   "@/lib/languageNames": { getLanguageName: (c) => ({ de: "German", es: "Spanish", om: "om" })[c] ?? c },
   "@/lib/i18n": { LANGUAGE_DISPLAY: { en: { label: "English", native: "English" }, de: { label: "German", native: "Deutsch" }, es: { label: "Spanish", native: "Español" } } },
+  // The real language registry (names, codes and aliases for languages outside the app's own list).
+  "@/lib/languageRegistry": load("lib/languageRegistry.ts", { "@/lib/countryNames": load("lib/countryNames.ts") }),
 });
 const T = (code, language, name, extra = {}) => ({ code, language, name, abbreviation: code.toUpperCase(), isDefault: false, textCopyAllowed: true, ...extra });
 const list = [T("kjv", "en", "King James Version"), T("bsb", "en", "Berean Standard Bible"), T("web", "en", "World English Bible"),

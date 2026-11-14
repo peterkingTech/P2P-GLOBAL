@@ -562,5 +562,9 @@
     "errorTitle": "Hindi ma-load ang mga resulta",
     "errorBody": "Pakisuri ang iyong koneksyon at subukang muli.",
     "retry": "Subukang muli"
+  },
+  "languages": {
+    "search": "Maghanap ng wika",
+    "noMatch": "Walang wikang tumugma sa iyong paghahanap."
   }
 }

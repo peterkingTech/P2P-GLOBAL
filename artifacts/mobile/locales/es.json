@@ -150,6 +150,7 @@
     "continueGrowth": "Continúa tu crecimiento",
     "stageOf": "Etapa {{stage}} de 6",
     "growingToward": "Creciendo hacia",
+    "yourGrowthStage": "Tu etapa de crecimiento",
     "forestReached": "Bosque de Naciones alcanzado",
     "morePoints": "{{points}} puntos más para {{name}}",
     "dailyWord": "Palabra Diaria",
@@ -753,5 +754,9 @@
     "hebrew": "Hebreo",
     "aramaic": "Arameo",
     "greek": "Griego"
+  },
+  "languages": {
+    "search": "Buscar idiomas",
+    "noMatch": "Ningún idioma coincide con tu búsqueda."
   }
 }

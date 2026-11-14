@@ -150,6 +150,7 @@
     "continueGrowth": "Endelea na ukuaji wako",
     "stageOf": "Hatua {{stage}} kati ya 6",
     "growingToward": "Ukikua kuelekea",
+    "yourGrowthStage": "Hatua yako ya ukuaji",
     "forestReached": "Umefikia Msitu wa Mataifa",
     "morePoints": "Alama {{points}} zaidi kufikia {{name}}",
     "dailyWord": "Neno la Siku",
@@ -753,5 +754,9 @@
     "hebrew": "Kiebrania",
     "aramaic": "Kiaramu",
     "greek": "Kigiriki"
+  },
+  "languages": {
+    "search": "Tafuta lugha",
+    "noMatch": "Hakuna lugha inayolingana na utafutaji wako."
   }
 }

@@ -75,7 +75,7 @@ export default function LineageScreen() {
             <Avatar photoUrl={data.me.photoUrl} name={data.me.name} size={44} />
             <View style={{ flex: 1 }}>
               <Text style={s.title}>You</Text>
-              {data.me.stage ? <Text style={s.meta}>{data.me.stage.emoji} {data.me.stage.name}</Text> : null}
+              {data.me.stage ? <Text style={s.meta}>{data.me.stage.name}</Text> : null}
             </View>
           </View>
           <AppButton label="My development history" icon="time-outline" variant="secondary" size="sm"
@@ -120,7 +120,7 @@ function PersonRow({ p, c, s, detail, highlight }: { p: LineagePerson; c: AppCol
       {p.private ? <View style={s.privateDot}><Ionicons name="person" size={18} color={c.textMuted} /></View> : <Avatar photoUrl={p.photoUrl} name={p.name} size={36} />}
       <View style={{ flex: 1 }}>
         <Text style={s.name} numberOfLines={1}>{p.name}</Text>
-        <Text style={s.meta} numberOfLines={1}>{[detail, p.stage ? `${p.stage.emoji} ${p.stage.name}` : null, p.status === "paused" ? "Paused" : null].filter(Boolean).join(" · ")}</Text>
+        <Text style={s.meta} numberOfLines={1}>{[detail, p.stage ? p.stage.name : null, p.status === "paused" ? "Paused" : null].filter(Boolean).join(" · ")}</Text>
       </View>
     </View>
   );
@@ -146,7 +146,7 @@ function Branch({ p, depth, c, s }: { p: LineagePerson; depth: number; c: AppCol
         <View style={{ flex: 1 }}>
           <Text style={s.name} numberOfLines={1}>{p.name}</Text>
           <Text style={s.meta} numberOfLines={1}>
-            {[p.stage ? `${p.stage.emoji} ${p.stage.name}` : null, has ? `Disciples ${p.disciples}` : null, p.status === "paused" ? "Paused" : null].filter(Boolean).join(" · ") || " "}
+            {[p.stage ? p.stage.name : null, has ? `Disciples ${p.disciples}` : null, p.status === "paused" ? "Paused" : null].filter(Boolean).join(" · ") || " "}
           </Text>
         </View>
         {has ? <Ionicons name={open ? "chevron-up" : "chevron-down"} size={18} color={c.textMuted} /> : null}

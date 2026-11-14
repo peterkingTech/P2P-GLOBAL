@@ -562,5 +562,9 @@
     "errorTitle": "Sonuçlar yüklenemedi",
     "errorBody": "Lütfen bağlantını kontrol edip tekrar dene.",
     "retry": "Tekrar dene"
+  },
+  "languages": {
+    "search": "Dil ara",
+    "noMatch": "Aramanızla eşleşen dil yok."
   }
 }
