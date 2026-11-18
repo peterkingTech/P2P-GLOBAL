@@ -23,6 +23,7 @@ import GroupsHome from "@/components/messages/GroupsHome";
 import { mailUnread } from "@/lib/mailApi";
 import "@/lib/i18n";
 import { withScreenBoundary } from "@/components/ScreenErrorBoundary";
+import SyncStatusBanner from "@/components/offline/SyncStatusBanner";
 
 // Three separate spaces: Chats (one-to-one, informal), P2P Mail (formal letters, never mixed into a chat)
 // and Groups (private groups, Family & Church, Peer Groups, Circles and Communities). Each has its own badge.
@@ -310,6 +311,9 @@ function MessagesTab() {
       </>) : null}
       {section === "groups" ? <GroupsHome conversations={groups} bottomPad={insets.bottom + 90} /> : null}
       {section === "chats" ? (<>
+      <View style={{ paddingHorizontal: 16 }}>
+        <SyncStatusBanner offlineNote={t("sync.messagesNeedInternet", { defaultValue: "Sending messages, P2P Mail and calls need an internet connection." })} />
+      </View>
       <View style={styles.searchRow}>
         <Ionicons name="search" size={16} color={colors.textMuted} />
         <TextInput

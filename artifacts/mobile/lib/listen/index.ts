@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { AppState, Platform } from "react-native";
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from "expo-audio";
-import { segmentFor, type RecordedNarration } from "./narration";
+import { alignedSegments, segmentFor, type RecordedNarration } from "./narration";
 import { getActiveGathering } from "@/lib/activeGathering";
 import { useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -11,6 +11,7 @@ import { createListenEngine, type ListenState, type SpeechDriver } from "./engin
 import { labelsFrom, type SpokenLabels } from "./labels";
 import { baseLanguage } from "./voices";
 import { createUiPrefs, type ListenUiPrefs } from "./uiPrefs";
+import { chosenVoiceFor, getVoicePrefs, isEligibleKind, loadVoiceDefaults, loadVoicePrefs, setReadingSource, setVoiceNotice, speakChunk, type ChosenVoice } from "@/lib/voices";
 
 /** Spoken signposts in the TEXT's language (no fallback to another language). */
 export function spokenLabels(language: string): SpokenLabels {
@@ -76,13 +77,109 @@ let recCursor = 0;
 let recPause: ReturnType<typeof setTimeout> | null = null;
 let recSub: { remove: () => void } | null = null;
 const recBroken = new Set<string>();
+// Where a paused recording stopped: { url, chunk, time } — resume continues from that exact moment.
+let recPausedAt: { url: string; chunk: number; time: number } | null = null;
+let recWatch: ReturnType<typeof setInterval> | null = null;
+let recCurrent: { url: string; chunk: number } | null = null;
+// ── P2P Voices (owner brief 2026-11-18): a synthetic voice from P2P's voice library, for ELIGIBLE content only ──
+// Same engine, same sentences: each sentence is one short recording made on demand by the server (cached there),
+// played with expo-audio. Highlighting stays on the sentence being heard, pause resumes at the exact moment, and
+// changing voice carries on from the same sentence. The next two sentences are fetched ahead so playback flows.
+// Never for Bible content (the server refuses too); any failure → the phone's voice reads that sentence and the
+// player says so in plain words. Official narration always comes first when the listener keeps that setting.
+let cloudPlayer: AudioPlayer | null = null;
+let cloudToken = 0;
+let cloudSub: { remove: () => void } | null = null;
+let cloudWatch: ReturnType<typeof setInterval> | null = null;
+let cloudPausedAt: { key: string; time: number } | null = null;
+let cloudCurrentKey = "";
+const cloudUrls = new Map<string, Promise<string>>();
+function cloudUrl(voiceId: string, o: { kind?: string; contentKey?: string; language: string }, text: string): Promise<string> {
+  const k = `${voiceId}|${o.contentKey}|${text}`;
+  let p = cloudUrls.get(k);
+  if (!p) {
+    p = speakChunk({ voiceId, contentKind: o.kind ?? "", contentKey: o.contentKey ?? "p2p", language: o.language, text }).then((r) => r.url);
+    p.catch(() => cloudUrls.delete(k));
+    cloudUrls.set(k, p);
+    if (cloudUrls.size > 120) { const oldest = cloudUrls.keys().next().value; if (oldest !== undefined) cloudUrls.delete(oldest); }
+  }
+  return p;
+}
+function cloudStop(rememberPause: boolean) {
+  cloudToken++;
+  cloudSub?.remove(); cloudSub = null;
+  if (cloudWatch) { clearInterval(cloudWatch); cloudWatch = null; }
+  if (cloudPlayer) {
+    if (rememberPause && cloudCurrentKey) { try { cloudPausedAt = { key: cloudCurrentKey, time: cloudPlayer.currentTime }; } catch {} }
+    try { cloudPlayer.pause(); } catch {}
+  }
+}
+function cloudSpeak(text: string, o: Parameters<SpeechDriver["speak"]>[1], voice: ChosenVoice): boolean {
+  const source = (o.source ?? text).trim();
+  if (!source) return false;
+  const token = ++cloudToken;
+  const key = `${voice.voiceId}|${o.contentKey}|${o.chunkIndex ?? -1}`;
+  const fallback = (why: string) => {
+    if (token !== cloudToken) return;
+    setVoiceNotice(why);
+    setReadingSource({ mode: "device" });
+    deviceSpeech.speak(text, o);
+  };
+  // Ahead: the next two sentences (same voice), so the next one starts without a wait.
+  if (o.chunkSources && typeof o.chunkIndex === "number")
+    for (const n of [1, 2]) { const t = o.chunkSources[o.chunkIndex + n]?.trim(); if (t) void cloudUrl(voice.voiceId, o, t).catch(() => {}); }
+  cloudUrl(voice.voiceId, o, source).then((url) => {
+    if (token !== cloudToken) return;
+    if (!cloudPlayer) cloudPlayer = createAudioPlayer({ uri: url }, { updateInterval: 100 });
+    else cloudPlayer.replace({ uri: url });
+    const p = cloudPlayer;
+    setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: !!o.background, interruptionMode: "doNotMix" }).catch(() => {});
+    setReadingSource({ mode: "p2p", voice: voice.name, provider: voice.provider });
+    setVoiceNotice(null);
+    cloudCurrentKey = key;
+    const resumeAt = o.resuming && cloudPausedAt?.key === key ? cloudPausedAt.time : 0;
+    cloudPausedAt = null;
+    let done = false;
+    cloudSub?.remove();
+    cloudSub = p.addListener("playbackStatusUpdate", (s) => {
+      if (token !== cloudToken || done) return;
+      if (s.didJustFinish) { done = true; cloudSub?.remove(); cloudSub = null; if (cloudWatch) { clearInterval(cloudWatch); cloudWatch = null; } o.onDone?.(); }
+    });
+    p.setPlaybackRate(o.rate);
+    (resumeAt > 0 ? p.seekTo(resumeAt) : Promise.resolve()).then(() => { if (token === cloudToken) p.play(); }, () => { if (token === cloudToken) p.play(); });
+    // A recording that never starts within 8 s (no connection, expired link): the phone's voice reads this sentence.
+    let started = false, waited = 0;
+    if (cloudWatch) clearInterval(cloudWatch);
+    cloudWatch = setInterval(() => {
+      if (token !== cloudToken || done) { if (cloudWatch) { clearInterval(cloudWatch); cloudWatch = null; } return; }
+      if (p.currentTime > resumeAt + 0.05) started = true;
+      if (!started && ++waited >= 8) { if (cloudWatch) { clearInterval(cloudWatch); cloudWatch = null; } cloudStop(false); fallback("Your chosen voice couldn't load, so your phone's voice is reading for now."); }
+    }, 1000);
+  }, () => fallback("Your chosen voice isn't available at the moment, so your phone's voice is reading."));
+  return true;
+}
+
 const recordedNarration: SpeechDriver = {
   speak(text, o) {
-    const n = o.narration as RecordedNarration | undefined;
-    const seg = n && o.source && !recBroken.has(n.url) ? segmentFor(n, o.source, recCursor) : null;
+    const official = o.narration as RecordedNarration | undefined;
+    void loadVoicePrefs(); void loadVoiceDefaults(); // after sign-in (cheap when already loaded)
+    // Official narration first (unless the listener chose a P2P Voice over it); otherwise their P2P Voice for this
+    // language when the content is eligible; otherwise the phone's voice. Bible is never read by a P2P Voice.
+    const chosen = o.kind !== "bible" && isEligibleKind(o.kind) ? chosenVoiceFor(o.language) : null;
+    if (chosen && (!official || !getVoicePrefs().preferOfficial)) { recStop(true); if (cloudSpeak(text, o, chosen)) return; }
+    cloudStop(false);
+    const n = official;
+    setReadingSource(n ? { mode: "official", voice: n.voice } : { mode: "device" });
+    // 2026-11-18: the sentence's stretch comes from ONE in-order alignment of the whole content (contiguous,
+    // tolerant of small wording differences); the old per-sentence exact search is kept only for callers
+    // that don't pass the sentence list.
+    const seg = n && o.source && !recBroken.has(n.url)
+      ? (o.chunkSources && typeof o.chunkIndex === "number" ? alignedSegments(n, o.chunkSources)[o.chunkIndex] ?? null : segmentFor(n, o.source, recCursor))
+      : null;
     if (!n || !seg) { recStop(true); return deviceSpeech.speak(text, o); }
     const token = ++recToken;
     if (recPause) { clearTimeout(recPause); recPause = null; }
+    if (recWatch) { clearInterval(recWatch); recWatch = null; }
     try {
       if (!recPlayer || recUrl !== n.url) {
         recStop(true);
@@ -94,41 +191,68 @@ const recordedNarration: SpeechDriver = {
       }
       const p = recPlayer;
       recCursor = seg.lastWord + 1;
+      const chunk = typeof o.chunkIndex === "number" ? o.chunkIndex : -1;
+      recCurrent = { url: n.url, chunk };
       let done = false;
-      const finish = () => { if (done || token !== recToken) return; done = true; recSub?.remove(); recSub = null; o.onDone?.(); };
+      const finish = () => {
+        if (done || token !== recToken) return;
+        done = true; recSub?.remove(); recSub = null;
+        if (recWatch) { clearInterval(recWatch); recWatch = null; }
+        o.onDone?.();
+      };
       recSub?.remove();
+      // The sentence ends when the AUDIO reaches its end (or the file ends) — never on a timer.
       recSub = p.addListener("playbackStatusUpdate", (s) => {
         if (token !== recToken) return;
         if (s.didJustFinish || s.currentTime >= seg.end - 0.02) finish();
       });
-      // Carry straight on when the recording is already at this sentence (it just finished the one before).
+      // Resume after a pause: from the exact moment it was paused (within this sentence's stretch).
+      const pausedHere = o.resuming && recPausedAt && recPausedAt.url === n.url && recPausedAt.chunk === chunk
+        && recPausedAt.time >= seg.start && recPausedAt.time < seg.end ? recPausedAt.time : null;
+      recPausedAt = null;
+      const from = pausedHere ?? seg.start;
+      // Carry straight on when the recording is already here (it just finished the sentence before).
       const here = p.currentTime;
-      const contiguous = p.playing && here >= seg.start - 0.6 && here <= seg.start + 0.3;
+      const contiguous = pausedHere === null && p.playing && here >= seg.start - 0.6 && here <= seg.start + 0.3;
       p.setPlaybackRate(o.rate);
       if (contiguous) p.play();
-      else p.seekTo(seg.start).then(() => { if (token === recToken) p.play(); }, () => { if (token === recToken) p.play(); });
-      // The recording can't be played (no connection, an expired link): this sentence — and the rest
-      // of this recording — goes to the phone's voice rather than silence.
-      setTimeout(() => {
-        if (done || token !== recToken || p.currentTime > seg.start + 0.05 || p.playing) return;
-        done = true; recBroken.add(n.url); recStop(true); deviceSpeech.speak(text, o);
-      }, 6000);
-      // Never stuck: if status updates stop, move on after the segment's length (+ slack).
-      setTimeout(finish, ((seg.end - seg.start) / Math.max(0.5, o.rate)) * 1000 + 2500);
+      else p.seekTo(from).then(() => { if (token === recToken) p.play(); }, () => { if (token === recToken) p.play(); });
+      // Watchdog — progress, not time. A recording that never starts (no connection, an expired link) goes to
+      // the phone's voice; one that stops moving mid-sentence (buffering) is WAITED for, and only after a long
+      // stall is it reported as an error (the listener resumes from the same place). It never skips ahead.
+      let lastTime = -1, still = 0, started = false;
+      recWatch = setInterval(() => {
+        if (done || token !== recToken) { if (recWatch) { clearInterval(recWatch); recWatch = null; } return; }
+        const t = p.currentTime;
+        if (t > from + 0.05) started = true;
+        if (t !== lastTime) { lastTime = t; still = 0; return; }
+        still++;
+        if (!started && still >= 6) { // 6 s and not a moment played: the recording isn't reachable
+          done = true; if (recWatch) { clearInterval(recWatch); recWatch = null; }
+          recBroken.add(n.url); recStop(true); deviceSpeech.speak(text, o);
+        } else if (started && still >= 25) { // stuck mid-sentence for 25 s: stop and say so (no skipping)
+          done = true; if (recWatch) { clearInterval(recWatch); recWatch = null; }
+          recPausedAt = { url: n.url, chunk, time: t };
+          recStop(true); o.onError?.(new Error("the recording stopped loading — check your connection, then tap play to continue"));
+        }
+      }, 1000);
     } catch {
       recStop(true);
       deviceSpeech.speak(text, o);
     }
   },
-  stop: () => { recStop(false); return deviceSpeech.stop(); },
+  stop: () => { recStop(false); cloudStop(true); return deviceSpeech.stop(); },
   capabilities: deviceSpeech.capabilities,
   getVoices: deviceSpeech.getVoices,
 };
 function recStop(now: boolean) {
   recToken++;
   recSub?.remove(); recSub = null;
+  if (recWatch) { clearInterval(recWatch); recWatch = null; }
   if (recPause) { clearTimeout(recPause); recPause = null; }
   if (!recPlayer) return;
+  // Remember where this sentence was (a pause resumes from here; any other start ignores it).
+  if (recCurrent && recCurrent.url === recUrl) { try { recPausedAt = { url: recUrl, chunk: recCurrent.chunk, time: recPlayer.currentTime }; } catch {} }
   if (now) { try { recPlayer.pause(); } catch {} return; }
   // Deferred: if the engine starts the next sentence straight away, it carries on without a gap.
   recPause = setTimeout(() => { recPause = null; try { recPlayer?.pause(); } catch {} }, 0);
@@ -139,7 +263,11 @@ export const listen = createListenEngine(recordedNarration, {
   get: (k) => AsyncStorage.getItem(k),
   set: (k, v) => AsyncStorage.setItem(k, v),
   remove: (k) => AsyncStorage.removeItem(k),
+}, Date.now, {
+  // A verified P2P Voice for a language the phone can't speak (e.g. Igbo, once a specialist provider is verified).
+  externalVoice: (language, kind) => isEligibleKind(kind) && !!chosenVoiceFor(language),
 });
+void loadVoicePrefs(); void loadVoiceDefaults();
 
 export function useListenState(): ListenState {
   return useSyncExternalStore(listen.subscribe, listen.getState, listen.getState);

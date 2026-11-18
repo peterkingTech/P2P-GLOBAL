@@ -48,6 +48,15 @@ export interface SpeakOptions {
   source?: string;
   /** The content's recorded narration, when it has one (opaque here; see lib/listen/narration). */
   narration?: unknown;
+  /** This chunk's place in the content, and every chunk's displayed text in playing order — so a recording
+   *  can be matched to the whole content once, in order (lib/listen/narration alignChunks). */
+  chunkIndex?: number;
+  chunkSources?: readonly string[];
+  /** True when continuing after a pause: a recording carries on from the exact moment it was paused. */
+  resuming?: boolean;
+  /** What is being read (P2P Voices: only eligible kinds may use a cloud voice — never "bible"), and its identity. */
+  kind?: ListenKind;
+  contentKey?: string;
 }
 /** What a narration source can honestly report. */
 export interface NarrationCapabilities {
@@ -75,7 +84,7 @@ export interface ListenLink { label: string; open: () => void }
 /** After listening: the next learning step on the same screen (never automatic). */
 export interface ListenAction { label: string; icon?: string; open: () => void }
 /** "playlist": a Scripture playlist / collection — one section per passage; plays on through them (Repeat applies). */
-export type ListenKind = "bible" | "story" | "story-intro" | "lesson" | "plan" | "playlist" | "study";
+export type ListenKind = "bible" | "story" | "story-intro" | "lesson" | "plan" | "playlist" | "study" | "daily_word";
 /** Playlists only: off · the current passage again · the whole queue again. */
 export type RepeatMode = "off" | "one" | "all";
 export type ArtworkSource = number | { uri: string };
@@ -171,7 +180,12 @@ const DEVICE_SPEECH: NarrationCapabilities = { seekSeconds: false, duration: fal
 /** Previous in a playlist: before this many sentences of a passage, go to the passage before; after, restart it. */
 export const PREVIOUS_RESTART_AFTER = 2;
 
-export function createListenEngine(driver: SpeechDriver, store: ListenStore, now: () => number = Date.now, opts: { replayDelaySeconds?: number } = {}) {
+export function createListenEngine(driver: SpeechDriver, store: ListenStore, now: () => number = Date.now, opts: {
+  replayDelaySeconds?: number;
+  /** P2P Voices: a verified voice for this language exists OUTSIDE the phone (e.g. Igbo through a specialist
+   *  provider) — then a phone with no voice for the language can still listen. Never consulted for "bible". */
+  externalVoice?: (language: string, kind?: ListenKind) => boolean;
+} = {}) {
   const replayDelay = opts.replayDelaySeconds ?? 3;
   let state: ListenState = {
     status: "idle", content: null, section: 0, partKey: null, chunk: 0, chunkCount: 0, chunks: [],
@@ -232,7 +246,10 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
   const clearPosition = (key: string) => quiet(store.remove(POS + key));
 
   // ── Speaking ──────────────────────────────────────────────────────────────
-  function speakFrom(index: number, offset = 0) {
+  let sources: string[] | null = null;
+  /** Every chunk's displayed text, in playing order (worked out once per content). */
+  const chunkSources = () => (sources ??= chunks.map((c) => content?.sections[c.section]?.parts[c.part]?.text.slice(c.start, c.end) ?? ""));
+  function speakFrom(index: number, offset = 0, resuming = false) {
     if (!content || index < 0 || index >= chunks.length || !state.voice || state.voice.kind === "unavailable") return;
     halt();
     const g = gen;
@@ -250,6 +267,8 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
         background: prefs.background,
         source: content.sections[c.section]?.parts[c.part]?.text.slice(c.start, c.end),
         narration: content.narration,
+        kind: content.kind, contentKey: content.key,
+        chunkIndex: index, chunkSources: chunkSources(), resuming,
         onBoundary: (e) => { if (g === gen && typeof e?.charIndex === "number") boundary = spokenFrom + e.charIndex; },
         onDone: () => { if (g === gen) advance(); },
         onError: (e) => { if (g === gen) fail("speech", `Listening stopped: ${e?.message || "the speech engine reported a problem"}.`); },
@@ -333,6 +352,7 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
     content = c;
     // One utterance per sentence; spoken copy prepared for the TEXT's language. The screen is untouched.
     chunks = buildChunks(c.sections, CHUNK_MAX, (t) => prepareSpeech(t, c.language));
+    sources = null;
     const { sections, ...rest } = c;
     set({
       status: "loading", content: { ...rest, sections, sectionTitles: sections.map((s) => s.title) },
@@ -345,7 +365,8 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
     set({ range: rangeFor(c) });
     const voices = await loadVoices();
     if (my !== request) return; // replaced while loading
-    const choice = chooseVoice(c.language, voices, prefs.voices[baseLanguage(c.language)] ?? null, override);
+    let choice = chooseVoice(c.language, voices, prefs.voices[baseLanguage(c.language)] ?? null, override);
+    if (choice.kind === "unavailable" && c.kind !== "bible" && opts.externalVoice?.(c.language, c.kind)) choice = { kind: "match", language: choice.language, voice: null };
     set({ voice: choice, voices: voicesFor(c.language, voices), allVoices: narrationVoices(voices), rate: prefs.rate, autoAgain: prefs.autoAgain });
     if (choice.kind === "unavailable") {
       return set({ status: "error", error: { kind: "unavailable_language", message: "This phone has no voice for this language. Choose another voice to listen anyway, or keep reading." } });
@@ -392,7 +413,7 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
     fromTheTop();
   }
   function resume() {
-    if (state.status === "paused") speakFrom(state.chunk, spokenFrom);
+    if (state.status === "paused") speakFrom(state.chunk, spokenFrom, true);
     else if (state.status === "completed") listenAgain();
     else if (state.status === "error" && state.error?.kind === "speech") speakFrom(state.chunk, spokenFrom);
   }
@@ -400,7 +421,7 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
     request++;
     halt();
     if (content && state.status === "playing") savePosition(chunks[state.chunk]);
-    content = null; chunks = []; override = null;
+    content = null; chunks = []; sources = null; override = null;
     set({ status: "idle", content: null, chunk: 0, chunkCount: 0, chunks: [], partKey: null, error: null, replayCountdown: null, upNext: null, replayed: false, presented: false, previewing: null, range: null });
   }
   const restartHere = () => { if (state.status === "playing") { const at = resumeOffset(chunks[state.chunk]?.text ?? "", boundary); speakFrom(state.chunk, at); } };
@@ -468,6 +489,9 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
      * the current sentence is read in that voice, then the narration carries on
      * if it was playing. Same single speech session — never two at once.
      */
+    /** P2P Voices: the voice source changed (another P2P Voice, official narration, the phone's voice) —
+     *  carry on from the SAME sentence, never from the start of the chapter. */
+    voiceSourceChanged() { restartHere(); },
     previewVoice(identifier: string) {
       if (!content) return;
       const v = state.allVoices.find((x) => x.identifier === identifier);

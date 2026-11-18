@@ -42,11 +42,13 @@ export default function AddScripture() {
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState<SaveTarget[] | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [pos, setPos] = useState<{ book: string; chapter: number } | null>(null);
   const ac = useRef<AbortController | null>(null);
 
   useEffect(() => {
     Promise.all([getTranslations(), loadPosition()]).then(([r, pos]) => {
       setTranslations(r.translations);
+      if (pos?.book && pos.chapter) setPos({ book: pos.book, chapter: pos.chapter });
       setT((cur) => cur || (pos && r.translations.some((x) => x.code === pos.translation) ? pos.translation : r.translations.find((x) => x.isDefault && x.language === "en")?.code ?? r.translations[0]?.code ?? ""));
     }).catch((e: any) => setError(e?.message ?? "Couldn't load translations."));
   }, []);
@@ -95,17 +97,21 @@ export default function AddScripture() {
         <View style={s.search}>
           <Ionicons name="search" size={18} color={c.textMuted} />
           <TextInput style={s.input} value={q} onChangeText={setQ} onSubmitEditing={() => run(0)} placeholder='John 3:16 · faith · "The Lord is my shepherd"' placeholderTextColor={c.textMuted}
-            returnKeyType="search" autoCorrect={false} accessibilityLabel="Search by reference, words or an exact phrase in quotes" />
+            returnKeyType="search" autoCorrect={false} autoFocus accessibilityLabel="Search by reference, words or an exact phrase in quotes" />
           {q ? <IconButton icon="close-circle" size="sm" color={c.textMuted} accessibilityLabel="Clear" onPress={() => { setQ(""); setResults(null); setNote(null); }} /> : null}
         </View>
         <View style={s.row}>
           <Pressable style={s.tChip} onPress={() => setPickT(true)} accessibilityRole="button" accessibilityLabel={`Translation: ${tInfo?.name ?? t}. Change`}>
             <Ionicons name="language-outline" size={16} color={c.accentGreen} />
-            <Text style={s.tText} numberOfLines={1}>{tInfo?.abbreviation ?? t}{tInfo?.name ? ` · ${tInfo.name}` : ""}</Text>
+            <Text style={s.tText} numberOfLines={1}>{tInfo?.abbreviation ?? t}</Text>
             <Ionicons name="chevron-down" size={14} color={c.textMuted} />
           </Pressable>
-          <AppButton label="Search" size="sm" onPress={() => run(0)} disabled={kind.kind === "empty" || !t} loading={busy && !results} />
+          <AppButton label="Search" icon="search" size="sm" onPress={() => run(0)} disabled={kind.kind === "empty" || !t} loading={busy && !results} style={{ flex: 1 }} />
         </View>
+        {/* Or go to the Bible itself: select verses there and "Add to playlist" (this playlist already ticked when coming from it). */}
+        <AppButton label="Browse the Bible" icon="book-outline" variant="secondary" fullWidth
+          onPress={() => router.push({ pathname: "/bible", params: { book: pos?.book ?? "JHN", chapter: String(pos?.chapter ?? 1), ...(t ? { t } : {}), ...(to ? { addTo: String(to) } : {}) } } as any)}
+          accessibilityLabel="Browse the Bible: select verses there, then Add to playlist" />
         {hint ? <Text style={s.hint}>{hint}{tInfo?.provider === "helloao" && kind.kind !== "reference" ? " — this translation can only be searched by reference. Switch translation to search words." : ""}</Text> : null}
         {flash ? <Text style={s.flash} accessibilityLiveRegion="polite">{flash}</Text> : null}
         {error ? <Text style={s.error} accessibilityLiveRegion="polite">{error}</Text> : null}
@@ -113,7 +119,7 @@ export default function AddScripture() {
         {results === null && !busy ? (
           <View style={s.empty}>
             <Ionicons name="book-outline" size={28} color={c.accentGreen} />
-            <Text style={s.emptyText}>Search by reference (John 3:16, Psalm 23:1-6), by a word (hope, forgiveness) or by a phrase in quotes. Choose several results and add them in one go.</Text>
+            <Text style={s.emptyText}>Search by reference (John 3:16, Psalm 23:1-6), by a word (hope, forgiveness) or by a phrase in quotes. Choose several results and add them in one go — or Browse the Bible, select verses and tap Add to playlist.</Text>
           </View>
         ) : null}
         {results?.length === 0 && !error && !note ? <Text style={s.hint}>Nothing found. Try other words or a reference.</Text> : null}
@@ -130,7 +136,7 @@ export default function AddScripture() {
                 </View>
               </Pressable>
               <View style={s.actions}>
-                <AppButton label="Add" icon="add" size="sm" variant="secondary" onPress={() => setSaving([{ ref: r.ref, reference: r.reference }])} accessibilityLabel={`Add ${r.reference}`} />
+                <AppButton label="Add to playlist" icon="add" size="sm" variant="secondary" onPress={() => setSaving([{ ref: r.ref, reference: r.reference }])} accessibilityLabel={`Add ${r.reference} to a playlist`} />
                 <AppButton label="Listen" icon="headset-outline" size="sm" variant="tertiary" onPress={() => playRefs(r.reference, [{ ref: r.ref, reference: r.reference }], "search")} accessibilityLabel={`Listen to ${r.reference}`} />
                 <AppButton label="Open" icon="book-outline" size="sm" variant="tertiary" onPress={() => router.push(bibleRoute({ book: r.ref.bookCode, chapter: r.ref.chapter, v: r.ref.startVerse, ve: r.ref.endVerse, translation: t }) as any)} accessibilityLabel={`Open ${r.reference} in the Bible reader`} />
               </View>
@@ -144,7 +150,7 @@ export default function AddScripture() {
         <View style={[s.bottom, { paddingBottom: 12 + insets.bottom }]}>
           <Text style={s.bottomText}>{selected.length} selected</Text>
           <AppButton label="Clear" size="sm" variant="tertiary" onPress={() => setChosen(new Set())} />
-          <AppButton label={`Add selected Scriptures`} icon="add" onPress={() => setSaving(selected.map((r) => ({ ref: r.ref, reference: r.reference })))} />
+          <AppButton label={`Add selected to playlist`} icon="add" onPress={() => setSaving(selected.map((r) => ({ ref: r.ref, reference: r.reference })))} />
         </View>
       ) : null}
 

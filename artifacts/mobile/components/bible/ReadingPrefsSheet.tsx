@@ -1,5 +1,7 @@
 import React, { useMemo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Switch } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Switch, ScrollView } from "react-native";
+import { useTranslation } from "react-i18next";
+import { EMPHASIS, emphasisColor, type EmphasisCategory } from "@/lib/scriptureEmphasis";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
@@ -14,10 +16,23 @@ interface Props {
   prefs: BibleReadingPrefs;
   onChange: (patch: Partial<BibleReadingPrefs>) => void;
   onClose: () => void;
+  /** Scripture emphasis: categories with published references, and whether this translation marks Jesus' words. */
+  emphasisAvailable?: string[];
+  jesusMarked?: boolean;
+  /** "emphasis": open as the Scripture emphasis sheet only (its own menu item in the reader, 2026-11-18). */
+  only?: "emphasis";
 }
 
-export default function ReadingPrefsSheet({ visible, prefs, onChange, onClose }: Props) {
-  const { colors: c } = useTheme();
+export default function ReadingPrefsSheet({ visible, prefs, onChange, onClose, emphasisAvailable = [], jesusMarked = false, only }: Props) {
+  const emphasisOnly = only === "emphasis";
+  const { colors: c, resolvedMode } = useTheme();
+  const { t } = useTranslation();
+  const on = new Set(prefs.emphasis);
+  const toggle = (k: EmphasisCategory, v: boolean) => onChange({ emphasis: v ? [...prefs.emphasis.filter((x) => x !== k), k] : prefs.emphasis.filter((x) => x !== k) });
+  // What each category can honestly show right now.
+  const note = (k: EmphasisCategory) => k === "jesus"
+    ? (jesusMarked ? null : t("bibleEmphasis.jesusNotMarked"))
+    : (on.has(k) && !emphasisAvailable.includes(k) ? t("bibleEmphasis.notPublished") : null);
   const styles = useMemo(() => makeStyles(c), [c]);
 
   const segmented = <K extends "lineSpacing" | "layout">(key: K, options: { value: BibleReadingPrefs[K]; label: string }[]) => (
@@ -38,10 +53,12 @@ export default function ReadingPrefsSheet({ visible, prefs, onChange, onClose }:
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableOpacity accessibilityRole="button" style={styles.overlay} activeOpacity={1} onPress={onClose} accessibilityLabel="Close reading settings">
         <TouchableOpacity activeOpacity={1} style={styles.sheet}>
+          <ScrollView style={{ maxHeight: 640 }} showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
-            <Text style={styles.title} accessibilityRole="header">Reading settings</Text>
+            <Text style={styles.title} accessibilityRole="header">{emphasisOnly ? t("bibleEmphasis.title") : "Reading settings"}</Text>
             <IconButton icon="close" accessibilityLabel="Close" onPress={onClose} color={c.textDark} style={{ marginRight: -8 }} />
           </View>
+          {!emphasisOnly ? (<>
 
           <Text style={[styles.preview, { fontSize: prefs.fontSize, lineHeight: Math.round(prefs.fontSize * LINE_HEIGHT[prefs.lineSpacing]) }]} numberOfLines={3}>
             In the beginning was the Word, and the Word was with God.
@@ -70,6 +87,27 @@ export default function ReadingPrefsSheet({ visible, prefs, onChange, onClose }:
             <Ionicons name="contrast-outline" size={14} color={c.textMuted} />
             <Text style={styles.themeNoteText}>Light and dark follow your P2P appearance setting.</Text>
           </View>
+
+          </>) : null}
+          {/* Scripture emphasis (2026-11-18): independent categories, each with its legend colour. */}
+          {!emphasisOnly ? <Text style={styles.label} accessibilityRole="header">{t("bibleEmphasis.title")}</Text> : null}
+          <Text style={styles.themeNoteText}>{t("bibleEmphasis.intro")}</Text>
+          {EMPHASIS.map((k) => {
+            const n = note(k);
+            return (
+              <View key={k} style={styles.emRow}>
+                <Text style={[styles.emDot, { color: emphasisColor(k, resolvedMode === "dark" ? "dark" : "light") }]} accessibilityElementsHidden importantForAccessibility="no">{"\u25CF"}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.switchLabel, { color: emphasisColor(k, resolvedMode === "dark" ? "dark" : "light") }]}>{t(`bibleEmphasis.cat.${k}`)}</Text>
+                  {n ? <Text style={styles.themeNoteText}>{n}</Text> : null}
+                </View>
+                <Switch value={on.has(k)} onValueChange={(v) => toggle(k, v)} trackColor={{ true: c.accentGreen, false: c.borderBeige }}
+                  accessibilityLabel={t("bibleEmphasis.toggle", { name: t(`bibleEmphasis.cat.${k}`) })} />
+              </View>
+            );
+          })}
+          <Text style={[styles.themeNoteText, { marginTop: 8 }]}>{t("bibleEmphasis.yourHighlights")}</Text>
+          </ScrollView>
         </TouchableOpacity>
       </TouchableOpacity>
     </Modal>
@@ -96,5 +134,7 @@ function makeStyles(c: AppColors) {
     switchLabel: { fontSize: 15, color: c.textDark, fontFamily: "Inter_500Medium" },
     themeNote: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 14 },
     themeNoteText: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", flex: 1 },
+    emRow: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 48 },
+    emDot: { fontSize: 16, width: 18, textAlign: "center" },
   });
 }

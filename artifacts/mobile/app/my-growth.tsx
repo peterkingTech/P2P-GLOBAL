@@ -8,6 +8,7 @@ import type { AppColors } from "@/constants/themes";
 import { STAGES } from "@/constants/stages";
 import { AppButton, ChipRow, FilterChip, IconButton } from "@/components/ui";
 import LivingTreeView from "@/components/growth/LivingTreeView";
+import TreePartsPanel from "@/components/growth/TreePartsPanel";
 import { withScreenBoundary } from "@/components/ScreenErrorBoundary";
 import { useGrowthStage } from "@/hooks/useGrowthStage";
 import { useGrowthTree } from "@/hooks/useGrowthTree";
@@ -163,6 +164,8 @@ function MyGrowthScreen() {
                   {t(`myGrowth.roots.status.${l.status}`)}{l.passedOn ? ` · ${fmt(l.passedOn)}` : ""}{l.practicalVerified ? ` · ${t("myGrowth.roots.practicalVerified", { count: l.practicalVerified })}` : ""}
                 </Text>
                 <Text style={s.small}>{l.group}</Text>
+                {l.about ? <Text style={s.small}>{t("myGrowth.roots.about", { defaultValue: "About this lesson: {{about}}", about: l.about })}</Text> : null}
+                {l.scripture?.length ? <Text style={s.small}>{t("myGrowth.roots.scripture", { defaultValue: "Scripture: {{refs}}", refs: l.scripture.join(" · ") })}</Text> : null}
               </TouchableOpacity>
             ))}
             {open && r.lessons.length > LESSONS_SHOWN ? (
@@ -216,6 +219,9 @@ function MyGrowthScreen() {
             <Text style={s.lessonTitle}>{f.label}</Text>
             <Text style={s.meta}>{fmt(f.date)} · {f.areaLabel} · {f.kind === "group" ? t("myGrowth.contributions.group", { count: f.peopleHelped ?? 0 }) : t("myGrowth.contributions.individual")}</Text>
             <Text style={[s.status, f.countsTowardMilestone ? s.statusPassed : s.statusOpen]}>{t(`myGrowth.contributions.status.${f.status}`)}</Text>
+            <Text style={s.small}>{f.status === "verified"
+              ? t("myGrowth.contributions.meaningVerified", { defaultValue: "What it means: a verified contribution to someone else's growth in {{area}}. It counts toward your next milestone.", area: f.areaLabel })
+              : t("myGrowth.contributions.meaningOther", { defaultValue: "What it means: a contribution in {{area}} that is not fruit yet. Only verified contributions become fruit.", area: f.areaLabel })}</Text>
           </View>
         );
       })}
@@ -263,7 +269,7 @@ function MyGrowthScreen() {
     </View>
   );
 
-  const content = section === "tree" ? <View style={{ gap: 12 }}>{stageCard}</View>
+  const content = section === "tree" ? <View style={{ gap: 12 }}><TreePartsPanel tree={tree} onOpenSection={setSection} />{stageCard}</View>
     : section === "roots" ? rootsSection : section === "application" ? applicationSection
     : section === "contributions" ? contributionsSection : section === "consistency" ? consistencySection : journeySection;
 

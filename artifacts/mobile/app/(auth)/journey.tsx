@@ -229,7 +229,8 @@ export default function JourneyScreen() {
     } finally {
       setBeginning(false);
     }
-    router.replace("/(tabs)" as any);
+    // 2026-11-18: the How to use P2P introduction first, then Home ("Continue to Home").
+    router.replace("/get-started?intro=1" as any);
   }
 
   async function handleRegisterChurchNow() {
@@ -249,7 +250,7 @@ export default function JourneyScreen() {
     } finally {
       setBeginning(false);
     }
-    router.replace("/(tabs)" as any);
+    router.replace("/get-started?intro=1" as any);
   }
 
   const topPad = insets.top + (Platform.OS === "web" ? 20 : 0);

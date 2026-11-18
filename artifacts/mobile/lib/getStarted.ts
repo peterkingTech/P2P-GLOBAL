@@ -6,7 +6,7 @@ import { DISCOVER_ROUTE, PRAYER_ROUTE } from "@/lib/moreRoutes";
 // per user on this device (AsyncStorage, same as other per-user UI state).
 
 export type GetStartedStepId =
-  | "understand" | "learning-path" | "peer-evaluation" | "connect" | "learn-together" | "pray" | "help-grow" | "discover";
+  | "understand" | "learning-path" | "bible" | "plans" | "peer-evaluation" | "connect" | "learn-together" | "pray" | "growth" | "help-grow" | "discover";
 
 export interface GetStartedStep {
   id: GetStartedStepId;
@@ -49,9 +49,31 @@ export const GET_STARTED_STEPS: GetStartedStep[] = [
     route: "/kingdom-school", actionLabel: "Open Kingdom School",
   },
   {
+    // 2026-11-18: the Bible tab and its study tools (guide version 2).
+    id: "bible", number: 3, title: "Read, hear and study the Bible", icon: "book",
+    summary: "The Bible tab: read, listen, compare translations and study deeper.",
+    points: [
+      "Choose a book and chapter, select verses to highlight them, save them or add a note.",
+      "Tap Listen to hear the chapter read aloud — it keeps going while you scroll.",
+      "Compare translations side by side, or switch to another one in your language.",
+      "Deep Study shows the original Hebrew and Greek words, cross-references, people and places, and commentaries — each with its source.",
+    ],
+    route: "/bible", actionLabel: "Open the Bible",
+  },
+  {
+    id: "plans", number: 4, title: "Plan your study", icon: "calendar-outline",
+    summary: "P2P Plans organise what you want to study, at your own pace.",
+    points: [
+      "Choose a Bible book, a topic such as Love, or a Kingdom School course — P2P shows what it has for it and why.",
+      "Build your own plan step by step, or start a prepared plan, on your own or together.",
+      "Pausing never loses your place, and there are no streaks or points.",
+    ],
+    route: "/plans", actionLabel: "Open P2P Plans",
+  },
+  {
     // Peer evaluation: there is no sign-up and no volunteer list. Passing a resource through an
     // independent evaluation is what qualifies someone, for that exact resource only.
-    id: "peer-evaluation", number: 3, title: "Learn Together. Help Others Grow.", icon: "people-circle-outline",
+    id: "peer-evaluation", number: 5, title: "Learn Together. Help Others Grow.", icon: "people-circle-outline",
     summary: "How peer evaluation works — and how you'll be invited to help.",
     points: [
       "You learn through Kingdom School, Kingdom Stories, reading plans and other P2P resources.",
@@ -66,7 +88,7 @@ export const GET_STARTED_STEPS: GetStartedStep[] = [
     showsServiceStatus: true,
   },
   {
-    id: "connect", number: 4, title: "Connect with peers", icon: "people-outline",
+    id: "connect", number: 6, title: "Connect with peers", icon: "people-outline",
     summary: "Find people to grow with, and stay in touch.",
     points: [
       "Connect with peers from Discover or a peer's profile.",
@@ -76,7 +98,7 @@ export const GET_STARTED_STEPS: GetStartedStep[] = [
     route: "/connect", actionLabel: "Find peers",
   },
   {
-    id: "learn-together", number: 5, title: "Learn together", icon: "school-outline",
+    id: "learn-together", number: 7, title: "Learn together", icon: "school-outline",
     summary: "Study the Bible with others, live.",
     points: [
       "Peer Circles meet regularly for Bible study.",
@@ -86,7 +108,7 @@ export const GET_STARTED_STEPS: GetStartedStep[] = [
     route: "/circles/discover", actionLabel: "Explore Peer Circles",
   },
   {
-    id: "pray", number: 6, title: "Pray together", icon: "hand-left-outline",
+    id: "pray", number: 8, title: "Pray together", icon: "hand-left-outline",
     summary: "Bring requests, pray for others, and share what God has done.",
     points: [
       "Post a prayer request or pray for someone else's.",
@@ -95,7 +117,17 @@ export const GET_STARTED_STEPS: GetStartedStep[] = [
     route: PRAYER_ROUTE, actionLabel: "Open Prayer",
   },
   {
-    id: "help-grow", number: 7, title: "Help someone grow", icon: "person-add-outline",
+    id: "growth", number: 9, title: "See how you grow", icon: "leaf",
+    summary: "Your tree shows real growth — not points.",
+    points: [
+      "Your growth stage moves forward through verified learning, application, consistency and service — never by opening content.",
+      "My Growth shows what you have done, what is next, and what each stage needs.",
+      "These milestones never measure your relationship with God or your worth.",
+    ],
+    route: "/my-growth", actionLabel: "Open My Growth",
+  },
+  {
+    id: "help-grow", number: 10, title: "Help someone grow", icon: "person-add-outline",
     summary: "Be an Electronic Evangelist.",
     points: [
       "Your phone can be more than a place to consume. Use it to help someone grow.",
@@ -104,7 +136,7 @@ export const GET_STARTED_STEPS: GetStartedStep[] = [
     route: "/connect/invite", actionLabel: "Invite a peer",
   },
   {
-    id: "discover", number: 8, title: "Discover Kingdom opportunities", icon: "compass-outline",
+    id: "discover", number: 11, title: "Discover Kingdom opportunities", icon: "compass-outline",
     summary: "See what God is doing, and where you can take part.",
     points: [
       "Discover shows live rooms, peer groups, churches and Kingdom Stories.",
@@ -115,6 +147,26 @@ export const GET_STARTED_STEPS: GetStartedStep[] = [
 ];
 
 const keyFor = (userId: string) => `getStarted:${userId}`;
+
+// ── The introduction after onboarding, and "what's new" (2026-11-18) ───────────
+/** Raise when significant new features are added to the guide; list them in WHATS_NEW. */
+export const GUIDE_VERSION = 2;
+/** The guide steps that are new in each version — shown once to people who saw an earlier version. */
+export const WHATS_NEW: Record<number, GetStartedStepId[]> = { 2: ["bible", "plans", "growth"] };
+const introKey = (userId: string) => `getStarted:intro:${userId}`;
+/** The guide version this person last saw as an introduction (0 = never). */
+export async function loadIntroSeen(userId: string): Promise<number> {
+  try { return Number(await AsyncStorage.getItem(introKey(userId))) || 0; } catch { return 0; }
+}
+export async function markIntroSeen(userId: string, version = GUIDE_VERSION): Promise<void> {
+  try { await AsyncStorage.setItem(introKey(userId), String(version)); } catch {}
+}
+/** New steps to point out to someone who last saw version `seen` (never on a first introduction). */
+export function whatsNewSince(seen: number, version = GUIDE_VERSION): GetStartedStepId[] {
+  const out: GetStartedStepId[] = [];
+  for (let v = Math.max(seen + 1, 2); v <= version; v++) out.push(...(WHATS_NEW[v] ?? []));
+  return out;
+}
 
 export async function loadCompletedSteps(userId: string): Promise<Set<GetStartedStepId>> {
   try {

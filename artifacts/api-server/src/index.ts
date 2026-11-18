@@ -13,6 +13,7 @@ import { flagOverdueContactMessages } from "./lib/contactOverdue";
 import { dispatchPendingPushes } from "./lib/pushDispatch";
 import { sendDueChurchCallReminders } from "./lib/churchCallReminders";
 import { sweepUnansweredCalls } from "./lib/callSweep";
+import { sweep as sweepAdminNotifications } from "./lib/adminNotifications";
 import { processScheduledDeletions } from "./lib/accountDeletion";
 import { runStudioScheduler } from "./lib/studio/runtime";
 
@@ -92,6 +93,17 @@ cron.schedule("*/1 * * * *", async () => {
     }
   } catch (err) {
     logger.error({ err }, "Crisis call escalation sweep failed");
+  }
+});
+
+// Admin Centre notifications — detect what needs administrative attention in every module, resolve what was
+// handled, and remind about what is overdue (lib/adminNotifications). Every minute; never from page rendering.
+cron.schedule("*/1 * * * *", async () => {
+  try {
+    const r = await sweepAdminNotifications();
+    if (r.created || r.resolved || r.reminded) logger.info(r, "Admin notifications sweep");
+  } catch (err) {
+    logger.error({ err }, "Admin notifications sweep failed");
   }
 });
 

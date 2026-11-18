@@ -36,7 +36,10 @@ const keysNeeded = Object.keys(apiCats.byTitle).map(U.topicKey);
 ok("13. every topic name and category has an English string (others fall back to English)", keysNeeded.every((k) => en.names[k]) && [...U.TOPIC_CATEGORIES, "other"].every((c) => en.categories[c]) && Object.keys(en.kinds).length === 7);
 ok("14. the introduction is unchanged", en.title === "Explore Scripture by Topic" && en.intro === "Passages chosen by P2P editors for each topic. Open any passage to read it in context.");
 ok("plurals use i18next v4 forms", en.count_one && en.count_other);
-ok("list: search box, category headers, counts beside topics, no hard-coded English labels", list.includes("searchTopics(") && list.includes("groupTopics(") && list.includes("scriptureCount") && list.includes('t("scriptureTopics.search")') && !list.includes('"Topics couldn\'t load. Try again"'));
+// 2026-11-18 (owner): the topic list was removed from Bible Study — topics are reached through the one search
+// (My Plan, api-server lib/studySearch: matched + connected topics), and each topic page is unchanged.
+ok("list: removed from Bible Study; the one search reaches topics instead", !list.includes("getTopics()") && !list.includes("groupTopics(") && list.includes('pathname: "/study", params: { q: query.trim() }')
+  && readFileSync(path.join(root, "../api-server/src/lib/studySearch.ts"), "utf8").includes('kind: "scripture_topic"'));
 ok("list: the search text is kept when returning from a topic (state in the mounted screen)", list.includes('const [query, setQuery] = useState("")'));
 ok("11–12. passages open in the existing Bible reader with the passage's translation", page.includes("topicPassageRoute(r)") && src("lib/bibleStudy.ts").includes("translation: r.translationCode") && !/fetch\(|bible\.helloao/.test(page));
 ok("topic page: editorial title and passage kind shown when reviewed passages carry them", page.includes("r.editorialTitle") && page.includes("scriptureTopics.kinds."));

@@ -88,8 +88,12 @@ const json = JSON.stringify(W.buildWidgetSnapshot({ ...base, prefs: { personalGr
 ok("no tokens, ids of people, emails, journal or prayer text in the snapshot", !/token|password|email|journal(Text|Entry)|prayerRequest|reflection|answer|message/i.test(json.replace(/journalUrl|prayerUrl/g, "")));
 ok("change detection ignores the timestamp", W.snapshotKey(W.buildWidgetSnapshot(base)) === W.snapshotKey(W.buildWidgetSnapshot({ ...base, now: new Date("2026-10-31T09:00:00Z") })));
 ok("greeting boundaries: morning < 12 ≤ afternoon < 18 ≤ evening", W.greetingFor(0) === "Good morning" && W.greetingFor(11) === "Good morning" && W.greetingFor(12) === "Good afternoon" && W.greetingFor(17) === "Good afternoon" && W.greetingFor(18) === "Good evening");
-ok("verse of the day: same rule as Home (day of month % length)", W.verseForDay(verses, new Date(2026, 9, 3)).ref === verses[3 % 2].ref && W.verseForDay([], new Date()) === null);
-ok("Home and widgets share one verse list", /import \{ DAILY_VERSES \} from "@\/constants\/dailyVerses";/.test(read("contexts/DataContext.tsx")) && /new Date\(\)\.getDate\(\) % DAILY_VERSES\.length/.test(read("contexts/DataContext.tsx")) && read("components/widgets/WidgetSyncHost.tsx").includes("DAILY_VERSES"));
+// Daily Word rule (2026-11-18): local calendar days since 1 Jan 2024, modulo the list length — Home, widgets, /daily-word.
+ok("verse of the day: day number since 1 Jan 2024", W.dailyIndex(new Date(2024, 0, 1)) === 0 && W.dailyIndex(new Date(2024, 0, 2, 23, 59)) === 1 && W.dailyIndex(new Date(2025, 0, 1)) === 366);
+ok("verse of the day: consecutive days give consecutive entries, wrapping", W.verseForDay(verses, new Date(2024, 0, 1)).ref === verses[0].ref && W.verseForDay(verses, new Date(2024, 0, 2)).ref === verses[1].ref && W.verseForDay(verses, new Date(2024, 0, 3)).ref === verses[0].ref && W.verseForDay([], new Date()) === null);
+ok("verse of the day: before 2024 still valid", !!W.verseForDay(verses, new Date(2023, 11, 31)));
+ok("Home and widgets share one verse list and rule", /import \{ DAILY_VERSES \} from "@\/constants\/dailyVerses";/.test(read("contexts/DataContext.tsx")) && read("contexts/DataContext.tsx").includes("setDailyVerse(verseForDay(DAILY_VERSES, new Date()));") && read("components/widgets/WidgetSyncHost.tsx").includes("DAILY_VERSES"));
+ok("native widgets use the same day number", read("modules/p2p-widgets/android/src/main/java/expo/modules/p2pwidgets/P2PWidgets.kt").includes("epoch.set(2024, Calendar.JANUARY, 1)") && read("plugins/p2p-widgets/P2PWidgets.swift").includes("DateComponents(year: 2024, month: 1, day: 1)"));
 
 // ── 2. Daily reminders ──────────────────────────────────────────────────────
 const R = load("lib/dailyReminders.ts");
@@ -116,7 +120,7 @@ const contractKeys = ["updatedAt", "signedIn", "greeting", "verses", "verseUrl",
 ok("iOS decodes the snapshot fields it uses", contractKeys.every((k) => swift.includes(k)));
 ok("Android reads the snapshot fields it uses", ["greeting", "verses", "verseUrl", "school", "plans", "story", "learning", "together", "gathering", "reminders", "hasProgress", "modulesCompleted", "totalModules", "startsAt", "prayerUrl", "journalUrl", "updatedAt", "signedIn"].every((k) => kotlin.includes(`"${k}"`)));
 ok("both: greeting boundaries 12 / 18", /h < 12 \? "GOOD MORNING" : \(h < 18/.test(swift) && /if \(h < 12\) "GOOD MORNING" else if \(h < 18\)/.test(kotlin));
-ok("both: verse of the day = day of month % list length (same as Home)", /component\(\.day, from: date\) % list\.count/.test(swift) && /DAY_OF_MONTH\) % list\.length\(\)/.test(kotlin));
+ok("both: verse of the day = day number since 1 Jan 2024 % list length (same as Home)", swift.includes("let n = ((days % list.count) + list.count) % list.count") && kotlin.includes("val n = ((days % list.length()) + list.length()) % list.length()"));
 ok("both: 'may be out of date' after a day", /> 86_400/.test(swift) && /24L \* 60 \* 60 \* 1000/.test(kotlin));
 ok("both: signed out shows no personal data", /signedIn != true/.test(swift) && /if \(signedIn \|\| worksSignedOut\)/.test(kotlin));
 ok("widgets never fetch (no network APIs)", !/URLSession|URLRequest|dataTask/.test(swift) && !/HttpURLConnection|OkHttp|URL\(/.test(kotlin));

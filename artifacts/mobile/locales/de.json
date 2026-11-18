@@ -698,7 +698,10 @@
     "areaSub": "Tiefer gehen: die Ursprachen, klassische Kommentare und Studienwerkzeuge.",
     "titleSub": "Ein Abschnitt: Wörter der Ursprache, Kommentare, Querverweise",
     "commentariesSub": "Klassische Kommentare und offene Studiennotizen",
-    "studyToolsSub": "Hebräische, griechische und aramäische Lexika, Strong-Nummern, Querverweise"
+    "studyToolsSub": "Hebräische, griechische und aramäische Lexika, Strong-Nummern, Querverweise",
+    "saveStudy": "In meinen Studien speichern",
+    "myStudies": "Meine gespeicherten Studien",
+    "savedHistory": "In „Meine gespeicherten Studien“ gespeichert."
   },
   "dictionary": {
     "loadError": "Das Wörterbuch konnte nicht geladen werden.",

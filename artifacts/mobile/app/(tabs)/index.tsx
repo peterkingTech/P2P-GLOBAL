@@ -39,6 +39,9 @@ import { useGrowthTree } from "@/hooks/useGrowthTree";
 import { botanicalDevelopment } from "@/lib/botanicalDevelopment";
 import { useGrowthStage, nextRequirementsMet } from "@/hooks/useGrowthStage";
 import { withScreenBoundary } from "@/components/ScreenErrorBoundary";
+import { GUIDE_VERSION, loadIntroSeen, markIntroSeen } from "@/lib/getStarted";
+import { dailyWordByRef } from "@/lib/dailyWord";
+import SyncStatusBanner from "@/components/offline/SyncStatusBanner";
 
 // Time-of-day palette for the greeting header. No stock imagery exists in
 // the project, so the "sunrise / daylight / night" feeling comes from
@@ -56,13 +59,15 @@ const HERO_ICON: Record<DayPart, keyof typeof Ionicons.glyphMap> = {
 };
 
 // Greeting and Daily Word as ONE spiritual welcome. The verse comes from the
-// existing dailyVerse in DataContext; there is no verse detail screen, so no
-// arrow or pagination is shown.
-function HomeHero({ dayPart, greetingLine, firstName, verse, photoUrl, onPressAvatar, styles }: {
+// existing dailyVerse in DataContext; tapping it opens Daily Word (/daily-word:
+// the verse in the person's translation + Today's Instruction, 2026-11-18).
+function HomeHero({ dayPart, greetingLine, firstName, verse, photoUrl, onPressAvatar, onPressVerse, styles }: {
   dayPart: DayPart; greetingLine: string; firstName: string;
   verse: { text: string; ref: string } | null; photoUrl: string | null;
-  onPressAvatar: () => void; styles: ReturnType<typeof makeStyles>;
+  onPressAvatar: () => void; onPressVerse: () => void; styles: ReturnType<typeof makeStyles>;
 }) {
+  // The catalogue entry for the verse Home shows (looked up by reference, so Home, widgets and /daily-word agree).
+  const instruction = verse ? dailyWordByRef(verse.ref) : null;
   return (
     <LinearGradient colors={HERO_GRADIENTS[dayPart]} start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }} style={styles.hero}>
       <View style={styles.heroTopRow}>
@@ -76,10 +81,22 @@ function HomeHero({ dayPart, greetingLine, firstName, verse, photoUrl, onPressAv
       </Text>
       {!!firstName && <Text style={styles.heroName}>{firstName} 👋</Text>}
       {verse && (
-        <View style={styles.heroVerseWrap}>
+        <TouchableOpacity style={styles.heroVerseWrap} onPress={onPressVerse} accessibilityRole="button"
+          accessibilityLabel={`Daily Word, ${verse.ref}`} accessibilityHint="Opens the verse in your translation with Today's Instruction">
+          <Text style={styles.heroDwLabel}>DAILY WORD{instruction?.theme ? ` · ${instruction.theme.toUpperCase()}` : ""}</Text>
           <Text style={styles.heroVerseText}>"{verse.text}"</Text>
           <ReadableText style={styles.heroVerseRef}>— {verse.ref}</ReadableText>
-        </View>
+          {instruction?.instruction ? (
+            <View style={styles.heroInstr}>
+              <Text style={styles.heroInstrLabel}>Today's Instruction</Text>
+              <Text style={styles.heroInstrText}>{instruction.instruction}</Text>
+            </View>
+          ) : null}
+          <View style={styles.heroDwBtn}>
+            <Ionicons name="book-outline" size={15} color="#0B1F19" />
+            <Text style={styles.heroDwBtnText}>Open Daily Word</Text>
+          </View>
+        </TouchableOpacity>
       )}
     </LinearGradient>
   );
@@ -201,6 +218,9 @@ function GuideInvitationCard({ onFind, onDismiss, colors }: { onFind: () => void
 
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
+    whatsNew: { flexDirection: "row", alignItems: "center", gap: 10, padding: 14, borderRadius: 16, marginBottom: 16, backgroundColor: c.card, borderWidth: 1, borderColor: c.accentGreen },
+    whatsNewTitle: { fontSize: 15, color: c.textDark, fontFamily: "Inter_700Bold" },
+    whatsNewBody: { fontSize: 13, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 18 },
     container: { flex: 1, backgroundColor: c.lightCream },
     content: { paddingHorizontal: 20 },
 
@@ -212,6 +232,12 @@ function makeStyles(c: AppColors) {
     heroName: { fontSize: 30, color: "#fff", fontFamily: "Inter_700Bold", marginTop: 2 },
     heroVerseWrap: { marginTop: 14, borderLeftWidth: 2, borderLeftColor: "rgba(242,201,120,0.6)", paddingLeft: 12 },
     heroVerseText: { fontSize: 15, lineHeight: 23, color: "rgba(255,255,255,0.92)", fontFamily: "Inter_400Regular" },
+    heroDwLabel: { fontSize: 11, letterSpacing: 0.8, color: "rgba(242,201,120,0.95)", fontFamily: "Inter_700Bold", marginBottom: 6 },
+    heroInstr: { marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.15)" },
+    heroInstrLabel: { fontSize: 10, color: "rgba(255,255,255,0.7)", fontFamily: "Inter_700Bold", marginBottom: 2 }, // smaller than the verse (owner 2026-11-18)
+    heroInstrText: { fontSize: 12, lineHeight: 17, color: "rgba(255,255,255,0.85)", fontFamily: "Inter_400Regular" },
+    heroDwBtn: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", marginTop: 12, minHeight: 40, paddingHorizontal: 14, borderRadius: 20, backgroundColor: "rgba(242,201,120,0.95)" },
+    heroDwBtnText: { fontSize: 13, color: "#0B1F19", fontFamily: "Inter_700Bold" },
     heroVerseRef: { fontSize: 13, color: "rgba(242,201,120,0.95)", marginTop: 8, fontFamily: "Inter_600SemiBold" },
 
     // Growth stage: the stage's 3D still on top, the next milestone underneath.
@@ -352,6 +378,22 @@ function HomeTab() {
     return () => { cancelled = true; };
   }, [profile?.id]);
 
+  // "What's new" (2026-11-18): someone who finished onboarding before the guide's current version sees ONE
+  // dismissible card pointing at the new steps — never a forced replay. New participants get the full
+  // introduction right after onboarding instead (app/(auth)/journey.tsx), so they never see this card.
+  const [showWhatsNew, setShowWhatsNew] = useState(false);
+  useEffect(() => {
+    if (!profile?.id || !profile.onboardingJourneyCompletedAt) return;
+    let cancelled = false;
+    void loadIntroSeen(profile.id).then((seen) => { if (!cancelled && seen < GUIDE_VERSION) setShowWhatsNew(true); });
+    return () => { cancelled = true; };
+  }, [profile?.id, profile?.onboardingJourneyCompletedAt]);
+  const closeWhatsNew = useCallback((open: boolean) => {
+    setShowWhatsNew(false);
+    if (profile?.id) void markIntroSeen(profile.id);
+    if (open) router.push("/get-started?whatsNew=1" as any);
+  }, [profile?.id, router]);
+
   const dismissGuideInvitation = useCallback(async () => {
     setShowGuideInvitation(false);
     if (profile?.id) await AsyncStorage.removeItem(`guideInvitationPending:${profile.id}`);
@@ -418,8 +460,10 @@ function HomeTab() {
         />
       }
     >
+      <SyncStatusBanner />
       {/* 1. Greeting + Daily Word, one spiritual welcome */}
       <HomeHero
+        onPressVerse={() => router.push("/daily-word" as any)}
         dayPart={dayPart}
         greetingLine={timeGreeting}
         firstName={firstName}
@@ -428,6 +472,19 @@ function HomeTab() {
         onPressAvatar={go("/(tabs)/profile")}
         styles={styles}
       />
+
+      {showWhatsNew ? (
+        <View style={styles.whatsNew} accessibilityRole="summary">
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={styles.whatsNewTitle}>{t("guide.whatsNewTitle", { defaultValue: "What's new in P2P" })}</Text>
+            <Text style={styles.whatsNewBody}>{t("guide.whatsNewBody", { defaultValue: "See how to read and hear the Bible, plan your study and follow your growth." })}</Text>
+          </View>
+          <AppButton size="sm" label={t("guide.whatsNewOpen", { defaultValue: "Show me" })} onPress={() => closeWhatsNew(true)} />
+          <TouchableOpacity onPress={() => closeWhatsNew(false)} accessibilityRole="button" accessibilityLabel={t("guide.whatsNewDismiss", { defaultValue: "Dismiss" })} hitSlop={10}>
+            <Ionicons name="close" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       {/* 2. Current growth stage — the person's own living tree: the real Meshy 3D model of their verified
           stage (with its verified fruit), leaves moving in the wind. Opens the Living Tree. */}

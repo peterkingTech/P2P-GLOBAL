@@ -258,7 +258,8 @@ router.post("/", async (req, res) => {
   try {
     const kind = b.kind === "playlist" ? "playlist" : "collection";
     const title = cleanTitle(b.title);
-    const refs = b.refs === undefined ? [] : await readRefs(b.refs);
+    // A new collection / playlist may start empty (passages are added later) — an empty list is the same as none.
+    const refs = b.refs === undefined || (Array.isArray(b.refs) && b.refs.length === 0) ? [] : await readRefs(b.refs);
     const c = must(await db.from("p2p_scripture_collections").insert({ owner_id: userId, kind, title, description: cleanText(b.description, 500) }).select("*").single()) as Coll;
     if (refs.length) must(await db.from("p2p_scripture_collection_items").insert(refs.map((r, i) => ({ ...r, collection_id: c.id, position: i, added_by: userId }))).select("id"));
     await log(c.id, userId, "created", { kind, items: refs.length });

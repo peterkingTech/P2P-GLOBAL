@@ -52,6 +52,9 @@ export function isServable(r: TranslationRow): boolean {
 
 /** May the server keep chapters in its short memory cache? */
 export const canCache = (r: TranslationRow) => (providerOf(r) === "helloao" ? r.permits_caching === true : true);
+/** May the APP keep this translation's chapters for reading offline? Only when the licence record says so
+ *  explicitly (permits_offline = true) — never assumed, never for a translation whose terms weren't reviewed. */
+export const offlineAllowed = (r: TranslationRow) => r.permits_offline === true;
 /** May verse TEXT leave the app (copy / share)? Otherwise only the reference is shared. */
 export const textCopyAllowed = (r: TranslationRow) =>
   providerOf(r) === "helloao" ? r.permits_sharing === true : /public domain/i.test(r.license_notes ?? "");

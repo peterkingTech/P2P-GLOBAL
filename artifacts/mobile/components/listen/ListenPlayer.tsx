@@ -16,6 +16,8 @@ import { LARGE_TABLET_BREAKPOINT, TABLET_BREAKPOINT } from "@/hooks/useLayout";
 import ReadAlongText from "./ReadAlongText";
 import LanguageFlag from "@/components/language/LanguageFlag";
 import PlaylistControls from "./PlaylistControls";
+import VoicesSheet from "./VoicesSheet";
+import { PROVIDER_LABEL, useReadingSource } from "@/lib/voices";
 import { listenTime, playbackTiming, progressLine } from "@/lib/listen/timing";
 
 // P2P GLOBAL — READ & LISTEN. One shared player for every Listen button:
@@ -144,6 +146,8 @@ export function ListenHost() {
 function ListenScreen({ st, c, s, dark }: { st: ListenState; c: AppColors; s: Styles; dark: boolean }) {
   const ui = useListenUi();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [voicesOpen, setVoicesOpen] = useState(false);
+  const { source: voiceSrc, notice: voiceNotice } = useReadingSource();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const content = st.content!;
@@ -320,6 +324,10 @@ function ListenScreen({ st, c, s, dark }: { st: ListenState; c: AppColors; s: St
         </>
       )}
       {st.voice?.kind === "override" && <Text style={s.note}>Reading with a {langName(st.voice.language)} voice, as you chose.</Text>}
+      {/* P2P Voices — the shared voice library, inside this same player (owner brief 2026-11-18). */}
+      <AppButton label="P2P Voices" icon="mic-outline" size="sm" variant="secondary" onPress={() => setVoicesOpen(true)} accessibilityLabel="P2P Voices: choose a natural voice, official narration or your phone's voice" />
+      <VoicesSheet visible={voicesOpen} onClose={() => setVoicesOpen(false)} />
+      {voiceNotice ? <Text style={s.note} accessibilityLiveRegion="polite">{voiceNotice}</Text> : null}
       <Text style={s.note}>Better voices can be downloaded in your phone's settings (on iPhone: Accessibility › Spoken Content › Voices). The app never downloads voices by itself.</Text>
 
       <View style={s.autoRow}>
@@ -339,7 +347,7 @@ function ListenScreen({ st, c, s, dark }: { st: ListenState; c: AppColors; s: St
         </View>
       )}
       <AppButton label="Stop listening" icon="stop" size="sm" variant="tertiary" onPress={() => { close(); listen.stop(); }} />
-      <Text style={s.note}>Read aloud by your phone's own voice. Listening doesn't mark anything complete.</Text>
+      <Text style={s.note}>{voiceSrc?.mode === "official" ? `Official narration (${voiceSrc.voice}).` : voiceSrc?.mode === "p2p" ? `Synthetic voice: ${voiceSrc.voice} (${PROVIDER_LABEL[voiceSrc.provider] ?? voiceSrc.provider}).` : "Read aloud by your phone's own voice."} Listening doesn't mark anything complete.</Text>
     </View>
   );
 

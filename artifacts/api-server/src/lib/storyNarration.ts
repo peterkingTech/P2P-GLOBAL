@@ -14,6 +14,9 @@ import { supabaseServiceRole as db } from "./supabase";
 
 export interface ChapterNarration {
   url: string; voice: string; model: string; createdAt: string;
+  /** Official narration (owner-approved). "workflow" = published through Admin › Story narration (migration 254);
+   *  "legacy" = uploaded before that workflow. Synthetic voices are never returned here. */
+  official?: true; origin?: "workflow" | "legacy"; provider?: string;
   /** The recording's words, normalised, space separated; starts/ends in centiseconds. */
   words: string; starts: number[]; ends: number[];
 }
@@ -47,10 +50,54 @@ async function manifestFor(storyId: string, chapterId: string, lang: string): Pr
   return found;
 }
 
-/** A chapter's narration in `lang` (ISO 639-1) with a playable link, or null when it has none. */
+// ── The owner-controlled workflow (routes/narrationsAdmin.ts, migration 254) ──
+// A PUBLISHED recording wins; a WITHDRAWN legacy marker hides the old manifest; with neither (or before the
+// migration is applied) the legacy manifest plays exactly as before. Cached a few minutes; publish / withdraw
+// clear the cache for that chapter at once.
+type Decision = { kind: "published"; row: { audio_path: string; timings_path: string; voice_name: string; model: string | null; provider: string; published_at: string } } | { kind: "withdrawn" } | { kind: "none" };
+const decisions = new Map<string, { at: number; d: Decision }>();
+export function invalidateNarration(storyId: string, chapterId: string, lang: string) {
+  decisions.delete(`${storyId}/${lang}/${chapterId}`); cache.delete(`${storyId}/${lang}/${chapterId}`);
+}
+async function decisionFor(storyId: string, chapterId: string, lang: string): Promise<Decision> {
+  const key = `${storyId}/${lang}/${chapterId}`;
+  const hit = decisions.get(key);
+  if (hit && Date.now() - hit.at < TTL_MS) return hit.d;
+  let d: Decision = { kind: "none" };
+  try {
+    const { data, error } = await db.from("p2p_story_narrations").select("status,legacy,audio_path,timings_path,voice_name,model,provider,published_at")
+      .eq("story_id", storyId).eq("chapter_id", chapterId).eq("language", lang).in("status", ["published", "withdrawn"]).order("published_at", { ascending: false, nullsFirst: false });
+    if (!error && data) {
+      const pub = (data as any[]).find((r) => r.status === "published" && r.audio_path && r.timings_path);
+      if (pub) d = { kind: "published", row: pub };
+      else if ((data as any[]).some((r) => r.status === "withdrawn" && r.legacy)) d = { kind: "withdrawn" };
+    }
+  } catch { /* migration 254 not applied: legacy behaviour */ }
+  decisions.set(key, { at: Date.now(), d });
+  return d;
+}
+const timingsCache = new Map<string, { words: string; starts: number[]; ends: number[] }>();
+async function published(row: Extract<Decision, { kind: "published" }>["row"]): Promise<ChapterNarration | null> {
+  let t = timingsCache.get(row.timings_path);
+  if (!t) {
+    const { data } = await db.storage.from(BUCKET).download(row.timings_path);
+    if (!data) return null;
+    const j = JSON.parse(await data.text()) as { words: string; starts: number[]; ends: number[] };
+    t = { words: j.words, starts: j.starts, ends: j.ends };
+    timingsCache.set(row.timings_path, t);
+  }
+  const { data } = await db.storage.from(BUCKET).createSignedUrl(row.audio_path, SIGNED_SECONDS);
+  if (!data?.signedUrl) return null;
+  return { url: data.signedUrl, voice: row.voice_name, model: row.model ?? "", createdAt: row.published_at, ...t, official: true, origin: "workflow", provider: row.provider };
+}
+
+/** A chapter's OFFICIAL narration in `lang` (ISO 639-1) with a playable link, or null when it has none. */
 export async function chapterNarration(storyId: string, chapterId: string, lang = "en"): Promise<ChapterNarration | null> {
   // A chapter's id, or "intro" for the story's introduction.
   if (!UUID.test(storyId) || !(UUID.test(chapterId) || chapterId === "intro") || !/^[a-z]{2,3}$/.test(lang)) return null;
+  const decision = await decisionFor(storyId, chapterId, lang);
+  if (decision.kind === "published") { const p = await published(decision.row).catch(() => null); if (p) return p; }
+  if (decision.kind === "withdrawn") return null;
   const found = await manifestFor(storyId, chapterId, lang);
   if (!found) return null;
   const { m, dir } = found;
@@ -62,5 +109,5 @@ export async function chapterNarration(storyId: string, chapterId: string, lang 
     url = data?.signedUrl ?? null;
   }
   if (!url) return null;
-  return { url, voice: m.voice.name, model: m.model, createdAt: m.createdAt, words: m.words, starts: m.starts, ends: m.ends };
+  return { url, voice: m.voice.name, model: m.model, createdAt: m.createdAt, words: m.words, starts: m.starts, ends: m.ends, official: true, origin: "legacy", provider: "elevenlabs" };
 }

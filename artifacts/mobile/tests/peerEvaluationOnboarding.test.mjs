@@ -23,7 +23,9 @@ const evalHome = src("app/evaluation/index.tsx"), admin = src("app/evaluation/ad
 const stage = steps.slice(steps.indexOf('id: "peer-evaluation"'), steps.indexOf('id: "connect"'));
 ok("stage: a dedicated step titled 'Learn Together. Help Others Grow.', right after the learning path", stage.includes('title: "Learn Together. Help Others Grow."')
   && steps.indexOf('id: "learning-path"') < steps.indexOf('id: "peer-evaluation"') && steps.includes('| "peer-evaluation"'));
-ok("stage: steps numbered 1–8 in order", [..."12345678"].every((n, i, a) => { const at = steps.indexOf(`number: ${n},`); return at > 0 && (i === 0 || at > steps.indexOf(`number: ${a[i - 1]},`)); }) && !steps.includes("number: 9,"));
+// 2026-11-18: the guide grew to 11 steps (Bible 3, Plans 4, Growth 9 added — lib/getStarted GUIDE_VERSION 2).
+const NUMS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+ok("stage: steps numbered 1–11 in order", NUMS.every((n, i) => { const at = steps.indexOf(`number: ${n},`); return at > 0 && (i === 0 || at > steps.indexOf(`number: ${NUMS[i - 1]},`)); }) && !steps.includes("number: 12,"));
 ok("stage: learning through Kingdom School, Kingdom Stories, plans and other resources", /Kingdom School, Kingdom Stories, reading plans and other P2P resources/.test(stage));
 ok("stage: exact-resource qualification by an independent peer, automatically", /independent peer/.test(stage) && /automatically/.test(stage) && /that exact resource/.test(stage));
 ok("stage: invitations only for resources you passed yourself", /only ever be invited for resources you have passed yourself/.test(stage));

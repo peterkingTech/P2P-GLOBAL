@@ -11,6 +11,8 @@ import { getApiUrl } from "@/lib/apiUrl";
 import { unregisterCurrentPushToken } from "@/lib/push";
 import { PROFILE_COLUMNS, isMissingFunction } from "@/lib/profileColumns";
 import { resolveSupabaseConfig } from "@/config/supabaseEnv";
+import { setOfflineUser } from "@/lib/offline";
+import { loadVoiceDefaults, loadVoicePrefs } from "@/lib/voices"; // P2P Voices: the person's choices and defaults after sign-in
 
 const SUPABASE_URL = "https://omkqkasniakcnmfcwrvs.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -424,6 +426,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
+      setOfflineUser(s?.user?.id ?? null); if (s?.user?.id) { void loadVoicePrefs(); void loadVoiceDefaults(); }
       if (s?.user) {
         void fetchAccountStatus(s.user.id);
         fetchProfile(s.user.id).finally(() => setIsLoading(false));
@@ -441,6 +444,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (event === "PASSWORD_RECOVERY") setIsPasswordRecovery(true);
       else if (event === "SIGNED_OUT") setIsPasswordRecovery(false);
       setSession(s);
+      setOfflineUser(s?.user?.id ?? null); if (s?.user?.id) { void loadVoicePrefs(); void loadVoiceDefaults(); }
       if (s?.user) {
         void fetchAccountStatus(s.user.id);
         fetchProfile(s.user.id);

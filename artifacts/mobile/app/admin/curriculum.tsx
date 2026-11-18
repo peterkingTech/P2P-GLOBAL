@@ -23,6 +23,7 @@ import PlanCategoryManager from "@/components/admin/PlanCategoryManager";
 import { previewMoveToBin, moveToBin, moveToBinMessage, type DeletePreview, type RecycleType } from "@/lib/recycleBinApi";
 import { AppButton } from "@/components/ui";
 import { showAlert, confirmAction } from "@/lib/alerts";
+import { useAdminContentWidth } from "@/lib/adminLayout";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -97,7 +98,7 @@ type MobilePanel = "modules" | "lessons" | "editor";
 
 export default function CurriculumManagerScreen() {
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const width = useAdminContentWidth(); // space beside the admin sidebar (lib/adminLayout)
   const isSplit = width >= 900;
 
   const [curricula, setCurricula] = useState<Curriculum[]>([]);

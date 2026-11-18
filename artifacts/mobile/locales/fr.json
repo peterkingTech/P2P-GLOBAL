@@ -698,7 +698,10 @@
     "areaSub": "Aller plus loin : les langues originales, des commentaires classiques et des outils d'étude.",
     "titleSub": "Un passage : mots originaux, commentaires, références croisées",
     "commentariesSub": "Commentaires classiques et notes d'étude ouvertes",
-    "studyToolsSub": "Lexiques hébreu, grec et araméen, numéros Strong, références croisées"
+    "studyToolsSub": "Lexiques hébreu, grec et araméen, numéros Strong, références croisées",
+    "saveStudy": "Enregistrer dans mes études",
+    "myStudies": "Mes études enregistrées",
+    "savedHistory": "Enregistré dans Mes études enregistrées."
   },
   "dictionary": {
     "loadError": "Impossible de charger le dictionnaire.",

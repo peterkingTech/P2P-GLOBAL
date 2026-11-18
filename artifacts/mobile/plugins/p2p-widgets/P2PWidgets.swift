@@ -99,10 +99,18 @@ enum P2PText {
     return h < 12 ? "GOOD MORNING" : (h < 18 ? "GOOD AFTERNOON" : "GOOD EVENING")
   }
 
-  /// Today's verse by the app's own rule: day of month % list length.
+  /// Today's Daily Word by the app's own rule (lib/widgetSnapshot.verseForDay): local calendar days since
+  /// 1 January 2024, modulo the list length.
   static func verse(_ s: P2PSnapshot?, _ date: Date) -> P2PSnapshot.Verse? {
     guard let list = s?.verses, !list.isEmpty else { return nil }
-    return list[Calendar.current.component(.day, from: date) % list.count]
+    let local = Calendar.current.dateComponents([.year, .month, .day], from: date)
+    var utc = Calendar(identifier: .gregorian)
+    utc.timeZone = TimeZone(identifier: "UTC")!
+    let today = utc.date(from: local) ?? date
+    let epoch = utc.date(from: DateComponents(year: 2024, month: 1, day: 1)) ?? date
+    let days = utc.dateComponents([.day], from: epoch, to: today).day ?? 0
+    let n = ((days % list.count) + list.count) % list.count
+    return list[n]
   }
 
   static func parse(_ iso: String?) -> Date? {

@@ -27,6 +27,7 @@ import { dismissCallNotifications } from "@/lib/callNotifications";
 import { endSystemCall } from "@/lib/callSystem";
 import { Image as ExpoImage } from "expo-image";
 import { DAILY_VERSES } from "@/constants/dailyVerses";
+import { verseForDay } from "@/lib/widgetSnapshot";
 
 import type { SubmissionType, Module, CurriculumCatalogItem, KingdomSchoolLockState, Plan, PlanCategory, PlanWithLockStatus, PlanSearchResult, PlanWithCategory } from "./data/learningModel";
 import { getMountainForPlan } from "./data/learningModel";
@@ -1741,8 +1742,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
     setIsLoading(true);
     try {
-      const dayIdx = new Date().getDate() % DAILY_VERSES.length;
-      setDailyVerse(DAILY_VERSES[dayIdx]);
+      // The Daily Word: one rule shared with the widgets and /daily-word (lib/widgetSnapshot.verseForDay).
+      setDailyVerse(verseForDay(DAILY_VERSES, new Date()));
       // Essentials, together: the home feed, Kingdom School and Learning Plans.
       const loadHome = async () => {
       const [prayersRes, sessionsRes] = await Promise.all([

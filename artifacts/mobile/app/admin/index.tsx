@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useData, AdminActivityEntry, ContactDepartment, ContactDeptStats } from "@/contexts/DataContext";
 import { apiFetch } from "@/lib/apiClient";
 import PlatformOverview from "@/components/admin/PlatformOverview";
+import NotificationSummary from "@/components/admin/NotificationSummary";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
 
@@ -28,12 +29,16 @@ const ROLE_LABELS: Record<string, string> = {
 
 function DashboardHeader({ role, zone, country }: { role: string; zone?: string | null; country?: string | null }) {
   return (
-    <View style={styles.header}>
-      <Text style={styles.headerRole}>{ROLE_LABELS[role] ?? role}</Text>
-      {(zone || country) && (
-        <Text style={styles.headerLocation}>{[zone, country].filter(Boolean).join(" · ")}</Text>
-      )}
-    </View>
+    <>
+      <View style={styles.header}>
+        <Text style={styles.headerRole}>{ROLE_LABELS[role] ?? role}</Text>
+        {(zone || country) && (
+          <Text style={styles.headerLocation}>{[zone, country].filter(Boolean).join(" · ")}</Text>
+        )}
+      </View>
+      {/* Admin Centre notifications (2026-11-18): what needs this administrator, across their modules. */}
+      <NotificationSummary />
+    </>
   );
 }
 

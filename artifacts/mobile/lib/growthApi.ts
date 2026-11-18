@@ -131,7 +131,9 @@ export type RootLessonStatus = "passed" | "returned" | "submitted" | "in_progres
 export interface LearningRoot {
   key: string; source: "foundations_curriculum" | "plan_category" | "kingdom_stories" | "curriculum_type"; title: string; categorySlug: string | null;
   passed: number; submitted: number; returned: number; inProgress: number; practicalVerified: number;
-  lessons: { id: string; title: string; status: RootLessonStatus; passedOn: string | null; practicalVerified: number; group: string }[];
+  lessons: { id: string; title: string; status: RootLessonStatus; passedOn: string | null; practicalVerified: number; group: string;
+    /** The lesson's own description and Scripture references (optional: an older server doesn't send them). */
+    about?: string | null; scripture?: string[] }[];
 }
 export interface LearningRoots {
   roots: LearningRoot[];

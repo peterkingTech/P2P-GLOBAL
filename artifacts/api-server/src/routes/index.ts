@@ -25,6 +25,10 @@ import recycleBinRouter from "./recycleBin";
 import studyTogetherRouter from "./studyTogether";
 import studyPlansRouter from "./studyPlans";
 import planDiscoveryRouter from "./planDiscovery";
+import studyWorkspaceRouter from "./studyWorkspace";
+import voicesRouter from "./voices";
+import narrationsAdminRouter from "./narrationsAdmin";
+import adminNotificationsRouter from "./adminNotifications";
 import scriptureCollectionsRouter from "./scriptureCollections";
 import scriptureLibraryRouter from "./scriptureLibrary";
 import peerEvaluationRouter from "./peerEvaluation";
@@ -81,6 +85,7 @@ router.use("/missions", missionsRouter); // Missions — new independent content
 router.use("/kingdom-wins", kingdomWinsRouter); // Kingdom Wins / Testimonies — peer-authored "look what God has done" domain, independent from the Prayer Wall and Missions
 router.use("/kingdom-stories", kingdomStoriesRouter); // Kingdom Stories — P2P-curated EDITORIAL content (Christian history/revival/missions/etc.), admin_content/super_admin write-gated, distinct from peer-authored Kingdom Wins
 router.use("/study-together", studyTogetherRouter); // Study Together shared (async) studies (migration 216); the live in-call study stays in calls.ts
+router.use("/study-workspace", studyWorkspaceRouter); // Scripture emphasis, Deep Study History, playlist read marks (2026-11-18, proposal 253)
 router.use("/plan-discovery", planDiscoveryRouter); // P2P Plans resource discovery — subjects → published resources, direct / supporting / further (2026-11-14)
 router.use("/study-plans", studyPlansRouter); // P2P Plans — one plan system organising existing resources (proposal 249); Together reuses Study Together
 router.use("/scripture-collections", scriptureCollectionsRouter); // Scripture collections + playlists: private by default, shared with peers / groups / studies (migration 220)
@@ -96,6 +101,9 @@ router.use("/room-invitations", roomInvitationsRouter); // P2P Rooms — shareab
 router.use("/sessions", sessionsRouter);
 router.use("/discipleship", discipleshipRouter);
 router.use("/notifications", notificationsRouter);
+router.use("/voices", voicesRouter); // P2P Voices (2026-11-18): catalogue, on-demand speech for eligible content, preferences — never Bible text, never ElevenLabs generation
+router.use("/admin/notifications", adminNotificationsRouter); // Admin Centre notifications (2026-11-18): every module, role-routed, deduplicated (migration 255); before /admin
+router.use("/admin/narrations", narrationsAdminRouter); // Official Kingdom Stories narration — owner-only (super_admin) upload → approve → publish workflow (migration 254); before /admin
 router.use("/admin/recycle-bin", recycleBinRouter); // Admin Recycle Bin (migration 214) — before /admin so its own role rules apply
 router.use("/admin/bible-translations", bibleTranslationsAdminRouter); // Bible licence review (super admin; AO Lab provider, migration 225)
 router.use("/admin", adminRouter);

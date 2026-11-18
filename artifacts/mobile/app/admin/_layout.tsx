@@ -1,10 +1,13 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Modal,
+  Pressable,
+  useWindowDimensions,
 } from "react-native";
 import { Slot, useRouter, usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,6 +18,39 @@ import { STUDIO_VIEW_ROLES } from "@/lib/studioModel";
 import { IMPACT_REVIEWER_ROLES } from "@/lib/winsModerationModel";
 import { AppButton } from "@/components/ui";
 import { endAdminSession } from "@/lib/adminSession";
+import { useAdminNotificationSummary } from "@/lib/adminNotificationsApi";
+
+// Admin Centre notifications (2026-11-18): the bell (unread count) and each section's outstanding count. Both read
+// ONE shared, live summary (lib/adminNotificationsApi — realtime with a polling fallback); the server decides which
+// modules this administrator may see. Small and calm: a number, never an animation.
+function NotificationBell() {
+  const router = useRouter();
+  const sum = useAdminNotificationSummary();
+  const n = sum?.unread ?? 0;
+  const critical = (sum?.critical ?? 0) > 0;
+  return (
+    <TouchableOpacity onPress={() => router.push("/admin/notifications" as any)} style={bellStyles.btn} accessibilityRole="button"
+      accessibilityLabel={`Notifications${n ? `: ${n} unread` : ""}${critical ? `, ${sum!.critical} critical` : ""}`}>
+      <Ionicons name={n ? "notifications" : "notifications-outline"} size={21} color={colors.cream} />
+      {n ? <View style={[bellStyles.badge, critical && bellStyles.badgeCritical]}><Text style={bellStyles.badgeText}>{n > 99 ? "99+" : n}</Text></View> : null}
+    </TouchableOpacity>
+  );
+}
+function NavBadge({ path }: { path: string }) {
+  const sum = useAdminNotificationSummary();
+  const n = sum?.badges?.[path] ?? 0;
+  if (!n) return null;
+  return <View style={bellStyles.navBadge} accessibilityLabel={`${n} need attention`}><Text style={bellStyles.navBadgeText}>{n > 99 ? "99+" : n}</Text></View>;
+}
+const bellStyles = StyleSheet.create({
+  btn: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 10 },
+  badge: { position: "absolute", top: 4, right: 2, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: "#F2C94C", alignItems: "center", justifyContent: "center" },
+  badgeCritical: { backgroundColor: "#F97066" },
+  badgeText: { fontSize: 10, color: "#1B1B1B", fontFamily: "Inter_700Bold" },
+  navBadge: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, backgroundColor: "rgba(255,255,255,0.22)", alignItems: "center", justifyContent: "center" },
+  navBadgeText: { fontSize: 11, color: "#fff", fontFamily: "Inter_700Bold" },
+});
+import { ADMIN_WIDE as WIDE } from "@/lib/adminLayout";
 
 const ADMIN_ROLES = new Set([
   "peer_guide",
@@ -42,6 +78,8 @@ const NAV_ITEMS = [
   { label: "Dashboard", path: "/admin", icon: "grid" as const, roles: Array.from(ADMIN_ROLES), section: "Overview" },
   { label: "Content", path: "/admin/content", icon: "library" as const, roles: ["peer_guide", "church_leader", "regional_admin", "super_admin", "admin_content"], section: "Content" },
   { label: "Kingdom Stories", path: "/admin/kingdom-stories", icon: "book" as const, roles: ["super_admin", "admin_content"], section: "Content" },
+  // Official Kingdom Stories narration (P2P Voices, 2026-11-18): OWNER ONLY — the API requires super_admin on every action.
+  { label: "Story Narration", path: "/admin/narrations", icon: "mic" as const, roles: ["super_admin"], section: "Content" },
   // Publishing Studio — same role list as the API's STUDIO_VIEW_ROLES (display only; /api/studio enforces it).
   { label: "Publishing Studio", path: "/admin/studio", icon: "megaphone" as const, roles: STUDIO_VIEW_ROLES, section: "Content" },
   { label: "Registrations", path: "/admin/registrations", icon: "people" as const, roles: ["church_leader", "regional_admin", "super_admin"], section: "People & Communities" },
@@ -67,22 +105,21 @@ const NAV_ITEMS = [
 // The six areas of the Admin Centre, in order. Groupings only — each screen keeps its own server-side checks.
 const SECTIONS = ["Overview", "People & Communities", "Discipleship & Learning", "Content", "Platform", "Help & Support"];
 
+// RESPONSIVE ADMIN CENTRE (owner brief 2026-11-18 §10). One navigation, two layouts:
+//   • desktop / wide tablet (≥ 1024 px): a fixed sidebar grouped by the six areas, the page beside it;
+//   • phone / narrow tablet: a top bar with the current page and a Menu button that opens the same grouped
+//     list as a drawer (no sideways-scrolling tab strip, nothing hidden off-screen).
+// Roles, the sign-in gate and every screen's own server-side checks are unchanged.
+
 export default function AdminLayout() {
   const { profile, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
-  // The tab row scrolls sideways when it is wider than the screen (phones, or
-  // roles with many tabs); keep the active tab in view after navigating.
-  const navScroll = useRef<ScrollView>(null);
-  const tabX = useRef<Record<string, number>>({});
-  const activeTabPath = useRef<string | null>(null);
-  const scrollToActive = () => {
-    const p = activeTabPath.current;
-    const x = p ? tabX.current[p] : undefined;
-    if (x !== undefined) navScroll.current?.scrollTo({ x: Math.max(0, x - 24), animated: true });
-  };
-  useEffect(() => { scrollToActive(); }, [pathname]);
+  const { width } = useWindowDimensions();
+  const wide = width >= WIDE;
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => { setMenuOpen(false); }, [pathname]);
 
   const isLoginScreen = pathname === "/admin/login";
 
@@ -121,132 +158,109 @@ export default function AdminLayout() {
 
   const visibleNav = NAV_ITEMS.filter((item) => item.roles.includes(profile.role))
     .sort((a, b) => SECTIONS.indexOf(a.section) - SECTIONS.indexOf(b.section));
-  // The most specific tab matching the current page ("/admin" matches every page).
-  activeTabPath.current = visibleNav
+  // The most specific item matching the current page ("/admin" matches every page).
+  const active = visibleNav
     .filter((item) => pathname.startsWith(item.path))
-    .sort((a, b) => b.path.length - a.path.length)[0]?.path ?? null;
+    .sort((a, b) => b.path.length - a.path.length)[0] ?? null;
+  const exit = async () => { await endAdminSession(); router.replace("/(tabs)"); };
+
+  const navList = (
+    <ScrollView contentContainerStyle={styles.navList}>
+      {SECTIONS.map((section) => {
+        const items = visibleNav.filter((i) => i.section === section);
+        if (!items.length) return null;
+        return (
+          <View key={section} style={{ gap: 2 }}>
+            <Text style={styles.navSection} accessibilityRole="header">{section}</Text>
+            {items.map((item) => {
+              const on = active?.path === item.path;
+              return (
+                <TouchableOpacity key={item.path} style={[styles.navItem, on && styles.navItemActive]} onPress={() => router.push(item.path as any)}
+                  accessibilityRole="button" accessibilityLabel={item.label} accessibilityState={{ selected: on }} aria-selected={on}>
+                  <Ionicons name={item.icon} size={17} color={on ? colors.cream : "rgba(255,255,255,0.65)"} />
+                  <Text style={[styles.navLabel, on && styles.navLabelActive]} numberOfLines={1}>{item.label}</Text>
+                  <NavBadge path={item.path} />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        );
+      })}
+    </ScrollView>
+  );
+
+  if (wide) {
+    return (
+      <View style={[styles.root, { paddingTop: insets.top, flexDirection: "row" }]}>
+        <View style={styles.sidebar}>
+          <View style={styles.brand}>
+            <Ionicons name="shield-checkmark" size={16} color={colors.lightGreen} />
+            <Text style={[styles.brandText, { flex: 1 }]}>Admin Centre</Text>
+            <NotificationBell />
+          </View>
+          {navList}
+          <View style={styles.sidebarFoot}>
+            <AppButton label="Exit Admin" onPress={exit} variant="outline" icon="exit-outline" palette="fixedLight" fullWidth />
+          </View>
+        </View>
+        <View style={styles.body}><Slot /></View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Top bar */}
       <View style={styles.topBar}>
-        {/* Left: logo wordmark */}
-        <View style={styles.topBarLeft}>
-          <Ionicons name="shield-checkmark" size={15} color={colors.lightGreen} />
-          <Text style={styles.topBarTitle}>Admin</Text>
+        <TouchableOpacity style={styles.menuBtn} onPress={() => setMenuOpen(true)} accessibilityRole="button" accessibilityLabel="Open the admin menu" accessibilityState={{ expanded: menuOpen }}>
+          <Ionicons name="menu" size={22} color={colors.cream} />
+        </TouchableOpacity>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.topKicker} numberOfLines={1}>Admin{active ? ` · ${active.section}` : ""}</Text>
+          <Text style={styles.topTitle} numberOfLines={1} accessibilityRole="header">{active?.label ?? "Admin Centre"}</Text>
         </View>
-
-        {/* Centre: section tabs — scroll sideways when they don't fit, so they
-            never run underneath the Admin title or the Exit Admin button. */}
-        <ScrollView
-          ref={navScroll}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.topBarNav}
-          contentContainerStyle={styles.topBarNavContent}
-        >
-          {visibleNav.map((item, i) => {
-            const active = pathname.startsWith(item.path);
-            const firstOfSection = i === 0 || visibleNav[i - 1].section !== item.section;
-            return (
-              <React.Fragment key={item.path}>
-              {firstOfSection ? <Text style={styles.navSection} accessibilityRole="header">{item.section}</Text> : null}
-              <TouchableOpacity
-                style={[styles.navTab, active && styles.navTabActive]}
-                onPress={() => router.push(item.path as any)}
-                onLayout={(e) => {
-                  tabX.current[item.path] = e.nativeEvent.layout.x;
-                  if (item.path === activeTabPath.current) scrollToActive();
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={item.label}
-                accessibilityState={{ selected: active }}
-                aria-selected={active}
-              >
-                <Ionicons
-                  name={item.icon}
-                  size={14}
-                  color={active ? colors.cream : "rgba(255,255,255,0.5)"}
-                />
-                <Text style={[styles.navTabLabel, active && styles.navTabLabelActive]}>
-                  {item.label}
-                </Text>
+        <NotificationBell />
+        <AppButton label="Exit" onPress={exit} variant="outline" icon="exit-outline" size="sm" style={{ flexShrink: 0 }} palette="fixedLight" accessibilityLabel="Exit Admin" />
+      </View>
+      <View style={styles.body}><Slot /></View>
+      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+        <View style={styles.drawerWrap}>
+          <View style={[styles.drawer, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 8, width: Math.min(320, width * 0.86) }]} accessibilityViewIsModal>
+            <View style={styles.brand}>
+              <Ionicons name="shield-checkmark" size={16} color={colors.lightGreen} />
+              <Text style={[styles.brandText, { flex: 1 }]}>Admin Centre</Text>
+              <TouchableOpacity onPress={() => setMenuOpen(false)} style={styles.menuBtn} accessibilityRole="button" accessibilityLabel="Close the menu">
+                <Ionicons name="close" size={22} color={colors.cream} />
               </TouchableOpacity>
-              </React.Fragment>
-            );
-          })}
-        </ScrollView>
-
-        {/* Right: Exit Admin */}
-        <AppButton label="Exit Admin" onPress={async () => { await endAdminSession(); router.replace("/(tabs)"); }} variant="outline" icon="exit-outline" style={{ flexShrink: 0 }} palette="fixedLight" />
-      </View>
-
-      {/* Page content */}
-      <View style={styles.body}>
-        <Slot />
-      </View>
+            </View>
+            {navList}
+            <View style={styles.sidebarFoot}>
+              <AppButton label="Exit Admin" onPress={exit} variant="outline" icon="exit-outline" palette="fixedLight" fullWidth />
+            </View>
+          </View>
+          <Pressable style={{ flex: 1 }} onPress={() => setMenuOpen(false)} accessibilityRole="button" accessibilityLabel="Close the menu" />
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.lightCream },
-  navSection: { alignSelf: "center", fontSize: 10, letterSpacing: 0.8, textTransform: "uppercase", color: "rgba(255,255,255,0.55)", fontFamily: "Inter_600SemiBold", marginLeft: 10, marginRight: 2 },
-
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.primaryGreen,
-    paddingHorizontal: 14,
-    paddingVertical: 4,
-    gap: 8,
-  },
-
-  topBarLeft: {
-    flexShrink: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    marginRight: 4,
-  },
-  topBarTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: colors.cream,
-    fontFamily: "Inter_700Bold",
-  },
-
-  // Takes the space between the title and Exit Admin and may shrink below
-  // its content width; the content then scrolls instead of overflowing.
-  topBarNav: {
-    flex: 1,
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  // flexGrow keeps the tabs centred when they fit (desktop, few tabs).
-  topBarNavContent: {
-    flexGrow: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    justifyContent: "center",
-  },
-  // 44px tall: a full-size touch target (the bar's own padding was reduced).
-  navTab: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    minHeight: 44,
-    borderRadius: 8,
-  },
-  navTabActive: { backgroundColor: "rgba(255,255,255,0.18)" },
-  navTabLabel: {
-    fontSize: 13,
-    color: "rgba(255,255,255,0.5)",
-    fontFamily: "Inter_500Medium",
-  },
-  navTabLabelActive: { color: colors.cream },
-
-  body: { flex: 1 },
+  sidebar: { width: 248, backgroundColor: colors.primaryGreen, paddingVertical: 10 },
+  brand: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingVertical: 10 },
+  brandText: { fontSize: 16, fontWeight: "700", color: colors.cream, fontFamily: "Inter_700Bold" },
+  navList: { paddingHorizontal: 8, paddingBottom: 12, gap: 10 },
+  navSection: { fontSize: 11, letterSpacing: 0.8, textTransform: "uppercase", color: "rgba(255,255,255,0.6)", fontFamily: "Inter_600SemiBold", paddingHorizontal: 10, paddingTop: 6, paddingBottom: 2 },
+  navItem: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 44, paddingHorizontal: 10, borderRadius: 10 },
+  navItemActive: { backgroundColor: "rgba(255,255,255,0.18)" },
+  navLabel: { flex: 1, fontSize: 14, color: "rgba(255,255,255,0.75)", fontFamily: "Inter_500Medium" },
+  navLabelActive: { color: colors.cream, fontFamily: "Inter_700Bold" },
+  sidebarFoot: { paddingHorizontal: 12, paddingTop: 8 },
+  topBar: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.primaryGreen, paddingHorizontal: 8, paddingVertical: 4, minHeight: 56 },
+  menuBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 10 },
+  topKicker: { fontSize: 11, color: "rgba(255,255,255,0.65)", fontFamily: "Inter_500Medium" },
+  topTitle: { fontSize: 16, color: colors.cream, fontFamily: "Inter_700Bold" },
+  drawerWrap: { flex: 1, flexDirection: "row", backgroundColor: "rgba(0,0,0,0.45)" },
+  drawer: { backgroundColor: colors.primaryGreen, height: "100%" },
+  body: { flex: 1, minWidth: 0 },
 });

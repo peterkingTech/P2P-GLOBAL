@@ -7,13 +7,14 @@ import { useStudioQuery } from "@/components/studio/useStudioQuery";
 import { Card, Chip, StateView, studioStyles as ss } from "@/components/studio/StudioUI";
 import { getOverview } from "@/lib/studioApi";
 import { auditActionLabel, deviceTimeZone, formatInZone } from "@/lib/studioModel";
+import { useAdminContentWidth } from "@/lib/adminLayout";
 
 // Publishing Overview. Every number is computed by the API from the
 // canonical records at request time — nothing cached, estimated or invented.
 
 export default function StudioOverview() {
   const router = useRouter();
-  const { width } = useWindowDimensions();
+  const width = useAdminContentWidth(); // space beside the admin sidebar (lib/adminLayout)
   const tz = deviceTimeZone();
   const { data, loading, error, reload } = useStudioQuery(() => getOverview(tz), [tz]);
   const cols = width >= 1000 ? 4 : width >= 600 ? 3 : 2;

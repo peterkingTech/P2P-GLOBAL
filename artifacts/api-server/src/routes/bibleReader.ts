@@ -83,8 +83,10 @@ router.get("/reader/chapter", async (req, res) => {
 });
 router.get("/reader/search", async (req, res) => {
   if (!(await caller(req, res))) return;
-  const { q, t, offset } = req.query as { q?: string; t?: string; offset?: string };
-  try { return ok(res, await searchBible(String(q ?? ""), String(t ?? ""), Number(offset ?? 0))); } catch (e) { return fail(res, e); }
+  const { q, t, offset, order, testament, limit } = req.query as { q?: string; t?: string; offset?: string; order?: string; testament?: string; limit?: string };
+  // Concordance (2026-11-18): optional Bible order, testament and page size; the defaults are unchanged.
+  const opts = { order: order === "canonical" ? "canonical" as const : "relevance" as const, testament: (testament === "ot" || testament === "nt" ? testament : null) as "ot" | "nt" | null, limit: limit ? Number(limit) : 20 };
+  try { return ok(res, await searchBible(String(q ?? ""), String(t ?? ""), Number(offset ?? 0), opts)); } catch (e) { return fail(res, e); }
 });
 router.get("/reader/related", async (req, res) => {
   if (!(await caller(req, res))) return;

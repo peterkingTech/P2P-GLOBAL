@@ -130,6 +130,8 @@ async function courseLessons(curriculumId: string): Promise<IndexedCourse["lesso
     (c) => db.from("p2p_lessons").select("id,title,module_id,order_index,status").in("module_id", c).order("order_index", { ascending: true }));
   return mods.flatMap((m) => les.filter((l) => l.module_id === m.id && (l.status ?? "published") === "published").sort((a, b) => a.order_index - b.order_index).map((l) => ({ id: l.id, title: l.title, group: m.title })));
 }
+/** The shared discovery index (published catalogue data only) — also used by the study workspace search. */
+export async function discoveryIndex(): Promise<DiscoveryIndex> { return index(); }
 async function index(): Promise<DiscoveryIndex> {
   if (cache && Date.now() - cache.at < TTL) return cache.ix;
   const ix = await buildIndex();

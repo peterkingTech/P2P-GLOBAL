@@ -7,7 +7,7 @@ export interface Pos { verse: number; offset: number }
 /** A selection / highlight: from `start` up to (not including) `end`. */
 export interface TextRange { start: Pos; end: Pos }
 export interface Token { start: number; end: number; text: string; word: boolean }
-export interface StyledRun { text: string; start: number; end: number; color: string | null; selected: boolean }
+export interface StyledRun { text: string; start: number; end: number; color: string | null; selected: boolean; jesus?: boolean }
 export interface StoredHighlight { id?: string; color: string; startVerse: number; endVerse: number; startOffset: number | null; endOffset: number | null }
 
 // A word = a run of characters that are neither whitespace nor punctuation.
@@ -119,7 +119,9 @@ export function rangeToStored(r: TextRange, lengthOf: (verse: number) => number)
  * Runs cover the text exactly once — nothing is duplicated or dropped, so
  * highlighted words stay inline with their neighbours.
  */
-export function verseRuns(verse: number, text: string, highlights: StoredHighlight[], selection: TextRange | null, lengthOf: (verse: number) => number): StyledRun[] {
+export function verseRuns(verse: number, text: string, highlights: StoredHighlight[], selection: TextRange | null, lengthOf: (verse: number) => number,
+  /** Scripture emphasis: [start, end) ranges that are words of Jesus (only when that emphasis is switched on). */
+  jesus?: readonly (readonly [number, number])[]): StyledRun[] {
   const len = text.length;
   const colorAt: (string | null)[] = new Array(len).fill(null);
   for (const h of highlights) {
@@ -135,12 +137,14 @@ export function verseRuns(verse: number, text: string, highlights: StoredHighlig
     const e = verse === selection.end.verse ? selection.end.offset : len;
     for (let i = Math.max(0, s); i < Math.min(len, e); i++) sel[i] = true;
   }
+  const red: boolean[] = new Array(len).fill(false);
+  for (const [s, e] of jesus ?? []) for (let i = Math.max(0, s); i < Math.min(len, e); i++) red[i] = true;
   const runs: StyledRun[] = [];
   let i = 0;
   while (i < len) {
     let j = i + 1;
-    while (j < len && colorAt[j] === colorAt[i] && sel[j] === sel[i]) j++;
-    runs.push({ text: text.slice(i, j), start: i, end: j, color: colorAt[i], selected: sel[i] });
+    while (j < len && colorAt[j] === colorAt[i] && sel[j] === sel[i] && red[j] === red[i]) j++;
+    runs.push({ text: text.slice(i, j), start: i, end: j, color: colorAt[i], selected: sel[i], ...(red[i] ? { jesus: true } : {}) });
     i = j;
   }
   return runs;

@@ -1,6 +1,7 @@
 import { Platform } from "react-native";
 import { BIBLE_BOOKS } from "@/lib/bibleBooks";
 import { apiRequest } from "@/lib/apiClient";
+import { cached, isNetworkError, kvGet, kvRemove, kvSet } from "@/lib/offline";
 
 // The Bible reader's client (api-server routes/bibleReader.ts). Scripture
 // text always comes from the server (licensed API.Bible translations only);
@@ -11,6 +12,7 @@ export class BibleApiError extends Error {
   status: number;
   constructor(message: string, status: number) { super(message); this.status = status; }
 }
+
 
 const call = <T,>(path: string, init?: RequestInit & { signal?: AbortSignal }) => apiRequest<T>(path, init, {
   fallbackError: "Something went wrong. Please try again.", offlineError: "You're offline — check your connection and try again.",
@@ -47,8 +49,9 @@ export function readerTarget(raw: string | null | undefined): { book: string; ch
   return { book: book.code, chapter, ...(m[3] ? { v: Number(m[3]), ve: Number(m[4] ?? m[3]) } : {}) };
 }
 /** Expo Router params to open the reader on a passage. */
-export function bibleRoute(t: { book: string; chapter: number; v?: number; ve?: number; translation?: string | null }) {
-  return { pathname: "/bible", params: { book: t.book, chapter: String(t.chapter), ...(t.v ? { v: String(t.v), ve: String(t.ve ?? t.v) } : {}), ...(t.translation ? { t: t.translation } : {}) } };
+export function bibleRoute(t: { book: string; chapter: number; v?: number; ve?: number; translation?: string | null; compare?: boolean; listen?: boolean }) {
+  return { pathname: "/bible", params: { book: t.book, chapter: String(t.chapter), ...(t.v ? { v: String(t.v), ve: String(t.ve ?? t.v) } : {}), ...(t.translation ? { t: t.translation } : {}),
+    ...(t.compare ? { compare: "1" } : {}), ...(t.listen ? { listen: "1" } : {}) } };
 }
 
 // Scripture reading face: the platform's own serif (no new font dependency).
@@ -72,15 +75,21 @@ export interface BibleTranslation {
   recordedAudio?: boolean;
 }
 /** `through`: the last verse this text covers when a translation joins verses (The Message: "1–2"). */
-export interface ChapterVerse { verse: number; text: string; paragraph: number; poetry: boolean; through?: number }
+export interface ChapterVerse { verse: number; text: string; paragraph: number; poetry: boolean; through?: number;
+  /** Words of Jesus as [start, end) ranges of `text`, from the translation's own red-letter markup (2026-11-18). */
+  emphasis?: { jesus: [number, number][] } }
 export interface BibleChapter {
-  translation: { code: string; name: string; textCopyAllowed: boolean; provider?: string; textDirection?: "ltr" | "rtl" };
+  translation: { code: string; name: string; textCopyAllowed: boolean; provider?: string; textDirection?: "ltr" | "rtl";
+    /** The licence permits keeping this text on the phone for offline reading (permits_offline, 2026-11-18). */
+    offlineAllowed?: boolean };
   book: { code: string; name: string; chapters: number };
   chapter: number; verses: ChapterVerse[]; headings: { beforeVerse: number; text: string }[];
   copyright: string | null;
   previous: { bookCode: string; chapter: number } | null; next: { bookCode: string; chapter: number } | null;
   /** AO Lab translations: the source's footnotes. */
   footnotes?: { verse: number | null; caller: string | null; text: string }[];
+  /** True when this is the copy kept on the phone (no connection). */
+  offline?: boolean;
 }
 // The licensed-translations list changes rarely: one request every 10 minutes at most
 // (a failed request isn’t remembered, so the next visit tries again).
@@ -92,8 +101,10 @@ export const getTranslations = () => {
   p.catch(() => { if (translationsCache?.p === p) translationsCache = null; });
   return p;
 };
-// Chapters read this session stay in memory only (never stored — licensed text); a chapter
-// already being fetched is shared, so a prefetch and the reader never download it twice.
+// Chapters read this session stay in memory; a chapter already being fetched is shared, so a prefetch
+// and the reader never download it twice. Offline-first (2026-11-18): a chapter is ALSO kept on the phone
+// — only when its translation's licence permits offline use (translation.offlineAllowed, from the reviewed
+// licence record) — so it opens without a connection; other licensed text is never stored.
 const chapterCache = new Map<string, BibleChapter>();
 const chapterPending = new Map<string, Promise<BibleChapter>>();
 export async function getChapter(book: string, chapter: number, t: string, signal?: AbortSignal): Promise<BibleChapter> {
@@ -108,11 +119,25 @@ export async function getChapter(book: string, chapter: number, t: string, signa
     .then((c) => {
       if (chapterCache.size > 60) chapterCache.delete(chapterCache.keys().next().value as string);
       chapterCache.set(key, c);
+      if (c.translation?.offlineAllowed) void keepOffline(key, c);
       return c;
+    })
+    .catch(async (e) => {
+      // No connection: a chapter kept on this phone (licence permitting) still opens, marked as such.
+      if (isNetworkError(e)) { const kept = await kvGet<BibleChapter>(`bible:${key}`); if (kept) return { ...kept, offline: true } as BibleChapter; }
+      throw e;
     })
     .finally(() => chapterPending.delete(key));
   chapterPending.set(key, p);
   return p;
+}
+/** Keeps at most 300 chapters on the phone (oldest dropped first). */
+async function keepOffline(key: string, c: BibleChapter) {
+  const idx = ((await kvGet<string[]>("bible:index")) ?? []).filter((k) => k !== key);
+  idx.push(key);
+  while (idx.length > 300) { const old = idx.shift(); if (old) void kvRemove(`bible:${old}`); }
+  await kvSet(`bible:${key}`, c);
+  await kvSet("bible:index", idx);
 }
 /** Start loading a chapter early (e.g. while the translations list loads); errors are ignored here. */
 export function prefetchChapter(book: string, chapter: number, t: string) {
@@ -120,9 +145,9 @@ export function prefetchChapter(book: string, chapter: number, t: string) {
   getChapter(book, chapter, t).catch(() => {});
 }
 export interface SearchResult { bookCode: string; chapter: number; verse: number; reference: string; text: string }
-export const searchBible = (q: string, t: string, offset: number, signal?: AbortSignal) =>
+export const searchBible = (q: string, t: string, offset: number, signal?: AbortSignal, opts: { order?: "relevance" | "canonical"; testament?: "ot" | "nt" | null; limit?: number } = {}) =>
   call<{ kind: "reference" | "text"; reference: { bookCode: string; chapter: number; startVerse: number | null; endVerse: number | null } | null; results: SearchResult[]; total: number }>(
-    `/bible/reader/search?q=${encodeURIComponent(q)}&t=${encodeURIComponent(t)}&offset=${offset}`, { signal });
+    `/bible/reader/search?q=${encodeURIComponent(q)}&t=${encodeURIComponent(t)}&offset=${offset}${opts.order ? `&order=${opts.order}` : ""}${opts.testament ? `&testament=${opts.testament}` : ""}${opts.limit ? `&limit=${opts.limit}` : ""}`, { signal });
 export interface RelatedLesson { lessonId: string; lessonTitle: string; moduleTitle: string; curriculumId: string; curriculumTitle: string; kind: "core" | "plan" }
 export const getRelatedLessons = (book: string, chapter: number) => call<{ lessons: RelatedLesson[] }>(`/bible/reader/related?book=${book}&chapter=${chapter}`);
 
@@ -136,8 +161,9 @@ export interface Highlight extends PassageRef { id: string; color: HighlightColo
 export interface BibleNote extends PassageRef { id: string; title: string | null; body: string; updatedAt: string }
 export interface Bookmark extends PassageRef { id: string }
 export type NewRef = { translationCode: string; bookCode: string; chapter: number; startVerse: number; endVerse: number };
+// The person's own highlights, notes and bookmarks for a chapter: kept on the phone so they still show offline.
 export const getMyChapter = (t: string, book: string, chapter: number) =>
-  call<{ available: boolean; highlights: Highlight[]; notes: BibleNote[]; bookmarks: Bookmark[] }>(`/bible/me/chapter?t=${encodeURIComponent(t)}&book=${book}&chapter=${chapter}`);
+  cached(`bible:me:${t}:${book}.${chapter}`, () => call<{ available: boolean; highlights: Highlight[]; notes: BibleNote[]; bookmarks: Bookmark[] }>(`/bible/me/chapter?t=${encodeURIComponent(t)}&book=${book}&chapter=${chapter}`));
 export type Offsets = { startOffset: number | null; endOffset: number | null };
 /** Highlights EXACTLY the given text; overlapped older highlights keep their parts outside it. */
 export const addHighlight = (r: NewRef, color: HighlightColor, off?: Offsets) =>

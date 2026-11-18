@@ -1,4 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { getCollectionReads, setPassageRead } from "@/lib/studyWorkspaceApi";
+import { enqueue, isNetworkError } from "@/lib/offline";
+
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, TextInput, Alert, Platform, Image, useWindowDimensions } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
@@ -37,6 +41,7 @@ export default function CollectionScreen() {
   const [d, setD] = useState<CollectionDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const { t } = useTranslation();
   const [busy, setBusy] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -46,10 +51,12 @@ export default function CollectionScreen() {
   const [languages, setLanguages] = useState<Record<string, string>>({});
   const [favId, setFavId] = useState<string | null>(null);
   const [lookOpen, setLookOpen] = useState(false);
+  // My own "read" marks (2026-11-18): per person — never changes the playlist for anyone else.
+  const [reads, setReads] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     if (!id) return;
-    try { setD(await getCollection(id)); setError(null); }
+    try { setD(await getCollection(id)); setError(null); getCollectionReads(id).then((r) => setReads(r.reads), () => {}); }
     catch (e: any) { setError(e?.message ?? "Couldn't load this collection."); }
     listFavourites().then((f) => setFavId([...f.playlists, ...f.collections].find((x) => x.collectionId === id)?.id ?? null)).catch(() => {});
   }, [id]);
@@ -93,6 +100,17 @@ export default function CollectionScreen() {
     ids.splice(index + by, 0, x);
     act(`move:${x}`, () => reorderCollection(d.id, ids, d.revision));
   };
+  const toggleRead = (itemId: string) => {
+    const was = !!reads[itemId];
+    // Shown at once; put back if the server says no.
+    setReads((r) => { const n = { ...r }; if (was) delete n[itemId]; else n[itemId] = new Date().toISOString(); return n; });
+    setPassageRead(itemId, !was).catch((e: any) => {
+      // No connection: keep the mark and send it when the connection returns (latest choice wins).
+      if (isNetworkError(e)) { void enqueue({ id: `read:${itemId}`, type: "collection.read", payload: { itemId, read: !was } }); setNotice(t("playlists.readQueued", { defaultValue: "Saved on this phone — it will sync when you're back online." })); return; }
+      setNotice(e?.message ?? t("playlists.readFailed")); setReads((r) => { const n = { ...r }; if (was) n[itemId] = new Date().toISOString(); else delete n[itemId]; return n; });
+    });
+  };
+  const readCount = d.items.filter((i) => reads[i.id]).length;
   const listen = (from?: string, shuffle = false) => act(shuffle ? "shuffle" : from ? `listen:${from}` : "listen", () => playSavedCollection(d.id, { startKey: from ?? null, shuffle }));
   // "10 scriptures · about 20 min" (lib/listen/timing; an estimate for the phone's voice).
   const verses = d.items.reduce((n, i) => n + Math.max(1, i.endVerse - i.startVerse + 1), 0);
@@ -183,6 +201,7 @@ export default function CollectionScreen() {
         <Text style={s.section}>{d.items.length} {d.items.length === 1 ? "passage" : "passages"}</Text>
         {canEdit ? <AppButton label="Add passages" icon="add" size="sm" variant="tertiary" onPress={() => setPicking(true)} /> : null}
       </View>
+      {d.items.length ? <Text style={s.muted} accessibilityLiveRegion="polite">{t("playlists.readCount", { read: readCount, total: d.items.length })}</Text> : null}
       {!d.items.length ? <Text style={s.muted}>{canEdit ? "Add passages from your saved passages, or use “Add to collection” when you select verses in the Bible reader." : "No passages yet."}</Text> : null}
       {d.items.map((i, index) => (
         <View key={i.id} style={s.item}>
@@ -205,6 +224,9 @@ export default function CollectionScreen() {
               <AppButton label="Read" size="sm" variant="tertiary" icon="book-outline"
                 onPress={() => router.push(bibleRoute({ book: i.bookCode, chapter: i.chapter, v: i.startVerse, ve: i.endVerse, translation: i.translationCode }) as any)} accessibilityLabel={`Read ${i.reference}`} />
               <AppButton label="Play from here" size="sm" variant="tertiary" icon="play-outline" loading={busy === `listen:${i.id}`} onPress={() => listen(i.id)} accessibilityLabel={`Play from ${i.reference}`} />
+              <AppButton label={reads[i.id] ? t("playlists.read") : t("playlists.markRead")} size="sm" variant="tertiary" icon={reads[i.id] ? "checkmark-circle" : "ellipse-outline"}
+                accessibilityLabel={reads[i.id] ? t("playlists.unmarkA11y", { ref: i.reference }) : t("playlists.markA11y", { ref: i.reference })}
+                onPress={() => toggleRead(i.id)} />
               {owner && noteFor?.id !== i.id ? <AppButton label={i.sharedNote ? "Edit note" : "Add note"} size="sm" variant="tertiary" icon="create-outline" onPress={() => setNoteFor({ id: i.id, text: i.sharedNote ?? "" })} /> : null}
             </View>
           </View>

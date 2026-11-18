@@ -29,7 +29,11 @@
     "test:narration": "node tests/storyNarration.test.mjs && node tests/kingdomStoryTranslations.test.mjs",
     "test:communication": "node tests/communication.test.mjs",
     "narrate": "node scripts/narrate.mjs",
-    "test:deep-study": "node tests/deepStudy.test.mjs"
+    "test:deep-study": "node tests/deepStudy.test.mjs",
+    "test:study-workspace": "node tests/studyWorkspace.test.mjs",
+    "test:biblical-names": "node tests/biblicalNames.test.mjs",
+    "test:voices": "node tests/voices.test.mjs",
+    "test:admin-notifications": "node tests/adminNotifications.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

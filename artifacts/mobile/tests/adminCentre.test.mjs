@@ -57,7 +57,7 @@ ok("every existing admin screen is still in the navigation", EXISTING.every((p) 
 ok("…plus Discipleship & Growth, Peer Evaluations and Access & Audit", ["/admin/discipleship\"", "/evaluation/admin\"", "/admin/access\""].every((p) => lay.includes(`path: "${p}`)));
 const navBlock = lay.slice(lay.indexOf("const NAV_ITEMS"), lay.indexOf("];", lay.indexOf("const NAV_ITEMS")));
 ok("every item belongs to one of the six areas", (navBlock.match(/\{ label:/g) ?? []).length === (navBlock.match(/section: "(Overview|People & Communities|Discipleship & Learning|Content|Platform|Help & Support)"/g) ?? []).length);
-ok("areas are labelled in the navigation, in order", lay.includes('const SECTIONS = ["Overview", "People & Communities", "Discipleship & Learning", "Content", "Platform", "Help & Support"];') && lay.includes("{firstOfSection ? <Text style={styles.navSection}"));
+ok("areas are labelled in the navigation, in order", lay.includes('const SECTIONS = ["Overview", "People & Communities", "Discipleship & Learning", "Content", "Platform", "Help & Support"];') && lay.includes("{SECTIONS.map((section) => {") && lay.includes("<Text style={styles.navSection} accessibilityRole=\"header\">{section}</Text>"));
 
 // ── The new screens ──
 const ov = src("components/admin/PlatformOverview.tsx"), dis = src("app/admin/discipleship.tsx"), acc = src("app/admin/access.tsx");

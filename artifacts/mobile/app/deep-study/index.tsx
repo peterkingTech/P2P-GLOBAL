@@ -12,6 +12,8 @@ import { listen, useListenOwner, type ListenSection } from "@/lib/listen";
 import { commentarySections, crossRefSections, peopleSections } from "@/lib/listen/studyContent";
 import { CANON, SCRIPTURE_FONT, bibleRoute, bookByCode, formatRef, getChapter, readerTarget, type BibleChapter } from "@/lib/bibleReaderApi";
 import { loadPosition } from "@/lib/bibleReadingPrefs";
+import { createStudy } from "@/lib/studyWorkspaceApi";
+import { enqueue, isNetworkError, newKey } from "@/lib/offline";
 import {
   compareCommentaries, crossReferences, interlinear, languageName, peoplePlaces,
   type CompareResult, type CrossRefs, type Interlinear, type InterlinearWord, type PeoplePlaces,
@@ -39,11 +41,23 @@ export default function DeepStudyScreen() {
   useEffect(() => { if (!p.t) loadPosition().then((pos) => setTranslation(pos?.translation ?? null)); }, [p.t]);
   // P2P Listen (the one shared player): Deep Study's listening shows its bar here; leaving keeps it in reach.
   useListenOwner(LISTEN_OWNER);
+  // Deep Study History (2026-11-18): save this passage study — reopened later on the same passage and tab.
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // No passage yet: choose one.
   if (!book || !chapter || chapter > book.chapters) return <PassagePicker tab={p.tab} />;
 
   const label = formatRef(book, chapter, from, to);
+  async function saveStudy() {
+    const body = { clientKey: newKey("ds"), kind: "deep_study" as const, title: label, focus: { book: book!.code, chapter, v: from, ve: to, t: translation }, state: { position: { section: tab } } };
+    setSaving(true);
+    try { await createStudy(body); setSaveMsg(t("deepStudy.savedHistory", { defaultValue: "Saved to My saved studies." })); }
+    catch (e: any) {
+      if (isNetworkError(e)) { await enqueue({ id: body.clientKey, type: "study.create", payload: body, label }); setSaveMsg(t("study.savedOffline", { defaultValue: "Saved on this phone — it will sync when you're back online." })); }
+      else setSaveMsg(e?.message ?? "");
+    } finally { setSaving(false); }
+  }
   const go = (next: { book: string; chapter: number; v?: number; ve?: number }) =>
     router.push({ pathname: "/deep-study", params: { book: next.book, chapter: String(next.chapter), ...(next.v ? { v: String(next.v), ve: String(next.ve ?? next.v) } : {}), ...(translation ? { t: translation } : {}), tab } } as any);
 
@@ -57,10 +71,17 @@ export default function DeepStudyScreen() {
         </View>
         <IconButton icon="book-outline" accessibilityLabel={t("deepStudy.openInBible", { defaultValue: "Open in the Bible" })}
           onPress={() => router.push(bibleRoute({ book: book.code, chapter, v: from ?? undefined, ve: to ?? undefined, translation }) as any)} color={c.textDark} />
+        <IconButton icon="library-outline" accessibilityLabel={t("study.openWorkspace", { defaultValue: "My Plan study workspace" })} onPress={() => router.push("/study" as any)} color={c.textDark} />
+        <IconButton icon="list-outline" accessibilityLabel={t("concordance.title", { defaultValue: "Concordance" })} onPress={() => router.push("/concordance" as any)} color={c.textDark} />
         <IconButton icon="swap-horizontal" accessibilityLabel={t("deepStudy.changePassage", { defaultValue: "Change passage" })} onPress={() => router.push({ pathname: "/deep-study", params: { tab } } as any)} color={c.textDark} />
       </View>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
         <PassageText book={book.code} chapter={chapter} from={from} to={to} translation={translation} />
+        <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <AppButton label={t("deepStudy.saveStudy", { defaultValue: "Save to my studies" })} icon="bookmark-outline" size="sm" variant="secondary" loading={saving} onPress={saveStudy} />
+          <AppButton label={t("deepStudy.myStudies", { defaultValue: "My saved studies" })} icon="time-outline" size="sm" variant="tertiary" onPress={() => router.push("/study/history" as any)} />
+          {saveMsg ? <Text style={{ color: c.textMid, fontSize: 13 }} accessibilityLiveRegion="polite">{saveMsg}</Text> : null}
+        </View>
         <ChipRow accessibilityLabel={t("deepStudy.studyBy", { defaultValue: "Study by" })} single>
           {([["original", t("deepStudy.tabOriginal", { defaultValue: "Original language" })], ["commentaries", t("deepStudy.tabCommentaries", { defaultValue: "Commentaries" })],
             ["xref", t("deepStudy.tabCrossRefs", { defaultValue: "Cross references" })], ["people", t("deepStudy.tabPeople", { defaultValue: "People & places" })]] as [Tab, string][]).map(([k, l]) => (

@@ -8,21 +8,15 @@ import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { AppButton, ChipRow, FilterChip, IconButton } from "@/components/ui";
 import { withScreenBoundary } from "@/components/ScreenErrorBoundary";
-import { getMyPlans, getPlans, type FocusType, type MyPlans, type PlanCard, type RunItem } from "@/lib/studyPlansApi";
-import { FOCUS_TYPES, dueKey, filterPlans, shelves, todayIso } from "@/lib/studyPlansUi";
-import { getSubjectTypes, type SubjectType } from "@/lib/planDiscoveryApi";
+import { getMyPlans, getPlans, type MyPlans, type PlanCard, type RunItem } from "@/lib/studyPlansApi";
+import { dueKey, shelves, todayIso } from "@/lib/studyPlansUi";
 
-// P2P PLANS — HOME (owner brief 2026-11-14). One plan system: continue your plans, explore (search, focus
-// filter, discovery collections — shelves, not separate systems), and My Plans (active, paused, completed,
-// created by me, saved, together). The Learning Centre's topic plans keep their own browser
+// P2P PLANS — HOME (owner brief 2026-11-14; simplified 2026-11-18). Continue your plans; MY PLAN search — study
+// any word, subject or question (not predefined topics; the subject tiles and focus-filter chips were removed by
+// the owner); plans to follow (shelves); and My Plans (active, paused, completed, created by me, saved, together). The Learning Centre's topic plans keep their own browser
 // (/plans/learning, unchanged). No streaks, no "late", no points.
 type MineTab = "active" | "paused" | "completed" | "drafts" | "created" | "saved" | "together";
 const MINE_TABS: MineTab[] = ["active", "paused", "completed", "drafts", "created", "saved", "together"];
-// Explore-by-subject shortcuts (shown only when that kind of subject has records).
-const SUBJECT_SHORTCUTS: { type: SubjectType; icon: React.ComponentProps<typeof Ionicons>["name"] }[] = [
-  { type: "bible_book", icon: "book-outline" }, { type: "bible_topic", icon: "pricetags-outline" }, { type: "biblical_person", icon: "person-outline" },
-  { type: "biblical_event", icon: "time-outline" }, { type: "core_foundations", icon: "school-outline" }, { type: "kingdom_school", icon: "library-outline" },
-];
 
 function PlansHome() {
   const router = useRouter();
@@ -33,20 +27,14 @@ function PlansHome() {
   const [plans, setPlans] = useState<PlanCard[] | null>(null);
   const [mine, setMine] = useState<MyPlans | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [q, setQ] = useState("");
-  const [focus, setFocus] = useState<FocusType | null>(null);
-  const [together, setTogether] = useState(false);
+  const [studyQ, setStudyQ] = useState("");
   const [tab, setTab] = useState<MineTab>("active");
-  const [subjectTypes, setSubjectTypes] = useState<Set<SubjectType>>(new Set(["bible_book", "bible_topic"]));
   const load = useCallback(() => {
     setError(null);
     Promise.all([getPlans(), getMyPlans()]).then(([p, m]) => { setPlans(p.plans); setMine(m); }, (e) => setError(e?.status === 503 ? t("p2pPlans.notAvailable") : e?.message ?? t("p2pPlans.notAvailable")));
-    getSubjectTypes().then((r) => setSubjectTypes(new Set(r.types.filter((x) => x.count > 0).map((x) => x.type))), () => {});
   }, [t]);
   useFocusEffect(load);
   const today = todayIso();
-  const filtering = !!q.trim() || !!focus || together;
-  const results = plans ? filterPlans(plans, { q, focus, together }) : [];
   const open = (id: string) => router.push({ pathname: "/study-plan/[id]", params: { id } } as any);
   const sessionsLabel = (p: PlanCard) => (p.derived ? t("p2pPlans.sessionsFollowCurriculum") : t("p2pPlans.sessions", { count: p.sessionCount ?? 0 }));
   const badge = (p: PlanCard) => (p.official ? t("p2pPlans.official") : t("p2pPlans.yourPlan"));
@@ -97,6 +85,18 @@ function PlansHome() {
       </View>
       <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 40 }]} keyboardShouldPersistTaps="handled">
         <Text style={s.body}>{t("p2pPlans.intro")}</Text>
+        {/* MY PLAN search (owner 2026-11-18): study ANY word, subject or question — not limited to predefined topics. */}
+        <View style={[s.card, { gap: 8 }]}>
+          <Text style={s.cardTitle}>{t("p2pPlans.studyTitle", { defaultValue: "Study anything in the Bible" })}</Text>
+          <Text style={s.small}>{t("p2pPlans.studyHint", { defaultValue: "A word, a subject or a question: grace, forgiveness, how to grow my relationship with God." })}</Text>
+          <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+            <TextInput value={studyQ} onChangeText={setStudyQ} returnKeyType="search" onSubmitEditing={() => studyQ.trim().length >= 2 && router.push({ pathname: "/study", params: { q: studyQ.trim() } } as any)}
+              placeholder={t("p2pPlans.studyPlaceholder", { defaultValue: "Search any word, subject or question" })} placeholderTextColor={c.textMuted} style={[s.input, { flex: 1 }]}
+              accessibilityLabel={t("p2pPlans.studyPlaceholder", { defaultValue: "Search any word, subject or question" })} />
+            <AppButton label={t("p2pPlans.studyGo", { defaultValue: "Study" })} icon="search" disabled={studyQ.trim().length < 2} onPress={() => router.push({ pathname: "/study", params: { q: studyQ.trim() } } as any)} />
+          </View>
+          <AppButton label={t("study.historyOpen", { defaultValue: "My saved studies" })} icon="time-outline" variant="tertiary" size="sm" onPress={() => router.push("/study/history" as any)} />
+        </View>
         {error ? (
           <View style={[s.card, { alignItems: "center" }]}>
             <Text style={s.cardTitle}>{error}</Text>
@@ -115,25 +115,8 @@ function PlansHome() {
               </View>
               <Text style={s.small}>{t("p2pPlans.home.journeyHint")}</Text>
             </TouchableOpacity>
-            <Text style={s.section} accessibilityRole="header">{t("p2pPlans.home.bySubject")}</Text>
-            <View style={s.grid}>
-              {SUBJECT_SHORTCUTS.filter((x) => subjectTypes.has(x.type)).map((x) => (
-                <TouchableOpacity key={x.type} style={s.tile} onPress={() => router.push({ pathname: "/plans/discover", params: { start: x.type } } as any)} accessibilityRole="button" accessibilityLabel={t(`p2pPlans.subjectType.${x.type}`)}>
-                  <Ionicons name={x.icon} size={20} color={c.accentGreen} />
-                  <Text style={s.tileText}>{t(`p2pPlans.subjectType.${x.type}`)}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={s.section} accessibilityRole="header">{t("p2pPlans.explore")}</Text>
-            <TextInput value={q} onChangeText={setQ} placeholder={t("p2pPlans.searchPlaceholder")} placeholderTextColor={c.textMuted} style={s.input} accessibilityLabel={t("p2pPlans.search")} />
-            <ChipRow accessibilityLabel={t("p2pPlans.explore")} single>
-              <FilterChip label={t("p2pPlans.allFocus")} selected={!focus} selection="single" onPress={() => setFocus(null)} />
-              {FOCUS_TYPES.map((f) => <FilterChip key={f} label={t(`p2pPlans.focus.${f}`)} selected={focus === f} selection="single" onPress={() => setFocus(focus === f ? null : f)} />)}
-              <FilterChip label={t("p2pPlans.togetherOnly")} selected={together} onPress={() => setTogether(!together)} />
-            </ChipRow>
-            {filtering ? (results.length ? results.map((p) => <Card key={p.id} p={p} />) : <Text style={s.meta}>{t("p2pPlans.noMatch")}</Text>)
-              : shelves(plans).map((sh) => (
+            <Text style={s.section} accessibilityRole="header">{t("p2pPlans.toFollow", { defaultValue: "Plans to follow" })}</Text>
+            {shelves(plans).map((sh) => (
                 <View key={sh.collection} style={{ gap: 8 }}>
                   <Text style={s.group}>{t(`p2pPlans.collection.${sh.collection}`)}</Text>
                   {sh.plans.map((p) => <Card key={p.id} p={p} />)}

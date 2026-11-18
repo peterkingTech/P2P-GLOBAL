@@ -8,8 +8,6 @@ import type { AppColors } from "@/constants/themes";
 import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import { loadPosition, type ReadingPosition } from "@/lib/bibleReadingPrefs";
 import { bookByCode } from "@/lib/bibleReaderApi";
-import { getTopics, type PrayerTopic } from "@/lib/prayerTopicsApi";
-import { groupTopics, searchTopics, topicKey } from "@/lib/scriptureTopicsUi";
 import { AppButton, IconButton } from "@/components/ui";
 import { BIBLE_COVER, BIBLE_COVER_BG, BIBLE_COVER_LABEL, ARTWORK_FILL } from "@/constants/artwork";
 import { useScrollToTopOnTabReselect, useTabCapsuleTopInset } from "@/components/IPadTabCapsule";
@@ -22,9 +20,10 @@ import { useTranslation } from "react-i18next";
 //     translations through the server.
 //   • Bible Reader, Search (API.Bible search: words, phrases, references, in
 //     the chosen translation), Notes, Highlights and the reader's library.
-//   • Explore Scripture by Topic — the editorially curated topic → reference
-//     lists already published for Pray the Word (same records, read only;
-//     opening a passage never changes anyone's Pray the Word progress).
+//   • Search and study anything (My Plan, 2026-11-18) — one search over everything Bible Study holds: Scripture,
+//     stories, dictionary, Greek/Hebrew, commentaries, cross-references, themes (incl. the editors' Scripture
+//     topics) and the person's own notes. The separate topic browser was removed by the owner (the topics
+//     still appear in search results). Concordance is listed with the study tools.
 // Reading plans are not offered here: no plan with a real reading schedule
 // exists yet, and an empty plan must not look like a working feature.
 // The same page is the Bible tab (asTab: no Back button, room for the tab bar).
@@ -44,15 +43,10 @@ export function BibleStudyHome({ asTab = false }: { asTab?: boolean }) {
   const s = useMemo(() => makeStyles(colors), [colors]);
   const { contentMaxWidth } = useLayout();
   const [pos, setPos] = useState<ReadingPosition | null>(null);
-  const [topics, setTopics] = useState<PrayerTopic[] | null>(null);
-  const [topicsFailed, setTopicsFailed] = useState(false);
   const [query, setQuery] = useState("");
-  const topicName = (title: string) => t(`scriptureTopics.names.${topicKey(title)}`, { defaultValue: title });
-  const shownTopics = useMemo(() => searchTopics(topics ?? [], query, (k) => t(`scriptureTopics.categories.${k}`)).filter(Boolean), [topics, query, t]);
 
   const load = useCallback(() => {
     loadPosition().then(setPos).catch(() => {});
-    getTopics().then((t) => { setTopics(t.filter((x) => x.status === "published")); setTopicsFailed(false); }).catch(() => setTopicsFailed(true));
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -111,11 +105,26 @@ export function BibleStudyHome({ asTab = false }: { asTab?: boolean }) {
         {/* The Bible Study area: Deep Study, Commentaries, Study Tools (one set of study records behind all three).
             Scripture itself stays in the Bible above — no second Scripture destination here. */}
         <Text style={s.section} accessibilityRole="header">{t("deepStudy.areaTitle", { defaultValue: "Bible Study" })}</Text>
-        <Text style={[s.meta, { marginBottom: 10 }]}>{t("deepStudy.areaSub", { defaultValue: "Go deeper: the original languages, classic commentaries and study tools." })}</Text>
+        {/* MY PLAN search (owner 2026-11-18): any word, phrase, question or reference → everything Bible Study holds. */}
+        <View style={[s.dest, { flexDirection: "column", alignItems: "stretch", gap: 8 }]}>
+          <Text style={s.tileTitle}>{t("study.searchAllTitle", { defaultValue: "Search and study anything" })}</Text>
+          <Text style={s.meta}>{t("study.searchAllSub", { defaultValue: "Scriptures, stories, the dictionary, Greek and Hebrew, commentaries, cross-references, themes and your own notes, in one search." })}</Text>
+          <View style={s.searchRow}>
+            <Ionicons name="search-outline" size={18} color={colors.textMuted} />
+            <TextInput value={query} onChangeText={setQuery} placeholder={t("study.searchPlaceholder2", { defaultValue: "A word, phrase, question or reference: grace, John 3:16" })} placeholderTextColor={colors.textMuted}
+              accessibilityLabel={t("study.searchLabel", { defaultValue: "Search the Bible and study tools" })} style={s.searchInput} autoCorrect={false} returnKeyType="search"
+              onSubmitEditing={() => query.trim().length >= 2 && router.push({ pathname: "/study", params: { q: query.trim() } } as any)} />
+            <AppButton label={t("study.search", { defaultValue: "Study" })} size="sm" disabled={query.trim().length < 2} onPress={() => router.push({ pathname: "/study", params: { q: query.trim() } } as any)} />
+          </View>
+          <AppButton label={t("study.historyOpen", { defaultValue: "My saved studies" })} icon="time-outline" variant="tertiary" size="sm" onPress={() => router.push("/study/history" as any)} />
+        </View>
+        <Text style={[s.meta, { marginBottom: 10, marginTop: 12 }]}>{t("deepStudy.areaSub", { defaultValue: "Go deeper: the original languages, classic commentaries and study tools." })}</Text>
         <View style={{ gap: 10 }}>
           {([
             { icon: "layers-outline", title: t("deepStudy.title", { defaultValue: "Deep Study" }), sub: t("deepStudy.titleSub", { defaultValue: "One passage: original words, commentaries, cross references" }), route: "/deep-study" },
             { icon: "text-outline", title: t("dictionary.title", { defaultValue: "Biblical Dictionary" }), sub: t("dictionary.hubSub", { defaultValue: "A–Z: Hebrew, Aramaic and Greek words, meanings and where they occur" }), route: "/dictionary" },
+            { icon: "ribbon-outline", title: t("names.title", { defaultValue: "Names and Titles of God" }), sub: t("names.hubSub", { defaultValue: "God the Father, Jesus Christ and the Holy Spirit — Hebrew, Aramaic and Greek, with Scripture" }), route: "/bible-study/names" },
+            { icon: "list-outline", title: t("concordance.title", { defaultValue: "Concordance" }), sub: t("concordance.hubSub", { defaultValue: "Every verse that uses a word, in Bible order, with Greek and Hebrew" }), route: "/concordance" },
             { icon: "library-outline", title: t("deepStudy.commentaries", { defaultValue: "Commentaries" }), sub: t("deepStudy.commentariesSub", { defaultValue: "Classic commentaries and open study notes" }), route: "/commentaries" },
             { icon: "construct-outline", title: t("deepStudy.studyTools", { defaultValue: "Study Tools" }), sub: t("deepStudy.studyToolsSub", { defaultValue: "Hebrew, Greek and Aramaic lexicons, Strong's, cross references" }), route: "/study-tools" },
           ] as const).map((d) => (
@@ -130,39 +139,6 @@ export function BibleStudyHome({ asTab = false }: { asTab?: boolean }) {
           ))}
         </View>
 
-        {/* Explore Scripture by Topic — searchable, grouped by category, with each topic's passage count.
-            The search text stays when you open a topic and come back (this screen stays mounted). */}
-        <Text style={s.section} accessibilityRole="header">{t("scriptureTopics.title", { defaultValue: "Explore Scripture by Topic" })}</Text>
-        <Text style={[s.meta, { marginBottom: 10 }]}>{t("scriptureTopics.intro", { defaultValue: "Passages chosen by P2P editors for each topic. Open any passage to read it in context." })}</Text>
-        {topics === null && !topicsFailed ? <ActivityIndicator color={colors.accentGreen} accessibilityLabel={t("scriptureTopics.loading")} />
-          : topicsFailed ? (
-            <AppButton label={t("scriptureTopics.failed")} onPress={load} variant="tertiary" />
-          ) : topics && topics.length ? (
-            <View style={{ gap: 12 }}>
-              <View style={s.searchRow}>
-                <Ionicons name="search-outline" size={18} color={colors.textMuted} />
-                <TextInput value={query} onChangeText={setQuery} placeholder={t("scriptureTopics.searchHint")} placeholderTextColor={colors.textMuted}
-                  accessibilityLabel={t("scriptureTopics.search")} style={s.searchInput} autoCorrect={false} returnKeyType="search" />
-                {query ? <IconButton icon="close-circle" size="sm" accessibilityLabel={t("scriptureTopics.clear")} onPress={() => setQuery("")} color={colors.textMuted} /> : null}
-              </View>
-              {!shownTopics.length ? <Text style={s.meta}>{t("scriptureTopics.noMatch", { query })}</Text> : groupTopics(shownTopics).map((g) => (
-                <View key={g.category} style={{ gap: 8 }}>
-                  <Text style={s.groupTitle} accessibilityRole="header">{t(`scriptureTopics.categories.${g.category}`)}</Text>
-                  <View style={s.chips}>
-                    {g.topics.map((tp) => {
-                      const name = topicName(tp.title);
-                      const count = typeof tp.scriptureCount === "number" ? t("scriptureTopics.count", { count: tp.scriptureCount }) : null;
-                      return (
-                        <AppButton key={tp.id} label={count ? `${name} · ${tp.scriptureCount}` : name} variant="secondary"
-                          accessibilityLabel={t("scriptureTopics.topicA11y", { title: name, count: count ?? "" })}
-                          onPress={() => router.push({ pathname: "/bible-study/topic/[slug]", params: { slug: tp.slug } } as any)} />
-                      );
-                    })}
-                  </View>
-                </View>
-              ))}
-            </View>
-          ) : <Text style={s.meta}>{t("scriptureTopics.none")}</Text>}
       </ScrollView>
     </View>
   );

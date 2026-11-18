@@ -172,7 +172,9 @@ const index = src("lib/listen/index.ts"), session = src("lib/listen/playlistSess
 ok("one player: the shared engine — device voice, or a server-made studio recording falling back to it; nothing else creates a speech engine",
   index.includes("export const listen = createListenEngine(recordedNarration, {") && index.includes("return deviceSpeech.speak(text, o);") && !/createListenEngine\(/.test(session) && !/createAudioPlayer/.test(session));
 ok("device speech speaks straight from the text (expo-speech), never via audio files made on the phone", /Speech\.speak\(text, \{/.test(index) && !/synthesize|\.caf\b|FileSystem|fileSpeech/.test(index)
-  && (index.match(/createAudioPlayer\(/g) ?? []).length === 1 && index.includes("createAudioPlayer({ uri: n.url }"));
+  // 2026-11-18 (owner, P2P Voices): exactly TWO players — the studio recording, and a P2P Voice whose audio is made
+  // on the SERVER (speakChunk → a link). Still nothing on the phone turns speech into a file.
+  && (index.match(/createAudioPlayer\(/g) ?? []).length === 2 && index.includes("createAudioPlayer({ uri: n.url }") && index.includes("cloudPlayer = createAudioPlayer({ uri: url }") && index.includes("speakChunk("));
 ok("the audio-file pipeline is gone: no file driver, no speech-to-file native module", !existsSync(path.join(root, "lib/listen/fileSpeech.ts")) && !existsSync(path.join(root, "modules/p2p-speech-audio")));
 ok("the engine has no sentence preparation, Now Playing or lock-screen button hooks (no misleading controls)", !/prepare\?\(|nowPlaying|setRemote|RemoteControls|publishNowPlaying/.test(engineSrc));
 ok("nothing auto-plays after a restart: resume is only ever a tap", !/AppState|useEffect\([^)]*resumePlaylist/.test(session) && src("app/library/index.tsx").includes("onPress={() => resume(continueItem.id)}"));

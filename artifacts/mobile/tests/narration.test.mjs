@@ -53,7 +53,7 @@ ok("loaded once per chapter per session", calls === 1);
 const engine = src("lib/listen/engine.ts"), index = src("lib/listen/index.ts"), chapter = src("app/kingdom-stories/chapter.tsx"), client = src("lib/kingdomStoriesApi.ts");
 ok("engine: passes the displayed text and the content's narration to the driver", engine.includes("source: content.sections[c.section]?.parts[c.part]?.text.slice(c.start, c.end),") && engine.includes("narration: content.narration,"));
 ok("driver: the phone's voice when there's no recording, no match, a broken recording, or any failure", index.includes("if (!n || !seg) { recStop(true); return deviceSpeech.speak(text, o); }") && index.includes("recBroken.add(n.url); recStop(true); deviceSpeech.speak(text, o);") && /catch \{\s*recStop\(true\);\s*deviceSpeech\.speak\(text, o\);/.test(index));
-ok("driver: consecutive sentences carry on without a seek; never stuck", index.includes("const contiguous = p.playing") && index.includes("recPause = setTimeout(") && index.includes("setTimeout(finish, ((seg.end - seg.start)"));
+ok("driver: consecutive sentences carry on without a seek; never stuck, and never advanced by a timer (2026-11-18)", index.includes("const contiguous = pausedHere === null && p.playing") && index.includes("recPause = setTimeout(") && index.includes("recWatch = setInterval(") && !index.includes("setTimeout(finish,"));
 ok("driver: one player, replaced (and the cursor reset) when the recording changes", index.includes("recPlayer?.remove();") && index.includes("recCursor = 0;"));
 ok("chapter: narration loaded for this chapter and its neighbours; Listen waits briefly, then the phone's voice", chapter.includes("for (const t of [prev, ch, next])") && chapter.includes("setTimeout(() => r(null), 3000)") && chapter.includes("narration: narrations.current.get(`${storyLang}:${target.id}`) ?? undefined,")
   && chapter.includes("loadNarration(story.id, target.id, storyLang)"));
@@ -77,6 +77,38 @@ ok("generator: one narrator per language (English Jon, native German Alexander) 
 ok("generator: files per language (scripts, output, storage); English words checked against the screen, translations for completeness", gen.includes("path.join(scriptDir, lang)") && gen.includes("narration/${lang}/${ch.id}.mp3") && gen.includes('if (lang !== "en")'));
 ok("scripts: Topic 1 (Creation) has all six chapters in English and German", ["en", "de"].every((l) => [1, 2, 3, 4, 5, 6].every((k) => apiSrc(`narration/scripts/creation/${l}/chapter-${k}.txt`).includes("### check:label"))));
 ok("API: narration per language (?lang=), English still served from the first upload's place", route.includes("req.query.lang") && lib.includes('const dirs = lang === "en" ? [`${lang}/`, ""] : [`${lang}/`];'));
+
+// ── 2026-11-18: whole-content alignment (continuous playback, no skips / repeats / drift) ──
+{
+  const W = "in the beginning god created the heavens and the earth now the earth was formless and void and darkness was over the surface of the deep and the spirit of god was hovering over the waters and god said let there be light and there was light god saw that the light was good".split(" ");
+  const D = { url: "https://x/g.mp3", voice: "Jon", model: "m", createdAt: "", words: W.join(" "), starts: W.map((_, i) => i * 40), ends: W.map((_, i) => i * 40 + 30) };
+  const g = N.fromData(D);
+  const S = ["In the beginning God created the heavens and the earth.", "Now the earth was formless and void, and darkness was over the surface of the deep.",
+    "And the Spirit of God was hovering over the waters.", "And God said, “Let there be light,” and there was light.", "God saw that the light was good."];
+  const a = N.alignChunks(g, S);
+  ok("align: every sentence found, in order", a.every(Boolean) && a.every((x, i) => i === 0 || x.firstWord === a[i - 1].lastWord + 1));
+  ok("align: contiguous — each sentence starts exactly where the previous ended (no gap, no overlap)", a.every((x, i) => i === 0 || x.start === a[i - 1].end));
+  ok("align: last sentence ends at the end of the recording's last word", a[4].end === D.ends[W.length - 1] / 100);
+  const b = N.alignChunks(g, ["In the beginning God created the heavens & the earth!", "Now the earth was formless — and void, and darkness was over the surface of the deep.", "And the Spirit of God was hovering over the waters.", "And God said, Let there be light, and there was light.", "God saw that the light was good."]);
+  ok("align: punctuation, dashes, curly quotes and a word written differently don't break it", b.every(Boolean) && b[4].lastWord === W.length - 1);
+  const c = N.alignChunks(g, ["Chapter One", ...S]);
+  ok("align: an on-screen heading the narrator didn't read → null (phone's voice), and the rest still aligns", c[0] === null && c.slice(1).every(Boolean) && c[1].firstWord === 0);
+  const d = N.alignChunks(g, [S[0], S[2], S[3], S[4]]);
+  ok("align: a sentence missing from the screen → the next one re-finds its place (no drift)", d.every(Boolean) && d[1].firstWord === W.indexOf("spirit") - 2 && d[3].lastWord === W.length - 1);
+  const W2 = "god is good god is good god is good".split(" ");
+  const g2 = N.fromData({ url: "https://x/r.mp3", voice: "v", model: "m", createdAt: "", words: W2.join(" "), starts: W2.map((_, i) => i * 10), ends: W2.map((_, i) => i * 10 + 8) });
+  const e = N.alignChunks(g2, ["God is good.", "God is good.", "God is good."]);
+  ok("align: repeated sentences play their own occurrences in turn (never the same one twice)", e.map((x) => x.firstWord).join() === "0,3,6");
+  const longP = S.join(" "), f = N.alignChunks(g, [longP]);
+  ok("align: one long paragraph or many short ones cover the same audio", f[0].start === a[0].start && f[0].end === a[4].end);
+  ok("align: cached per recording + sentence list", N.alignedSegments(g, S) === N.alignedSegments(g, S));
+  // 2026-11-18 (P2P Voices): the chunk index, every chunk's text, 'resuming', the content kind and key are passed for
+  // EVERY reading (a P2P Voice prefetches the next sentences and must know it isn't Bible content); the recording
+  // driver still uses them only when the content has a recording.
+  ok("engine: passes the chunk index, every chunk's text, 'resuming', kind and key", engine.includes("kind: content.kind, contentKey: content.key,") && engine.includes("chunkIndex: index, chunkSources: chunkSources(), resuming,") && engine.includes("speakFrom(state.chunk, spokenFrom, true)"));
+  ok("driver: resumes from the exact paused moment; otherwise from the sentence's start", index.includes("recPausedAt.time >= seg.start && recPausedAt.time < seg.end ? recPausedAt.time : null") && index.includes("const from = pausedHere ?? seg.start;"));
+  ok("driver: a stall is waited for, then reported — never skipped", index.includes("started && still >= 25") && index.includes("o.onError?.(new Error("));
+}
 
 console.log(`narration (app): ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

@@ -61,6 +61,7 @@ ok("nothing persisted to storage by the cache (memory only; Bible text never sto
   let reqs = [];
   const B = load("lib/bibleReaderApi.ts", {
     "react-native": { Platform: { select: (o) => o.ios } },
+    "@/lib/offline": { isNetworkError: (e) => e?.status === 0, kvGet: async () => null, kvSet: async () => {}, kvRemove: async () => {} },
     "@/lib/bibleBooks": load("lib/bibleBooks.ts"),
     "@/lib/apiClient": { apiRequest: (p) => { reqs.push(p); return new Promise((r) => setTimeout(() => r(p.includes("translations") ? { translations: [] } : { chapter: 1, verses: [] }), 15)); } },
   });
@@ -77,6 +78,7 @@ ok("nothing persisted to storage by the cache (memory only; Bible text never sto
   let n = 0;
   const B = load("lib/bibleReaderApi.ts", {
     "react-native": { Platform: { select: (o) => o.ios } },
+    "@/lib/offline": { isNetworkError: (e) => e?.status === 0, kvGet: async () => null, kvSet: async () => {}, kvRemove: async () => {} },
     "@/lib/bibleBooks": load("lib/bibleBooks.ts"),
     "@/lib/apiClient": { apiRequest: () => { n++; return Promise.reject(new Error("offline")); } },
   });

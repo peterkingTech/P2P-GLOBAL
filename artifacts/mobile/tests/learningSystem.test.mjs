@@ -125,7 +125,8 @@ for (const [f, needle] of [["app/(tabs)/index.tsx", 'router.push("/kingdom-schoo
 }
 ok("links: reminder/notification routes unchanged (still allowed)", src("lib/studyReminders.ts").includes('new Set(["/bible", "/plans", "/(tabs)/learn"])'));
 const bs = src("app/bible-study/index.tsx");
-ok("bible study: continue reading, reader, search, notes, highlights, topics", ["Continue Reading", '"/bible"', '"/bible/search"', '"/notes"', '"/highlights"', "Explore Scripture by Topic", "getTopics()"].every((w) => bs.includes(w)));
+// 2026-11-18 (owner): the topic browser was replaced by one search over everything (topics included) + Concordance.
+ok("bible study: continue reading, reader, search, notes, highlights, study search, concordance", ["Continue Reading", '"/bible"', '"/bible/search"', '"/notes"', '"/highlights"', 'pathname: "/study"', '"/concordance"'].every((w) => bs.includes(w)) && !bs.includes("Explore Scripture by Topic"));
 ok("bible study: no empty reading plans presented as a feature", !/reading plan/i.test(bs.replace(/\/\/.*$/gm, "")));
 ok("bible study: topics read-only (never touches Pray the Word progress)", !/updateTopicProgress/.test(bs + src("app/bible-study/topic/[slug].tsx")));
 const hubScreen = src("app/study-together/index.tsx");

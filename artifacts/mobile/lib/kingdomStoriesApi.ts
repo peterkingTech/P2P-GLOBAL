@@ -1,5 +1,6 @@
 import { supabase } from "@/contexts/AuthContext";
 import { apiRequest } from "@/lib/apiClient";
+import { isNetworkError, kvGet, kvSet } from "@/lib/offline";
 
 // Kingdom Stories — P2P-curated EDITORIAL content (migration 152).
 // Distinct from Kingdom Wins/P2P Impact (peer-authored testimony): only
@@ -292,7 +293,15 @@ export function getKingdomStoriesFeed(opts: { category?: string; featured?: bool
  * `contentLanguage` says which language the chapters are actually in.
  */
 export function getKingdomStory(id: string, lang?: string): Promise<KingdomStory> {
-  return authedFetch(`/kingdom-stories/${id}${lang && lang !== "en" ? `?lang=${encodeURIComponent(lang)}` : "?lang=en"}`);
+  // Offline-first (2026-11-18): the last story text opened is kept on this phone (P2P's own content), so a
+  // story read before still opens without a connection. Pictures and narration still need the internet.
+  const key = `ks:${id}:${lang || "en"}`;
+  return (authedFetch(`/kingdom-stories/${id}${lang && lang !== "en" ? `?lang=${encodeURIComponent(lang)}` : "?lang=en"}`) as Promise<KingdomStory>)
+    .then((st) => { void kvSet(key, st); return st; })
+    .catch(async (e) => {
+      if (isNetworkError(e)) { const kept = await kvGet<KingdomStory>(key); if (kept) return kept; }
+      throw e;
+    });
 }
 /** The reader's content language as a base code ("de-CH" → "de"); English when unset. */
 export function baseContentLanguage(code: string | null | undefined): string {

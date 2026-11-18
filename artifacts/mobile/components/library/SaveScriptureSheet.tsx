@@ -24,6 +24,8 @@ export default function SaveScriptureSheet({ visible, targets, onClose, onDone, 
   const { colors: c } = useTheme();
   const s = useMemo(() => makeStyles(c), [c]);
   const insets = useSafeAreaInsets();
+  // Shared with me but view-only: shown greyed with the reason, so a playlist never seems to "disappear" (2026-11-18).
+  const [viewOnly, setViewOnly] = useState<CollectionCard[]>([]);
   const [list, setList] = useState<CollectionCard[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(true);
@@ -39,7 +41,8 @@ export default function SaveScriptureSheet({ visible, targets, onClose, onDone, 
     setList(null); setError(null); setSaved(true); setFavourite(false); setChosen(new Set(initialCollectionIds)); setQuery(""); setNaming(null); setName("");
     listCollections()
       // Recently used first: the ones I changed most recently.
-      .then((r) => setList([...r.mine, ...r.shared.filter((x) => x.permission === "collaborate")].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))))
+      .then((r) => { setList([...r.mine, ...r.shared.filter((x) => x.permission === "collaborate")].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
+        setViewOnly(r.shared.filter((x) => x.permission !== "collaborate")); })
       .catch((e: any) => { setError(e?.message ?? "Couldn't load your playlists."); setList([]); });
   }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -109,7 +112,7 @@ export default function SaveScriptureSheet({ visible, targets, onClose, onDone, 
               <Switch value={favourite} onValueChange={setFavourite} accessibilityLabel="Add to Favourites" trackColor={{ true: c.accentGreen, false: c.borderBeige }} thumbColor="#fff" />
             </View>
 
-            <Text style={s.section}>Playlists and collections</Text>
+            <Text style={s.section}>Add to your playlists</Text>
             <TextInput style={s.input} value={query} onChangeText={setQuery} placeholder="Search your playlists" placeholderTextColor={c.textMuted} accessibilityLabel="Search your playlists and collections" />
             {!list ? <ActivityIndicator color={c.accentGreen} style={{ margin: 16 }} accessibilityLabel="Loading" /> : null}
             {shown.map((x) => {
@@ -126,7 +129,17 @@ export default function SaveScriptureSheet({ visible, targets, onClose, onDone, 
                 </Pressable>
               );
             })}
-            {list && !list.length ? <Text style={s.muted}>No playlists or collections yet — create one below.</Text> : null}
+            {list && !list.length ? <Text style={s.muted}>No playlists or collections of your own yet — create one below.</Text> : null}
+            {viewOnly.filter((x) => !query.trim() || x.title.toLowerCase().includes(query.trim().toLowerCase())).map((x) => (
+              <View key={x.id} style={[s.row, { opacity: 0.55 }]} accessibilityLabel={`${x.title}: shared with you to view and listen only — you can't add passages`}>
+                <CoverArt cover={x.cover} kind={x.kind} size={44} />
+                <View style={{ flex: 1 }}>
+                  <Text style={s.name} numberOfLines={1}>{x.title}</Text>
+                  <Text style={s.muted}>{x.ownerName ? `${x.ownerName}'s · ` : ""}view and listen only — ask the owner to let you collaborate</Text>
+                </View>
+                <Ionicons name="lock-closed-outline" size={20} color={c.textMuted} />
+              </View>
+            ))}
             {naming ? (
               <View style={{ gap: 8, marginTop: 10 }}>
                 <SegmentedControl accessibilityLabel="Create" value={naming} onChange={(v) => setNaming(v as CollectionKind)} options={[{ value: "playlist", label: "Playlist" }, { value: "collection", label: "Collection" }]} />

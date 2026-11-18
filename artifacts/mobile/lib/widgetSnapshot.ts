@@ -152,9 +152,16 @@ export function signedOutSnapshot(now: Date, link: (path: string) => string, ver
   });
 }
 
-/** Today's verse by the app's own rule (day of month % list length) — the same verse Home shows. */
-export function verseForDay(verses: { ref: string; text: string }[], day: Date) {
-  return verses.length ? verses[day.getDate() % verses.length] : null;
+/** Local calendar days since 1 January 2024 (the Daily Word day number; the native widgets compute the same). */
+export function dailyIndex(day: Date): number {
+  return Math.floor((Date.UTC(day.getFullYear(), day.getMonth(), day.getDate()) - Date.UTC(2024, 0, 1)) / 86_400_000);
+}
+/** Today's Daily Word by the app's one rule (day number % list length): the same verse on Home, the widgets
+ *  and the Daily Word screen; with 400 entries none repeats for 400 days. */
+export function verseForDay<T extends { ref: string; text: string }>(verses: T[], day: Date): T | null {
+  if (!verses.length) return null;
+  const n = dailyIndex(day) % verses.length;
+  return verses[n < 0 ? n + verses.length : n];
 }
 
 /** Time-of-day greeting, as the widgets compute it on the phone (no network). */

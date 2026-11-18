@@ -698,7 +698,10 @@
     "areaSub": "Zama zaidi: lugha za asili, maelezo ya zamani na vifaa vya kujifunza.",
     "titleSub": "Kifungu kimoja: maneno ya asili, maelezo, marejeo mtambuka",
     "commentariesSub": "Maelezo ya zamani na vidokezo huria vya masomo",
-    "studyToolsSub": "Kamusi za Kiebrania, Kigiriki na Kiaramu, namba za Strong, marejeo mtambuka"
+    "studyToolsSub": "Kamusi za Kiebrania, Kigiriki na Kiaramu, namba za Strong, marejeo mtambuka",
+    "saveStudy": "Hifadhi kwenye masomo yangu",
+    "myStudies": "Masomo yangu yaliyohifadhiwa",
+    "savedHistory": "Imehifadhiwa kwenye Masomo yangu yaliyohifadhiwa."
   },
   "dictionary": {
     "loadError": "Kamusi haikuweza kupakiwa.",

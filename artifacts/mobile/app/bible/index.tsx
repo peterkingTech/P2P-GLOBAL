@@ -38,6 +38,8 @@ import { usePerfVisit } from "@/lib/perf";
 import { loadLocale } from "@/lib/i18n";
 import { useTranslation } from "react-i18next";
 import { deliverPick } from "@/lib/passagePick";
+import { emphasisColor, loadChapterEmphasis, verseCategories, type ChapterEmphasis, type EmphasisCategory } from "@/lib/scriptureEmphasis";
+import { overlayVerses, setStudyOverlay, useStudyOverlay } from "@/lib/studyOverlay";
 
 // The P2P Bible reader. Scripture comes from the server (licensed API.Bible
 // translations only, never stored in our database); highlights, notes and
@@ -46,7 +48,9 @@ import { deliverPick } from "@/lib/passagePick";
 // screen, so the call keeps running; the Return bar goes back to it.
 
 // pick=plan: opened from the P2P Plans builder to CHOOSE a passage (a reference is handed back; nothing else changes).
-type Params = { book?: string; chapter?: string; v?: string; ve?: string; t?: string; compare?: string; pick?: string };
+type Params = { book?: string; chapter?: string; v?: string; ve?: string; t?: string; compare?: string; pick?: string; listen?: string;
+  /** Came from a playlist's "Find Scripture" → "Browse the Bible": that playlist is already ticked in "Add to playlist". */
+  addTo?: string };
 // How a tap selects text. Verse (default) and Passage select whole verses;
 // Word, Phrase and Sentence select exact words — never silently widened.
 type SelectMode = "verse" | "word" | "phrase" | "sentence" | "passage";
@@ -72,6 +76,12 @@ export default function BibleReaderScreen() {
   const styles = useMemo(() => makeStyles(c), [c]);
   const palette = useMemo(() => highlightPalette(resolvedMode), [resolvedMode]);
   const { prefs, update: updatePrefs } = useBibleReadingPrefs();
+  // Scripture emphasis (2026-11-18): the categories switched on; the editorial references are loaded only when
+  // one of those categories is on (words of Jesus come with the chapter itself).
+  const emphasisOn = useMemo(() => new Set(prefs.emphasis as EmphasisCategory[]), [prefs.emphasis]);
+  const [chapterEmphasis, setChapterEmphasis] = useState<ChapterEmphasis>({ references: [], available: [] });
+  // Study-wide highlighting (2026-11-18): the open My Plan study's passages, shown temporarily (◆ + banner).
+  const studyOverlay = useStudyOverlay();
   const gathering = useActiveGathering();
   // Daily study goal: count time while this screen is focused and on screen.
   const { profile } = useAuth();
@@ -98,10 +108,17 @@ export default function BibleReaderScreen() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [focus, setFocus] = useState(false);
-  const [sheet, setSheet] = useState<null | "books" | "translations" | "prefs" | "related" | "menu" | "compare" | "collection">(null);
+  const [sheet, setSheet] = useState<null | "books" | "translations" | "prefs" | "emphasis" | "related" | "menu" | "compare" | "collection">(null);
   // Bible Compare: extra licensed translations read beside this one (remembered on this device).
   const [compareRaw, setCompareRaw] = useState<string[]>([]);
   useEffect(() => { loadCompare().then(setCompareRaw); }, []);
+  const editorialOn = [...emphasisOn].some((k) => k !== "jesus");
+  useEffect(() => {
+    if (!loc || !editorialOn) { setChapterEmphasis({ references: [], available: [] }); return; }
+    let cancelled = false;
+    loadChapterEmphasis(loc.book, loc.chapter).then((e) => { if (!cancelled) setChapterEmphasis(e); });
+    return () => { cancelled = true; };
+  }, [loc?.book, loc?.chapter, editorialOn]);
   const { width: screenWidth } = useWindowDimensions();
   // The text fills the screen at every size (no narrow column); only the side
   // margins grow with the screen, plus any landscape safe-area insets.
@@ -252,7 +269,8 @@ export default function BibleReaderScreen() {
   useListenOwner("bible");
   const listenState = useListenState();
   const listening = listenState.content?.owner === "bible" && listenState.status !== "idle" ? listenState : null;
-  const autoListen = useRef<StartAt | null>(null);
+  // ?listen=1 (e.g. "Listen" on a My Plan finding): start P2P Listen once the chapter has loaded.
+  const autoListen = useRef<StartAt | null>(params.listen === "1" ? "start" : null);
   const chapterListenKey = bibleListenKey;
   // The content itself is built in lib/listen/bibleContent, so moving chapters and
   // "Continue to next chapter" keep working after the listener leaves the Bible.
@@ -528,9 +546,11 @@ export default function BibleReaderScreen() {
   // A run's look: solid highlight fill (dark ink on it) or underline, plus the
   // selection wash. Inline Text styles only — nothing that can change line layout.
   const selectionWash = withAlpha(c.accentGreen, resolvedMode === "dark" ? 0.32 : 0.2);
-  const runStyle = (run: { color: string | null; selected: boolean }) => {
+  const runStyle = (run: { color: string | null; selected: boolean; jesus?: boolean }) => {
     const p = run.color ? (palette as Record<string, { wash: string; swatch: string; ink: string }>)[run.color] ?? palette.gold : null;
     return [
+      // Scripture emphasis: words of Jesus in red — a personal highlight always wins (its own ink on its wash).
+      run.jesus && !p ? { color: emphasisColor("jesus", resolvedMode === "dark" ? "dark" : "light") } : null,
       p && run.color !== "underline" ? { backgroundColor: p.wash, color: p.ink } : null,
       run.color === "underline" ? { textDecorationLine: "underline" as const, textDecorationColor: p?.swatch } : null,
       run.selected ? { backgroundColor: selectionWash, textDecorationLine: "underline" as const, textDecorationStyle: "dotted" as const, textDecorationColor: c.accentGreen } : null,
@@ -591,6 +611,17 @@ export default function BibleReaderScreen() {
     body = (
       <ScrollView ref={scrollRef} scrollEventThrottle={64} onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }} contentContainerStyle={[styles.scroll, fullWidth, { paddingTop: focus ? insets.top + 56 : 8, paddingBottom: (sel ? 200 : 40) + insets.bottom }]}>
         {error && <Text style={styles.inlineError}>{error.message}</Text>}
+        {studyOverlay ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: c.accentGreen, marginBottom: 8 }} accessibilityLiveRegion="polite">
+            <Text style={{ color: c.accentGreen, fontSize: 16 }} importantForAccessibility="no">{"\u25C6"}</Text>
+            <Text style={{ flex: 1, color: c.textMid, fontSize: 13 }}>
+              {overlayVerses(studyOverlay, data.book.code, data.chapter).size
+                ? tr("studyOverlay.marked", { defaultValue: "Your study “{{title}}”: {{count}} verse(s) marked ◆ in this chapter. Only you see this; your highlights are unchanged.", title: studyOverlay.title, count: overlayVerses(studyOverlay, data.book.code, data.chapter).size })
+                : tr("studyOverlay.none", { defaultValue: "Showing your study “{{title}}”. No passages from it in this chapter.", title: studyOverlay.title })}
+            </Text>
+            <AppButton label={tr("studyOverlay.hide", { defaultValue: "Hide" })} size="sm" variant="tertiary" onPress={() => void setStudyOverlay(null)} accessibilityLabel={tr("studyOverlay.hideLabel", { defaultValue: "Stop showing the study in the Bible" })} />
+          </View>
+        ) : null}
         <Text style={styles.chapterTitle} accessibilityRole="header">{data.book.name} {data.chapter}</Text>
         <CompareView bookCode={loc.book} chapter={loc.chapter} primary={data} others={compare} translations={translations ?? []}
           width={screenWidth - 2 * sidePad - insets.left - insets.right} fontSize={fontSize} lineHeight={lineHeight} verseNumbers={prefs.verseNumbers}
@@ -610,6 +641,17 @@ export default function BibleReaderScreen() {
     body = (
       <ScrollView ref={scrollRef} scrollEventThrottle={64} onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }} contentContainerStyle={[styles.scroll, fullWidth, { paddingTop: focus ? insets.top + 56 : 8, paddingBottom: (sel ? 200 : 40) + insets.bottom }]}>
         {error && <Text style={styles.inlineError}>{error.message}</Text>}
+        {studyOverlay ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: c.accentGreen, marginBottom: 8 }} accessibilityLiveRegion="polite">
+            <Text style={{ color: c.accentGreen, fontSize: 16 }} importantForAccessibility="no">{"\u25C6"}</Text>
+            <Text style={{ flex: 1, color: c.textMid, fontSize: 13 }}>
+              {overlayVerses(studyOverlay, data.book.code, data.chapter).size
+                ? tr("studyOverlay.marked", { defaultValue: "Your study “{{title}}”: {{count}} verse(s) marked ◆ in this chapter. Only you see this; your highlights are unchanged.", title: studyOverlay.title, count: overlayVerses(studyOverlay, data.book.code, data.chapter).size })
+                : tr("studyOverlay.none", { defaultValue: "Showing your study “{{title}}”. No passages from it in this chapter.", title: studyOverlay.title })}
+            </Text>
+            <AppButton label={tr("studyOverlay.hide", { defaultValue: "Hide" })} size="sm" variant="tertiary" onPress={() => void setStudyOverlay(null)} accessibilityLabel={tr("studyOverlay.hideLabel", { defaultValue: "Stop showing the study in the Bible" })} />
+          </View>
+        ) : null}
         <Text style={styles.chapterTitle} accessibilityRole="header">{data.book.name} {data.chapter}</Text>
         {blocks.map((blk) => {
           const card = blk.card ? (palette as Record<string, { wash: string; ink: string }>)[blk.card] ?? palette.gold : null;
@@ -621,7 +663,9 @@ export default function BibleReaderScreen() {
               {blk.verses.map((v) => {
                 const h = hlByVerse.get(v.verse);
                 const selected = !!sel && v.verse >= sel.start && v.verse <= sel.end;
-                const runs = verseRuns(v.verse, v.text, my.highlights, range, lengthOf);
+                const runs = verseRuns(v.verse, v.text, my.highlights, range, lengthOf, emphasisOn.has("jesus") ? v.emphasis?.jesus : undefined);
+                const cats = verseCategories(v.verse, chapterEmphasis.references, emphasisOn);
+                const inStudy = studyOverlay ? overlayVerses(studyOverlay, data.book.code, data.chapter).has(v.verse) : false;
                 const toks = textMode ? tokensOf.get(v.verse) ?? [] : [];
                 return (
                   <Text key={v.verse} onPress={textMode ? undefined : () => tapVerse(v.verse)}
@@ -633,6 +677,8 @@ export default function BibleReaderScreen() {
                     accessibilityLabel={textMode ? undefined : `Verse ${v.verse}${v.through ? ` to ${v.through}` : ""}${h ? `, highlighted ${(palette[h.color] ?? palette.gold).label}` : ""}${notedVerses.has(v.verse) ? ", has a note" : ""}`}>
                     {notedVerses.has(v.verse) && <Text style={{ fontSize: Math.round(fontSize * 0.95) }}><Ionicons name="document-text" size={Math.round(fontSize * 0.95)} color={card ? card.ink : c.textMid} />{"\u00A0"}</Text>}
                     {speakingVerse === v.verse && <Text accessibilityLabel="Being read aloud"><Ionicons name="volume-medium" size={Math.round(fontSize * 0.9)} color={card ? card.ink : c.accentGreen} />{" "}</Text>}
+                    {inStudy && <Text accessibilityLabel={tr("studyOverlay.inStudy", { defaultValue: "In your study {{title}}", title: studyOverlay!.title })} style={{ color: c.accentGreen, fontSize: Math.round(fontSize * 0.75) }}>{"\u25C6\u00A0"}</Text>}
+                    {cats.map((k) => <Text key={k} accessibilityLabel={tr(`bibleEmphasis.cat.${k}`)} style={{ color: emphasisColor(k, resolvedMode === "dark" ? "dark" : "light"), fontSize: Math.round(fontSize * 0.7) }}>{"\u25CF\u00A0"}</Text>)}
                     {prefs.verseNumbers && <Text style={[styles.verseNum, { fontSize: Math.round(fontSize * 0.62) }, card && { color: card.ink, opacity: 0.75 }]}>{v.through ? `${v.verse}\u2013${v.through}` : v.verse}{"\u00A0"}</Text>}
                     {runs.map((run) => !textMode
                       ? <Text key={run.start} style={runStyle(run)}>{run.text}</Text>
@@ -828,6 +874,7 @@ export default function BibleReaderScreen() {
             <MenuItem styles={styles} c={c} icon="library-outline" label="My notes & highlights" onPress={() => { setSheet(null); router.push("/bible/library" as any); }} />
             <MenuItem styles={styles} c={c} icon="school-outline" label="Lessons on this chapter" onPress={() => setSheet("related")} />
             <MenuItem styles={styles} c={c} icon="git-compare-outline" label={compare.length ? "Compare translations (on)" : "Compare translations"} onPress={() => setSheet("compare")} />
+            <MenuItem styles={styles} c={c} icon="color-palette-outline" label={prefs.emphasis.length ? `Scripture emphasis (${prefs.emphasis.length} on)` : "Scripture emphasis"} onPress={() => setSheet("emphasis")} />
             <MenuItem styles={styles} c={c} icon="text-outline" label="Reading settings" onPress={() => setSheet("prefs")} />
             <MenuItem styles={styles} c={c} icon="color-wand-outline" label={`Select by: ${MODES.find((m) => m.key === mode)!.label}`} onPress={() => { setSheet(null); setModeSheet(true); }} />
             <MenuItem styles={styles} c={c} icon="expand-outline" label="Focus mode" onPress={() => { setSheet(null); setRange(null); setFocus(true); }} />
@@ -837,7 +884,8 @@ export default function BibleReaderScreen() {
 
       <BookChapterPicker visible={sheet === "books"} onClose={() => setSheet(null)} currentBook={loc?.book ?? "JHN"} currentChapter={loc?.chapter ?? 1}
         onSelect={(b, ch) => go(b, ch)} testaments={translation?.coverage === "nt" ? ["NT"] : translation?.coverage === "ot" ? ["OT"] : undefined} />
-      <ReadingPrefsSheet visible={sheet === "prefs"} prefs={prefs} onChange={updatePrefs} onClose={() => setSheet(null)} />
+      <ReadingPrefsSheet visible={sheet === "prefs" || sheet === "emphasis"} only={sheet === "emphasis" ? "emphasis" : undefined} prefs={prefs} onChange={updatePrefs} onClose={() => setSheet(null)}
+        emphasisAvailable={chapterEmphasis.available} jesusMarked={!!data?.verses.some((v) => v.emphasis?.jesus?.length)} />
       <CompareSheet visible={sheet === "compare"} onClose={() => setSheet(null)} translations={translations ?? []} primary={loc?.t ?? ""} selected={compare} onApply={applyCompare} />
       {book && loc && (
         <RelatedLessonsSheet visible={sheet === "related"} book={book.code} bookName={book.name} chapter={loc.chapter} onClose={() => setSheet(null)}
@@ -845,6 +893,7 @@ export default function BibleReaderScreen() {
       )}
       {/* Save Scripture: Saved, Favourites, playlists and collections — several at once. */}
       <SaveScriptureSheet visible={sheet === "collection" && !!selRef} targets={selRef ? [{ ref: selRef, reference: selLabel.replace(/ · selected words$/, "") }] : []}
+        initialCollectionIds={params.addTo ? [String(params.addTo)] : []}
         onClose={() => setSheet(null)} onDone={(m) => { setSheet(null); flash(m); }} />
       <BibleNoteSheet visible={!!noteEdit} reference={noteEdit?.label ?? ""} initial={noteEdit?.note ? { title: noteEdit.note.title, body: noteEdit.note.body } : null}
         saving={noteSaving} error={noteError} onClose={() => setNoteEdit(null)} onSave={saveNote} onDelete={noteEdit?.note ? removeNote : undefined} />

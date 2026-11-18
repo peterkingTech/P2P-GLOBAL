@@ -34,6 +34,7 @@ function load(file, mocks) {
 const books = load("lib/bibleBooks.ts", {});
 const bible = load("lib/bibleReaderApi.ts", {
   "react-native": { Platform: { select: (o) => o.ios } },
+  "@/lib/offline": { isNetworkError: (e) => e?.status === 0, kvGet: async () => null, kvSet: async () => {}, kvRemove: async () => {} },
   "@/contexts/AuthContext": { supabase: { auth: { getSession: async () => ({ data: { session: null } }) } } },
   "@/lib/apiUrl": { getApiUrl: () => "http://api.test/api" },
   "@/lib/bibleBooks": books,

@@ -21,6 +21,8 @@ const sent = [];
 const mocks = {
   "@/lib/apiClient": { apiRequest: async (p, init = {}) => { sent.push({ path: p, method: init.method ?? "GET", body: init.body ? JSON.parse(init.body) : undefined }); return {}; } },
   "@/lib/sharing": { WEB_APP_URL: "https://example.invalid" },
+  // Offline read-through (lib/offline.cached, 2026-11-18): pass-through in tests.
+  "@/lib/offline": { cached: (_k, f) => f(), isNetworkError: () => false, kvGet: async () => null, kvSet: async () => {} },
 };
 const load = (rel) => {
   const js = ts.transpileModule(src(rel), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;

@@ -10,8 +10,11 @@ export interface BibleReadingPrefs {
   lineSpacing: "compact" | "comfortable" | "relaxed";
   verseNumbers: boolean;
   layout: "paragraphs" | "verses";
+  /** Scripture emphasis categories switched on (lib/scriptureEmphasis) — none by default. */
+  emphasis: string[];
 }
-export const DEFAULT_PREFS: BibleReadingPrefs = { fontSize: 19, lineSpacing: "comfortable", verseNumbers: true, layout: "paragraphs" };
+export const DEFAULT_PREFS: BibleReadingPrefs = { fontSize: 19, lineSpacing: "comfortable", verseNumbers: true, layout: "paragraphs", emphasis: [] };
+const EMPHASIS_KEYS = ["jesus", "holy_spirit", "father", "commands", "promises", "prophecy", "prayer_worship"];
 export const LINE_HEIGHT: Record<BibleReadingPrefs["lineSpacing"], number> = { compact: 1.45, comfortable: 1.7, relaxed: 1.95 };
 export const FONT_MIN = 15, FONT_MAX = 30;
 
@@ -25,6 +28,7 @@ export function clampPrefs(raw: unknown): BibleReadingPrefs {
     lineSpacing: p.lineSpacing === "compact" || p.lineSpacing === "relaxed" ? p.lineSpacing : "comfortable",
     verseNumbers: p.verseNumbers !== false,
     layout: p.layout === "verses" ? "verses" : "paragraphs",
+    emphasis: Array.isArray(p.emphasis) ? [...new Set(p.emphasis.filter((x): x is string => EMPHASIS_KEYS.includes(String(x))))] : [],
   };
 }
 

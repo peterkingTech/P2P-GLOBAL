@@ -1,3 +1,4 @@
+import { cached } from "@/lib/offline";
 import { apiRequest } from "@/lib/apiClient";
 import { WEB_APP_URL } from "@/lib/sharing";
 import type { NewRef } from "@/lib/bibleReaderApi";
@@ -61,10 +62,13 @@ const call = <T,>(path: string, init: RequestInit = {}) =>
   apiRequest<T>(`/scripture-collections${path}`, init, { fallbackError: "That didn't work. Please try again." });
 const json = (method: string, body: unknown): RequestInit => ({ method, body: JSON.stringify(body) });
 
-export const listCollections = () => call<{ mine: CollectionCard[]; shared: CollectionCard[] }>("");
+// Offline-first (2026-11-18): the person's playlists and their contents are kept on the phone (references and
+// their own titles/notes — never licensed Bible text), so they open without a connection, marked offline.
+export const listCollections = () => cached("collections:list", () => call<{ mine: CollectionCard[]; shared: CollectionCard[] }>(""));
 export const createCollection = (kind: CollectionKind, title: string, refs: NewRef[] = [], description?: string) =>
-  call<{ id: string }>("", json("POST", { kind, title, description, refs }));
-export const getCollection = (id: string) => call<CollectionDetail>(`/${id}`);
+  // An empty new playlist sends no passage list (2026-11-18 fix: an empty list was refused with "Choose at least one passage").
+  call<{ id: string }>("", json("POST", { kind, title, description, ...(refs.length ? { refs } : {}) }));
+export const getCollection = (id: string) => cached(`collections:${id}`, () => call<CollectionDetail>(`/${id}`));
 export const renameCollection = (id: string, title: string, revision: number, description?: string | null) => call<{ revision: number }>(`/${id}`, json("PATCH", { title, description, revision }));
 export const deleteCollection = (id: string) => call<{ deleted: true }>(`/${id}`, { method: "DELETE" });
 /** Appends passages. One that's already there is skipped (`skipped`) unless `allowRepeat` — the person's explicit choice. */

@@ -60,6 +60,7 @@ import { PageFrame } from "@/components/PageFrame";
 import { getStageFromPoints, stageByName } from "@/constants/stages";
 import i18n, { SUPPORTED_LANGUAGES, loadLocale, setAppLanguage } from "@/lib/i18n";
 import { usePresenceHeartbeat } from "@/lib/presence";
+import "@/lib/offline/handlers"; // queued offline changes are sent whichever screen is open
 
 SplashScreen.preventAutoHideAsync();
 

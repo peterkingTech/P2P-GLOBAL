@@ -118,7 +118,10 @@ export function getHelloAoBooks(translationId: string) {
 // Normalised into the reader's existing model (lib/bibleReader.ts Chapter):
 // verses (number, text, paragraph, poetry), headings (before a verse), plus
 // footnotes and — only where a reviewed licence allows it — audio links.
-export interface NormalisedVerse { verse: number; text: string; paragraph: number; poetry: boolean; wordsOfJesus?: boolean }
+export interface NormalisedVerse { verse: number; text: string; paragraph: number; poetry: boolean; wordsOfJesus?: boolean;
+  /** 2026-11-18: [start, end) character ranges of this verse's text that the TRANSLATION ITSELF marks as words
+   *  of Jesus (its red-letter markup) — narration and other speakers in the same verse are not included. */
+  jesusRanges?: [number, number][] }
 export interface NormalisedFootnote { verse: number | null; caller: string | null; text: string }
 export interface HelloAoAudio { reader: string; url: string; timings: number[] | null }
 export interface NormalisedChapter {
@@ -149,6 +152,7 @@ export function normaliseChapter(json: unknown): NormalisedChapter {
   // Inline pieces of a verse (or Hebrew subtitle): strings, formatted text, inline headings, line breaks, footnote refs.
   const inline = (items: unknown[], onHeading: (t: string) => void) => {
     let text = "", poetry = false, jesus = false, afterNote = false;
+    const ranges: [number, number][] = [];
     // The source drops the space where a footnote marker sat between two words
     // ("only" {note} "Son"): restore one — never in scripts written without spaces.
     const join = (piece: string) => {
@@ -161,11 +165,17 @@ export function normaliseChapter(json: unknown): NormalisedChapter {
         if (typeof it.poem === "number") { poetry = true; if (text && !text.endsWith("\n")) text += "\n"; afterNote = false; }
         if (it.wordsOfJesus === true) jesus = true;
         join(it.text);
+        if (it.wordsOfJesus === true && it.text) {
+          const s = text.length - it.text.length, e = text.length;
+          const last = ranges[ranges.length - 1];
+          // One range for consecutive marked pieces (only spacing between them).
+          if (last && !text.slice(last[1], s).trim()) last[1] = e; else ranges.push([s, e]);
+        }
       } else if (isObj(it) && typeof it.heading === "string") onHeading(it.heading);
       else if (isObj(it) && it.lineBreak === true) { if (text && !text.endsWith("\n")) text += "\n"; afterNote = false; }
       else if (isObj(it) && typeof it.noteId === "number") afterNote = true;   // the notes themselves come from chapter.footnotes
     }
-    return { text, poetry, jesus };
+    return { text, poetry, jesus, ranges };
   };
   for (const c of json.chapter.content) {
     if (!isObj(c)) continue;
@@ -184,8 +194,13 @@ export function normaliseChapter(json: unknown): NormalisedChapter {
       const existing = verses.get(n);
       if (!existing) {
         pushHeading(n);
-        verses.set(n, { verse: n, text: parts.text, paragraph, poetry: parts.poetry, ...(parts.jesus ? { wordsOfJesus: true } : {}) });
-      } else existing.text += parts.text;
+        verses.set(n, { verse: n, text: parts.text, paragraph, poetry: parts.poetry, ...(parts.jesus ? { wordsOfJesus: true, jesusRanges: parts.ranges } : {}) });
+      } else {
+        // A verse continued in a later block: its ranges move along by the text already there.
+        const shift = existing.text.length;
+        existing.text += parts.text;
+        if (parts.ranges.length) { existing.wordsOfJesus = true; existing.jesusRanges = [...(existing.jesusRanges ?? []), ...parts.ranges.map(([s, e]) => [s + shift, e + shift] as [number, number])]; }
+      }
     }
   }
   const footnotes: NormalisedFootnote[] = (Array.isArray(json.chapter.footnotes) ? json.chapter.footnotes : []).flatMap((f) => {

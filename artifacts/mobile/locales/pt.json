@@ -698,7 +698,10 @@
     "areaSub": "Aprofunde-se: as línguas originais, comentários clássicos e ferramentas de estudo.",
     "titleSub": "Uma passagem: palavras originais, comentários, referências cruzadas",
     "commentariesSub": "Comentários clássicos e notas de estudo abertas",
-    "studyToolsSub": "Léxicos hebraico, grego e aramaico, números Strong, referências cruzadas"
+    "studyToolsSub": "Léxicos hebraico, grego e aramaico, números Strong, referências cruzadas",
+    "saveStudy": "Guardar nos meus estudos",
+    "myStudies": "Os meus estudos guardados",
+    "savedHistory": "Guardado em Os meus estudos guardados."
   },
   "dictionary": {
     "loadError": "Não foi possível carregar o dicionário.",

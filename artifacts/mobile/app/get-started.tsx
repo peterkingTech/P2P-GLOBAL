@@ -1,17 +1,22 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from "react-native";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
+import { useAuth } from "@/contexts/AuthContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
-import { GET_STARTED_STEPS, type GetStartedStepId } from "@/lib/getStarted";
+import { GET_STARTED_STEPS, GUIDE_VERSION, loadIntroSeen, markIntroSeen, whatsNewSince, type GetStartedStepId } from "@/lib/getStarted";
 import { useGetStartedProgress } from "@/hooks/useGetStartedProgress";
 import { AppButton } from "@/components/ui";
 import { getEvaluationStatus, type EvaluationStatus } from "@/lib/peerEvaluationApi";
 
 // "How to use P2P". Reachable any time from Home and Profile — not a
-// first-launch-only tutorial.
+// first-launch-only tutorial. 2026-11-18: shown as the introduction right after onboarding (?intro=1,
+// "Continue to Home"), and as "what's new" (?whatsNew=1) when the guide gains significant new steps
+// (GUIDE_VERSION); someone who has seen this version is never sent through it again. Every string is
+// translatable (guide.* — the English text is the default).
 //
 // A step with an `acknowledgement` (peer evaluation) is finished only when the participant ticks it:
 // opening the feature doesn't finish it, and nothing about it is inferred. Whether the service behind
@@ -22,6 +27,26 @@ export default function GetStartedScreen() {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const { completed, completedCount, total, complete } = useGetStartedProgress();
+  const { t } = useTranslation();
+  const { profile } = useAuth();
+  const params = useLocalSearchParams<{ intro?: string; whatsNew?: string }>();
+  const introMode = params.intro === "1";
+  const [newSteps, setNewSteps] = useState<Set<GetStartedStepId>>(new Set());
+  useEffect(() => {
+    if (!profile?.id) return;
+    let cancelled = false;
+    void loadIntroSeen(profile.id).then((seen) => {
+      if (cancelled) return;
+      setNewSteps(new Set(params.whatsNew === "1" || (seen > 0 && seen < GUIDE_VERSION) ? whatsNewSince(seen) : []));
+      // Opening the guide in any mode counts as having seen this version's introduction.
+      if (seen < GUIDE_VERSION) void markIntroSeen(profile.id);
+    });
+    return () => { cancelled = true; };
+  }, [profile?.id, params.whatsNew]);
+  const tr = (step: (typeof GET_STARTED_STEPS)[number], field: "title" | "summary" | "actionLabel" | "acknowledgement") =>
+    t(`guide.steps.${step.id}.${field}`, { defaultValue: (step[field] as string | undefined) ?? "" });
+  const trPoint = (step: (typeof GET_STARTED_STEPS)[number], i: number, p: string) => t(`guide.steps.${step.id}.points.${i}`, { defaultValue: p });
+  const goHome = () => { if (profile?.id) void markIntroSeen(profile.id); router.replace("/(tabs)" as any); };
   // Open the first unfinished step by default.
   const [openStep, setOpenStep] = useState<GetStartedStepId | null>(
     () => GET_STARTED_STEPS.find((s) => !completed.has(s.id))?.id ?? null,
@@ -55,20 +80,25 @@ export default function GetStartedScreen() {
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity hitSlop={10} onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Back">
-          <Ionicons name="arrow-back" size={22} color={colors.textDark} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>How to use P2P</Text>
+        {!introMode ? (
+          <TouchableOpacity hitSlop={10} onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button" accessibilityLabel={t("guide.back", { defaultValue: "Back" })}>
+            <Ionicons name="arrow-back" size={22} color={colors.textDark} />
+          </TouchableOpacity>
+        ) : null}
+        <Text style={[styles.headerTitle, { flex: 1 }]} accessibilityRole="header">{introMode ? t("guide.introTitle", { defaultValue: "Welcome — here's how P2P works" }) : t("guide.title", { defaultValue: "How to use P2P" })}</Text>
+        {introMode ? <AppButton size="sm" variant="tertiary" label={t("guide.skip", { defaultValue: "Skip for now" })} onPress={goHome} /> : null}
       </View>
 
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
-        <Text style={styles.intro}>Everyone is learning from someone and helping someone grow. Here is how P2P helps you do both.</Text>
+        <Text style={styles.intro}>{t("guide.intro", { defaultValue: "Everyone is learning from someone and helping someone grow. Here is how P2P helps you do both." })}</Text>
+        {introMode ? <Text style={styles.intro}>{t("guide.introHint", { defaultValue: "Open each step to see what it does — you can come back to this guide any time from your profile." })}</Text> : null}
+        {newSteps.size ? <Text style={styles.newNote} accessibilityLiveRegion="polite">{t("guide.whatsNewNote", { defaultValue: "New in P2P — the steps marked New explain features added since you last looked." })}</Text> : null}
 
-        <View style={styles.progressWrap} accessibilityLabel={`${completedCount} of ${total} steps done`}>
+        <View style={styles.progressWrap} accessibilityLabel={t("guide.progressLabel", { defaultValue: "{{done}} of {{total}} steps done", done: completedCount, total })}>
           <View style={styles.progressTrack}>
             <View style={[styles.progressFill, { width: `${(completedCount / total) * 100}%` }]} />
           </View>
-          <Text style={styles.progressText}>{completedCount} of {total} done</Text>
+          <Text style={styles.progressText}>{t("guide.progress", { defaultValue: "{{done}} of {{total}} done", done: completedCount, total })}</Text>
         </View>
 
         {GET_STARTED_STEPS.map((step) => {
@@ -81,7 +111,7 @@ export default function GetStartedScreen() {
                 onPress={() => setOpenStep(open ? null : step.id)}
                 accessibilityRole="button"
                 accessibilityState={{ expanded: open }}
-                accessibilityLabel={`Step ${step.number}, ${step.title}${done ? ", done" : ""}`}
+                accessibilityLabel={`${t("guide.stepLabel", { defaultValue: "Step {{n}}", n: step.number })}, ${tr(step, "title")}${done ? `, ${t("guide.done", { defaultValue: "done" })}` : ""}${newSteps.has(step.id) ? `, ${t("guide.new", { defaultValue: "New" })}` : ""}`}
               >
                 <View style={[styles.badge, done && styles.badgeDone]}>
                   {done
@@ -89,18 +119,18 @@ export default function GetStartedScreen() {
                     : <Text style={styles.badgeText}>{step.number}</Text>}
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.stepTitle}>{step.title}</Text>
-                  <Text style={styles.stepSummary}>{step.summary}</Text>
+                  <Text style={styles.stepTitle}>{tr(step, "title")}{newSteps.has(step.id) ? <Text style={styles.newBadge}>{`  ${t("guide.new", { defaultValue: "New" })}`}</Text> : null}</Text>
+                  <Text style={styles.stepSummary}>{tr(step, "summary")}</Text>
                 </View>
                 <Ionicons name={open ? "chevron-up" : "chevron-down"} size={18} color={colors.textMuted} />
               </TouchableOpacity>
 
               {open && (
                 <View style={styles.stepBody}>
-                  {step.points.map((p) => (
+                  {step.points.map((p, i) => (
                     <View key={p} style={styles.pointRow}>
                       <Ionicons name={step.icon} size={14} color={colors.accentGreen} style={{ marginTop: 3 }} />
-                      <Text style={styles.pointText}>{p}</Text>
+                      <Text style={styles.pointText}>{trPoint(step, i, p)}</Text>
                     </View>
                   ))}
                   {step.showsServiceStatus && <ServiceStatusLine service={service} styles={styles} colors={colors} />}
@@ -115,28 +145,28 @@ export default function GetStartedScreen() {
                       })}
                       accessibilityRole="checkbox"
                       accessibilityState={{ checked: done || acknowledged.has(step.id), disabled: done }}
-                      accessibilityLabel={step.acknowledgement}
+                      accessibilityLabel={tr(step, "acknowledgement")}
                     >
                       <View style={[styles.ackBox, (done || acknowledged.has(step.id)) && styles.ackBoxOn]}>
                         {(done || acknowledged.has(step.id)) && <Ionicons name="checkmark" size={14} color="#fff" />}
                       </View>
-                      <Text style={styles.ackText}>{step.acknowledgement}</Text>
+                      <Text style={styles.ackText}>{tr(step, "acknowledgement")}</Text>
                     </TouchableOpacity>
                   )}
                   <View style={styles.stepActions}>
                     {step.route && (
-                      <AppButton label={`${step.actionLabel ?? "Open"}`} onPress={() => { void handleOpen(step.id, step.route as string, step.acknowledgement); }} style={{ flex: 1 }} />
+                      <AppButton label={step.actionLabel ? tr(step, "actionLabel") : t("guide.open", { defaultValue: "Open" })} onPress={() => { void handleOpen(step.id, step.route as string, step.acknowledgement); }} style={{ flex: 1 }} />
                     )}
                     {!done && (
                       <TouchableOpacity accessibilityRole="button"
                         style={[step.route ? styles.secondaryBtn : styles.primaryBtn, !!step.acknowledgement && !acknowledged.has(step.id) && styles.btnDisabled]}
                         disabled={!!step.acknowledgement && !acknowledged.has(step.id)}
                         accessibilityState={{ disabled: !!step.acknowledgement && !acknowledged.has(step.id) }}
-                        accessibilityHint={step.acknowledgement ? "Tick the statement above first" : undefined}
+                        accessibilityHint={step.acknowledgement ? t("guide.tickFirst", { defaultValue: "Tick the statement above first" }) : undefined}
                         onPress={() => finish(step)}
                       >
                         <Text style={step.route ? styles.secondaryBtnText : styles.primaryBtnText}>
-                          {step.acknowledgement ? "Done" : step.route ? "Mark as done" : "Got it"}
+                          {step.acknowledgement ? t("guide.doneButton", { defaultValue: "Done" }) : step.route ? t("guide.markDone", { defaultValue: "Mark as done" }) : t("guide.gotIt", { defaultValue: "Got it" })}
                         </Text>
                       </TouchableOpacity>
                     )}
@@ -146,6 +176,12 @@ export default function GetStartedScreen() {
             </View>
           );
         })}
+        {introMode ? (
+          <View style={{ gap: 8, marginTop: 8 }}>
+            <AppButton label={t("guide.continueHome", { defaultValue: "Continue to Home" })} icon="arrow-forward" iconPosition="trailing" onPress={goHome} />
+            <Text style={styles.intro}>{t("guide.revisit", { defaultValue: "You'll find this guide again under My Profile → How to use P2P." })}</Text>
+          </View>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -176,6 +212,8 @@ function makeStyles(c: AppColors) {
     headerTitle: { fontSize: 18, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
     content: { paddingHorizontal: 20, paddingTop: 4 },
     intro: { fontSize: 15, color: c.textDark, lineHeight: 22, fontFamily: "Inter_400Regular", marginBottom: 16 },
+    newNote: { fontSize: 13.5, color: c.accentGreen, lineHeight: 19, fontFamily: "Inter_600SemiBold", marginBottom: 12 },
+    newBadge: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_700Bold" },
     progressWrap: { marginBottom: 18 },
     progressTrack: { height: 6, borderRadius: 3, backgroundColor: c.borderBeige, overflow: "hidden" },
     progressFill: { height: 6, borderRadius: 3, backgroundColor: c.accentGreen },

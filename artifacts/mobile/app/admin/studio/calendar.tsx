@@ -8,6 +8,7 @@ import { Banner, Chip, Pill, StateView, studioStyles as ss } from "@/components/
 import { getCalendar, type CalendarEvent } from "@/lib/studioApi";
 import { ACTION_LABELS, SCHEDULE_STATUS_LABELS, dateKeyInZone, deviceTimeZone, eventsByDay, formatInZone, gridRange, isOverdue, monthGrid } from "@/lib/studioModel";
 import { IconButton } from "@/components/ui";
+import { useAdminContentWidth } from "@/lib/adminLayout";
 
 // Content Calendar: scheduled jobs (all statuses) and publications of
 // Kingdom Stories for the visible month, grouped by day in the device's time
@@ -19,7 +20,7 @@ const MONTHS = ["January", "February", "March", "April", "May", "June", "July", 
 
 export default function StudioCalendar() {
   const router = useRouter();
-  const { width } = useWindowDimensions();
+  const width = useAdminContentWidth(); // space beside the admin sidebar (lib/adminLayout)
   const tz = deviceTimeZone();
   const todayKey = dateKeyInZone(new Date().toISOString(), tz);
   const [view, setView] = useState<"month" | "agenda">(width >= 700 ? "month" : "agenda");

@@ -133,7 +133,7 @@ ok("maqaf joins become a space; sof pasuq and cantillation removed; meteg kept",
   ok("Deep Study: word detail has pronunciation; commentaries, cross references and people can be heard", ds.includes("<PronounceButton text={picked.text} language={picked.language} transliteration={picked.transliteration} />")
     && ds.includes("commentarySections(") && ds.includes("crossRefSections(") && ds.includes("peopleSections("));
   ok("study listening is read in English and says so", ds.includes('language: "en"') && ds.includes('"deepStudy.readInEnglish"'));
-  ok("engine: study is a content kind; other kinds unchanged", /export type ListenKind = "bible" \| "story" \| "story-intro" \| "lesson" \| "plan" \| "playlist" \| "study";/.test(src("lib/listen/engine.ts")));
+  ok("engine: study is a content kind; other kinds unchanged", /export type ListenKind = "bible" \| "story" \| "story-intro" \| "lesson" \| "plan" \| "playlist" \| "study" \| "daily_word";/.test(src("lib/listen/engine.ts")));
 
   console.log(`studyAudio (app): ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

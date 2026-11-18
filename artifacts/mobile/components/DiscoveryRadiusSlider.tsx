@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
-import { View, Text, StyleSheet, PanResponder, I18nManager, LayoutChangeEvent } from "react-native";
+import { View, Text, StyleSheet, PanResponder, I18nManager, LayoutChangeEvent, Platform } from "react-native";
 import colors from "@/constants/colors";
 
 // Discovery Search radius. Snaps to fixed stops (evenly spaced on the track,
@@ -132,7 +132,8 @@ const styles = StyleSheet.create({
   value: { fontSize: 13, color: colors.textDark, fontFamily: "Inter_600SemiBold" },
   // Positions below are computed physically (RTL handled in code), so the
   // track itself is laid out LTR to stop React Native swapping left/right.
-  touchArea: { height: 40, justifyContent: "center", direction: "ltr" },
+  // "direction" is a native layout style only (react-native-web rejects it); the slider stays left-to-right on phones.
+  touchArea: { height: 40, justifyContent: "center", ...(Platform.OS === "web" ? {} : { direction: "ltr" as const }) },
   track: { position: "absolute", height: 4, borderRadius: 2, backgroundColor: colors.borderBeige },
   fill: { position: "absolute", height: 4, borderRadius: 2, backgroundColor: colors.primaryGreen },
   tick: { position: "absolute", width: 4, height: 4, borderRadius: 2, backgroundColor: colors.textMuted, opacity: 0.5 },

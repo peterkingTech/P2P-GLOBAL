@@ -329,10 +329,19 @@ router.get("/me/learning-roots", async (req, res) => {
 
     // The curriculum structure of those lessons (published or not — a passed lesson stays in its root).
     const lessonIds = [...status.keys()];
-    const lessons: { id: string; title: string; module_id: string }[] = [];
+    const lessons: { id: string; title: string; module_id: string; subtitle: string | null }[] = [];
+    const scriptureBy = new Map<string, string[]>();
     for (let i = 0; i < lessonIds.length; i += 150) {
-      const { data } = await db.from("p2p_lessons").select("id,title,module_id").in("id", lessonIds.slice(i, i + 150));
+      const chunk = lessonIds.slice(i, i + 150);
+      // The lesson's own description ("what was learned") and its own Scripture references (2026-11-18).
+      const [{ data }, { data: sc }] = await Promise.all([
+        db.from("p2p_lessons").select("id,title,module_id,subtitle").in("id", chunk),
+        db.from("p2p_scriptures").select("lesson_id,reference").in("lesson_id", chunk).limit(2000),
+      ]);
       lessons.push(...((data ?? []) as typeof lessons));
+      for (const r of (sc ?? []) as { lesson_id: string; reference: string | null }[]) if (r.reference) {
+        const list = scriptureBy.get(r.lesson_id) ?? []; if (!list.includes(r.reference) && list.length < 4) list.push(r.reference); scriptureBy.set(r.lesson_id, list);
+      }
     }
     const moduleIds = [...new Set(lessons.map((l) => l.module_id))];
     const modules: { id: string; title: string; curriculum_id: string }[] = [];
@@ -355,7 +364,7 @@ router.get("/me/learning-roots", async (req, res) => {
     }
     const modBy = new Map(modules.map((m) => [m.id, m])), curBy = new Map(curricula.map((c) => [c.id, c]));
 
-    type Lesson = { id: string; title: string; status: RootLessonStatus; passedOn: string | null; practicalVerified: number; group: string };
+    type Lesson = { id: string; title: string; status: RootLessonStatus; passedOn: string | null; practicalVerified: number; group: string; about: string | null; scripture: string[] };
     type Root = { key: string; source: "foundations_curriculum" | "plan_category" | "kingdom_stories" | "curriculum_type"; title: string; categorySlug: string | null;
       passed: number; submitted: number; returned: number; inProgress: number; practicalVerified: number; lessons: Lesson[] };
     const roots = new Map<string, Root>();
@@ -372,7 +381,8 @@ router.get("/me/learning-roots", async (req, res) => {
       let r = roots.get(key);
       if (!r) { r = { key, source, title, categorySlug: slug, passed: 0, submitted: 0, returned: 0, inProgress: 0, practicalVerified: 0, lessons: [] }; roots.set(key, r); }
       const st = status.get(l.id)!;
-      r.lessons.push({ id: l.id, title: l.title, status: st.status, passedOn: st.passedOn, practicalVerified: st.practical, group: c.type === "core" ? m.title : c.title });
+      r.lessons.push({ id: l.id, title: l.title, status: st.status, passedOn: st.passedOn, practicalVerified: st.practical, group: c.type === "core" ? m.title : c.title,
+        about: l.subtitle ?? null, scripture: scriptureBy.get(l.id) ?? [] });
       if (st.status === "passed") r.passed++; else if (st.status === "submitted") r.submitted++; else if (st.status === "returned") r.returned++; else r.inProgress++;
       r.practicalVerified += st.practical;
     }

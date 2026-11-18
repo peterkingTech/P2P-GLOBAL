@@ -13,6 +13,7 @@ import {
 } from "@/lib/studioModel";
 import { runStatusChange, type ActionOutcome } from "@/lib/studioActions";
 import { AppButton } from "@/components/ui";
+import { useAdminContentWidth } from "@/lib/adminLayout";
 
 // Content Library: the canonical records themselves (no copies), page by page.
 // Kingdom Stories open in their existing editor and can be published (after
@@ -25,7 +26,7 @@ const PAGE_SIZE = 20;
 export default function StudioLibrary() {
   const router = useRouter();
   const { profile } = useAuth();
-  const { width } = useWindowDimensions();
+  const width = useAdminContentWidth(); // space beside the admin sidebar (lib/adminLayout)
   const wide = width >= 820;
   const tz = deviceTimeZone();
   const [type, setType] = useState<SourceType>("kingdom_story");

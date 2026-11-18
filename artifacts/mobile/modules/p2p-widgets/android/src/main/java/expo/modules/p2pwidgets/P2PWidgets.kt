@@ -137,11 +137,19 @@ object P2PWidgets {
     return if (h < 12) "GOOD MORNING" else if (h < 18) "GOOD AFTERNOON" else "GOOD EVENING"
   }
 
-  /** Today's verse by the app's own rule: day of month % list length. */
+  /** Today's Daily Word by the app's own rule (lib/widgetSnapshot.verseForDay): local calendar days since
+   *  1 January 2024, modulo the list length. */
   fun verseOfDay(s: JSONObject?): JSONObject? {
     val list = s?.optJSONArray("verses") ?: return null
     if (list.length() == 0) return null
-    return list.optJSONObject(Calendar.getInstance().get(Calendar.DAY_OF_MONTH) % list.length())
+    val c = Calendar.getInstance()
+    val utc = Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
+    utc.clear(); utc.set(c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH))
+    val epoch = Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
+    epoch.clear(); epoch.set(2024, Calendar.JANUARY, 1)
+    val days = ((utc.timeInMillis - epoch.timeInMillis) / 86_400_000L).toInt()
+    val n = ((days % list.length()) + list.length()) % list.length()
+    return list.optJSONObject(n)
   }
 
   private fun parseIso(iso: String?): Date? {

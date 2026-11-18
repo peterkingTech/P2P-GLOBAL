@@ -2,9 +2,8 @@
 //  1. lib/launchNotification.ts + its use in app/_layout.tsx — the native-only
 //     getLastNotificationResponseAsync is never called on web, native keeps
 //     calling it, and a native failure no longer becomes an unhandled error.
-//  2. app/admin/_layout.tsx — the top-bar tab row is a horizontal ScrollView
-//     between the fixed Admin title and Exit Admin button, and every admin
-//     role still sees exactly its own tabs.
+//  2. app/admin/_layout.tsx — the responsive Admin Centre (2026-11-18): a grouped sidebar on wide
+//     screens, a top bar + Menu drawer on phones; every admin role still sees exactly its own items.
 // Run: node tests/adminShell.test.mjs
 import { createRequire } from "node:module";
 import { readFileSync, existsSync } from "node:fs";
@@ -23,9 +22,10 @@ let pass = 0, fail = 0;
 const ok = (name, cond, detail = "") => { if (cond) pass++; else { fail++; console.log(`FAIL ${name} ${detail}`); } };
 
 const host = (name) => { const f = ({ [name]: function () { return null; } })[name]; f.__host = true; return f; };
-const RN = { View: host("View"), Text: host("Text"), TouchableOpacity: host("TouchableOpacity"), ScrollView: host("ScrollView"), StyleSheet: { create: (s) => s } };
+const env = { profile: null, pathname: "/admin", width: 390 };
+const RN = { View: host("View"), Text: host("Text"), TouchableOpacity: host("TouchableOpacity"), ScrollView: host("ScrollView"), Modal: host("Modal"), Pressable: host("Pressable"),
+  StyleSheet: { create: (s) => s }, useWindowDimensions: () => ({ width: env.width, height: 800 }) };
 const Ionicons = host("Ionicons");
-const env = { profile: null, pathname: "/admin" };
 const mocks = {
   // The shared button system renders as a labelled tappable (tests/helpers/buttonDouble.mjs).
   "@/components/ui": buttonDouble(React, RN),
@@ -35,6 +35,8 @@ const mocks = {
   "expo-router": { Slot: host("Slot"), useRouter: () => ({ push() {}, replace() {} }), usePathname: () => env.pathname },
   "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) },
   "@/contexts/AuthContext": { useAuth: () => ({ profile: env.profile, isLoading: false, isAuthenticated: true }) },
+  // Admin Centre notifications (2026-11-18): the bell and sidebar badges read one live summary — a fixed one here.
+  "@/lib/adminNotificationsApi": { useAdminNotificationSummary: () => ({ unread: 3, critical: 1, badges: { "/admin/moderation": 2 } }) },
 };
 const cache = new Map();
 function loadFile(file) {
@@ -98,7 +100,7 @@ const src = readFileSync(path.join(root, "app/admin/_layout.tsx"), "utf8");
 // Learning · Content · Platform · Help & Support); each area keeps the original order.
 const EXPECTED = {
   // "Kingdom Wins" review: Wins moderators + the admin_content P2P Impact reviewer (migration 189).
-  super_admin: ["Dashboard", "Registrations", "Moderation", "Kingdom Wins", "Usernames", "Verification", "Discipleship & Growth", "Peer Evaluations", "Content", "Kingdom Stories", "Publishing Studio", "Translations", "Recycle Bin", "Access & Audit", "Team", "Help Requests", "P2P Official Mail"],
+  super_admin: ["Dashboard", "Registrations", "Moderation", "Kingdom Wins", "Usernames", "Verification", "Discipleship & Growth", "Peer Evaluations", "Content", "Kingdom Stories", "Story Narration", "Publishing Studio", "Translations", "Recycle Bin", "Access & Audit", "Team", "Help Requests", "P2P Official Mail"],
   admin_content: ["Dashboard", "Kingdom Wins", "Content", "Kingdom Stories", "Publishing Studio", "Recycle Bin"],
   admin_moderation: ["Dashboard", "Moderation", "Kingdom Wins", "Publishing Studio"],
   moderator: ["Dashboard", "Moderation", "Kingdom Wins", "Usernames", "Verification", "Publishing Studio", "Help Requests"],
@@ -118,22 +120,29 @@ for (const [role, tabs] of Object.entries(EXPECTED)) {
   const labels = scroll.length ? findAll(scroll[0], (n) => n.type === RN.TouchableOpacity).map((b) => b.props.accessibilityLabel) : [];
   ok(`${role}: exactly its tabs, in order`, JSON.stringify(labels) === JSON.stringify(tabs), JSON.stringify(labels));
 }
-{
+for (const width of [390, 1280]) {
+  env.width = width;
   env.profile = { id: "u", role: "super_admin" };
   env.pathname = "/admin/studio/review";
   const tree = expand(React.createElement(Admin));
-  const bar = findAll(tree, (n) => n.type === RN.View && [].concat(n.props.children).some((c) => c && c.type === RN.ScrollView))[0];
-  const kids = [].concat(bar.props.children).filter(Boolean);
-  ok("top bar: Admin title, scrolling tabs, Exit Admin as three siblings", kids.length === 3 && /Admin/.test(textIn(kids[0])) && kids[1].type === RN.ScrollView && /Exit Admin/.test(textIn(kids[2])));
-  ok("top bar: tab row scrolls horizontally", kids[1].props.horizontal === true);
-  ok("top bar: title and Exit never shrink", src.includes("topBarLeft: {\n    flexShrink: 0") && /<AppButton label="Exit Admin"[^\n]*style=\{\{ flexShrink: 0 \}\}/.test(src));
-  ok("top bar: tab row may shrink below its content (then scrolls)", /topBarNav: \{\s*flex: 1,\s*flexShrink: 1,\s*minWidth: 0,/.test(src));
-  const tabs = findAll(kids[1], (n) => n.type === RN.TouchableOpacity);
-  ok("tabs: labelled buttons with selected state", tabs.every((t) => t.props.accessibilityRole === "button" && typeof t.props.accessibilityLabel === "string" && "selected" in t.props.accessibilityState));
-  ok("tabs: aria-selected mirrors the selected state (reaches the browser)", tabs.every((t) => t.props["aria-selected"] === t.props.accessibilityState.selected));
-  ok("tabs: Publishing Studio selected on a Studio page", tabs.find((t) => t.props.accessibilityLabel === "Publishing Studio").props.accessibilityState.selected === true);
-  ok("tabs: report layout for scroll-into-view", tabs.every((t) => typeof t.props.onLayout === "function"));
+  const lists = findAll(tree, (n) => n.type === RN.ScrollView);
+  ok(`${width}px: one grouped navigation list`, lists.length === 1);
+  const items = findAll(lists[0], (n) => n.type === RN.TouchableOpacity);
+  ok(`${width}px: items are labelled buttons with selected state`, items.length > 0 && items.every((t) => t.props.accessibilityRole === "button" && typeof t.props.accessibilityLabel === "string" && "selected" in t.props.accessibilityState));
+  ok(`${width}px: aria-selected mirrors the selected state`, items.every((t) => t.props["aria-selected"] === t.props.accessibilityState.selected));
+  ok(`${width}px: Publishing Studio selected on a Studio page (only it)`, items.filter((t) => t.props.accessibilityState.selected).map((t) => t.props.accessibilityLabel).join() === "Publishing Studio");
+  ok(`${width}px: the six areas are headings`, /Overview/.test(textIn(lists[0])) && /Help & Support/.test(textIn(lists[0])));
+  ok(`${width}px: Exit Admin reachable`, /Exit Admin/.test(JSON.stringify(findAll(tree, (n) => n.props && (n.props.label === "Exit Admin" || n.props.accessibilityLabel === "Exit Admin")).map((n) => n.props.label ?? n.props.accessibilityLabel))));
+  const modal = findAll(tree, (n) => n.type === RN.Modal);
+  if (width < 1024) {
+    ok("phone: the list lives in a Menu drawer (Modal), closed by default", modal.length === 1 && modal[0].props.visible === false);
+    ok("phone: a labelled Menu button opens it", findAll(tree, (n) => n.type === RN.TouchableOpacity && n.props.accessibilityLabel === "Open the admin menu").length === 1);
+    ok("phone: top bar names the current page", /Publishing Studio/.test(textIn(tree.props.children[0])));
+  } else {
+    ok("desktop: sidebar, no drawer", modal.length === 0 && tree.props.style.some((x) => x && x.flexDirection === "row"));
+  }
 }
+ok("menu items keep a 44px touch target", /navItem: \{[^}]*minHeight: 44/.test(src) && /menuBtn: \{ width: 44, height: 44/.test(src));
 {
   env.profile = { id: "u", role: "student" };
   env.pathname = "/admin";

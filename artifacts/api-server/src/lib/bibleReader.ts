@@ -1,6 +1,6 @@
 import { supabaseServiceRole as db } from "./supabase";
 import { BOOK_CODES } from "./bibleService";
-import { attributionOf, canCache, canPlayRecordedAudio, isServable, providerOf, textCopyAllowed as licenceTextCopyAllowed, type TranslationRow } from "./bibleLicence";
+import { attributionOf, canCache, canPlayRecordedAudio, isServable, offlineAllowed, providerOf, textCopyAllowed as licenceTextCopyAllowed, type TranslationRow } from "./bibleLicence";
 import { getHelloAoBooks, getHelloAoCatalogue, getHelloAoChapter, HelloAoError, type HelloAoTranslation } from "./bibleProviders/helloao";
 import { CURATED_TRANSLATIONS } from "./bibleProviders/helloaoRegistry";
 
@@ -139,9 +139,11 @@ async function providerGet(path: string): Promise<{ data: any; meta?: any }> {
 
 // ── Chapters ────────────────────────────────────────────────────────────────
 /** `through`: the last verse this text covers, when a translation joins verses (The Message: "1–2"). */
-export interface ChapterVerse { verse: number; text: string; paragraph: number; poetry: boolean; through?: number }
+export interface ChapterVerse { verse: number; text: string; paragraph: number; poetry: boolean; through?: number;
+  /** Scripture emphasis taken from the translation itself (2026-11-18): words of Jesus as [start, end) ranges. */
+  emphasis?: { jesus: [number, number][] } }
 export interface Chapter {
-  translation: { code: string; name: string; textCopyAllowed: boolean; provider?: string; textDirection?: "ltr" | "rtl" };
+  translation: { code: string; name: string; textCopyAllowed: boolean; provider?: string; textDirection?: "ltr" | "rtl"; offlineAllowed?: boolean };
   book: { code: string; name: string; chapters: number };
   chapter: number;
   verses: ChapterVerse[];
@@ -155,6 +157,27 @@ export interface Chapter {
   audio?: { reader: string; url: string; timings: number[] | null }[];
 }
 const HEADING_STYLES = /^(s\d?|ms\d?|mr|r|d|sp|cl)$/;
+const WJ_OPEN = "\uE000", WJ_CLOSE = "\uE001";
+/** Removes the words-of-Jesus marks and records where they were, as ranges of the final text. */
+export function withJesusRanges(v: ChapterVerse): ChapterVerse {
+  if (!v.text.includes(WJ_OPEN)) return v;
+  let out = "", start = -1;
+  const ranges: [number, number][] = [];
+  for (const ch of v.text) {
+    if (ch === WJ_OPEN) { if (start < 0) start = out.length; continue; }
+    if (ch === WJ_CLOSE) {
+      if (start >= 0 && out.length > start) {
+        const last = ranges[ranges.length - 1];
+        if (last && !out.slice(last[1], start).trim()) last[1] = out.length; else ranges.push([start, out.length]);
+      }
+      start = -1; continue;
+    }
+    out += ch;
+  }
+  // Leading spaces trimmed off a range are not part of it.
+  const clean = ranges.map(([s, e]) => { while (s < e && /\s/.test(out[s])) s++; while (e > s && /\s/.test(out[e - 1])) e--; return [s, e] as [number, number]; }).filter(([s, e]) => e > s);
+  return { ...v, text: out, ...(clean.length ? { emphasis: { jesus: clean } } : {}) };
+}
 // KJV source text carries "¶" paragraph marks; the reader shows paragraphs itself.
 const PILCROW = /¶\s*/g;
 // Verse ids: BOOK.CHAPTER.VERSE[letter], optionally "-BOOK.CHAPTER.VERSE[letter]" for joined verses.
@@ -166,11 +189,15 @@ export function parseChapterContent(content: unknown[]): { verses: ChapterVerse[
   const headings: { beforeVerse: number; text: string }[] = [];
   let paragraph = 0;
   let pendingHeading: string[] = [];
-  const walkText = (node: any, onText: (t: string, verseId: string | null) => void) => {
+  // Words of Jesus (2026-11-18): text inside the translation's own "wj" character style is wrapped in two
+  // private-use marks here, and turned into [start, end) ranges AFTER the text is tidied (so the ranges are
+  // exact). Translations without the markup simply have no ranges.
+  const walkText = (node: any, onText: (t: string, verseId: string | null) => void, wj = false) => {
     if (!node) return;
-    if (typeof node.text === "string") onText(node.text, node.attrs?.verseId ?? null);
+    const inWj = wj || (node.name === "char" && node.attrs?.style === "wj");
+    if (typeof node.text === "string") onText(inWj && node.text ? WJ_OPEN + node.text + WJ_CLOSE : node.text, node.attrs?.verseId ?? null);
     if (node.name === "note") return;
-    for (const child of Array.isArray(node.items) ? node.items : []) if (child?.name !== "verse") walkText(child, onText);
+    for (const child of Array.isArray(node.items) ? node.items : []) if (child?.name !== "verse") walkText(child, onText, inWj);
   };
   for (const para of Array.isArray(content) ? content : []) {
     const style = String((para as any)?.attrs?.style ?? "");
@@ -199,7 +226,7 @@ export function parseChapterContent(content: unknown[]): { verses: ChapterVerse[
     });
   }
   return {
-    verses: [...verses.values()].sort((a, b) => a.verse - b.verse).map((v) => ({ ...v, text: v.text.replace(PILCROW, "").replace(/[ \t]+/g, " ").replace(/ *\n */g, "\n").trim() })),
+    verses: [...verses.values()].sort((a, b) => a.verse - b.verse).map((v) => withJesusRanges({ ...v, text: v.text.replace(PILCROW, "").replace(/[ \t]+/g, " ").replace(/ *\n */g, "\n").trim() })),
     headings,
   };
 }
@@ -214,9 +241,9 @@ async function helloAoChapter(t: TRow, book: { code: string; name: string; chapt
   try {
     const c = await getHelloAoChapter(String(t.provider_translation_id), book.code, chapter);
     return {
-      translation: { code: t.translation_code, name: t.translation_name, textCopyAllowed: textCopyAllowed(t), provider: "helloao", textDirection: t.text_direction === "rtl" ? "rtl" : "ltr" },
+      translation: { code: t.translation_code, name: t.translation_name, textCopyAllowed: textCopyAllowed(t), provider: "helloao", textDirection: t.text_direction === "rtl" ? "rtl" : "ltr", offlineAllowed: offlineAllowed(t) },
       book: { code: book.code, name: book.name, chapters: book.chapters }, chapter,
-      verses: c.verses.map(({ wordsOfJesus: _w, ...v }) => v), headings: c.headings,
+      verses: c.verses.map(({ wordsOfJesus: _w, jesusRanges, ...v }) => ({ ...v, ...(jesusRanges?.length ? { emphasis: { jesus: jesusRanges } } : {}) })), headings: c.headings,
       copyright: attributionOf(t),
       previous: c.previous && bookByCode(c.previous.bookCode) ? c.previous : null,
       next: c.next && bookByCode(c.next.bookCode) ? c.next : null,
@@ -277,7 +304,7 @@ export async function getChapter(bookCode: string, chapter: number, translationC
     return b && Number.isInteger(n) && n >= 1 ? { bookCode: b.code, chapter: n } : null;
   };
   const value: Chapter = {
-    translation: { code: t.translation_code, name: t.translation_name, textCopyAllowed: textCopyAllowed(t) },
+    translation: { code: t.translation_code, name: t.translation_name, textCopyAllowed: textCopyAllowed(t), offlineAllowed: offlineAllowed(t) },
     book: { code: book.code, name: book.name, chapters: book.chapters }, chapter,
     verses: parsed.verses, headings: parsed.headings,
     copyright: (json.data?.copyright as string | undefined)?.trim() || null,
@@ -289,7 +316,9 @@ export async function getChapter(bookCode: string, chapter: number, translationC
 }
 
 // ── Search ──────────────────────────────────────────────────────────────────
-export async function searchBible(q: string, translationCode: string, offset: number) {
+/** Concordance options (2026-11-18, additive): Bible order instead of relevance, a testament, a bigger page. */
+export interface SearchOptions { order?: "relevance" | "canonical"; testament?: "ot" | "nt" | null; limit?: number }
+export async function searchBible(q: string, translationCode: string, offset: number, opts: SearchOptions = {}) {
   const query = String(q ?? "").trim();
   if (query.length < 2) throw new BibleError("Type at least 2 characters", 400);
   if (query.length > 120) throw new BibleError("That search is too long", 400);
@@ -299,7 +328,10 @@ export async function searchBible(q: string, translationCode: string, offset: nu
   if (!t) throw new BibleError("That translation isn't available", 404);
   // AO Lab offers no search; references (above) still work in every translation.
   if (providerOf(t) === "helloao") throw new BibleError("Word search isn't available for this translation yet. Search by reference (e.g. John 3:16), or switch translation to search words.", 400);
-  const params = new URLSearchParams({ query, limit: "20", offset: String(Math.max(0, Math.min(1000, offset | 0))), sort: "relevance" });
+  const limit = Math.max(1, Math.min(50, Math.floor(opts.limit ?? 20)));
+  const params = new URLSearchParams({ query, limit: String(limit), offset: String(Math.max(0, Math.min(1000, offset | 0))), sort: opts.order === "canonical" ? "canonical" : "relevance" });
+  if (opts.testament === "ot") params.set("range", "GEN-MAL");
+  if (opts.testament === "nt") params.set("range", "MAT-REV");
   const json = await providerGet(`/bibles/${t.api_bible_id}/search?${params}`);
   const verses = (json.data?.verses ?? []) as { id?: string; bookId?: string; reference?: string; text?: string }[];
   return {
