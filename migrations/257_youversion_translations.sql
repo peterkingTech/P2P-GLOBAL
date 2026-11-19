@@ -1,5 +1,6 @@
 -- 257 — The owner's YouVersion Platform Bible versions (owner 2026-11-19: "add the new translations").
--- ADDITIVE: inserts 62 rows into p2p_bible_translations (provider 'youversion'); never updates or deletes.
+-- ADDITIVE: widens the provider check to allow 'youversion' (existing rows unaffected), adds a numeric-id check for
+-- YouVersion rows, and inserts 62 rows into p2p_bible_translations (provider 'youversion'); never updates or deletes.
 -- Only versions NOT already served by API.Bible or AO Lab (29 duplicates skipped by language + abbreviation/title;
 -- DELUT and RVES also skipped as the same editions as LUT and RVR09).
 -- COPYRIGHT (owner rule): YouVersion's developer guidance asks for each version's attribution from its own record and
@@ -8,6 +9,25 @@
 -- The chapter text is fetched live from YouVersion with its copyright on every load; nothing is stored.
 -- Rows written before the provider code is deployed are simply not shown (old code can't serve them) — safe either order.
 begin;
+
+-- Widen the provider list to include YouVersion (same pattern as 225). Existing rows are all api.bible / helloao,
+-- which the new list still allows, so no existing row is affected.
+do $$
+begin
+  if exists (select 1 from pg_constraint where conname = 'p2p_bible_translations_provider_check'
+             and pg_get_constraintdef(oid) not like '%youversion%') then
+    alter table public.p2p_bible_translations drop constraint p2p_bible_translations_provider_check;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'p2p_bible_translations_provider_check') then
+    alter table public.p2p_bible_translations add constraint p2p_bible_translations_provider_check
+      check (provider in ('api.bible', 'dbp', 'local', 'helloao', 'youversion'));
+  end if;
+  -- A YouVersion row always names its numeric YouVersion id.
+  if not exists (select 1 from pg_constraint where conname = 'p2p_bible_translations_youversion_identity') then
+    alter table public.p2p_bible_translations add constraint p2p_bible_translations_youversion_identity
+      check (provider <> 'youversion' or provider_translation_id ~ '^[0-9]{1,7}$');
+  end if;
+end $$;
 
 insert into public.p2p_bible_translations (language, translation_code, translation_name, is_default_for_language, provider, provider_translation_id, abbreviation, is_licensed_confirmed, license_notes)
 select v.language, v.code, v.name, false, 'youversion', v.yv_id, v.abbr, true, v.notes
