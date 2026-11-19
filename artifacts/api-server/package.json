@@ -36,7 +36,8 @@
     "test:admin-notifications": "node tests/adminNotifications.test.mjs",
     "test:learning-plans": "node tests/learningPlans.test.mjs",
     "test:bible-audio": "node tests/bibleAudio.test.mjs",
-    "test:azure-translator": "node tests/azureTranslator.test.mjs"
+    "test:azure-translator": "node tests/azureTranslator.test.mjs",
+    "test:youversion": "node tests/youversion.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

@@ -72,6 +72,7 @@ export type AiActivity = "ai_processing" | "ai_summarisation" | "ai_analysis" | 
 export function aiAllowedFor(r: TranslationRow & { permits_ai?: boolean | null }, activity: AiActivity): boolean {
   if (activity === "model_training") return false; // never: P2P does not train models on any text
   if (r.preview) return false;
+  if (providerOf(r) === "youversion") return false; // display-only (owner's copyright rule; terms silent on AI)
   if (r.permits_ai === true) return true;
   if (providerOf(r) === "helloao") return r.licence_status === "approved" && /^public domain$/i.test(String(r.licence_name ?? "").trim());
   return /^\s*public domain\b/i.test(r.license_notes ?? "");

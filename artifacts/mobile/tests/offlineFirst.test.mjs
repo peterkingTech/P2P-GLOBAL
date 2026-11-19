@@ -106,7 +106,7 @@ ok("bible: chapters kept on the phone only when the licence permits offline", bi
 ok("bible: offline returns the kept copy, marked", bible.includes("return { ...kept, offline: true } as BibleChapter;"));
 ok("bible: capped at 300 chapters", bible.includes("while (idx.length > 300)"));
 const reader = readFileSync(path.join(root, "../api-server/src/lib/bibleReader.ts"), "utf8"), lic = readFileSync(path.join(root, "../api-server/src/lib/bibleLicence.ts"), "utf8");
-ok("api: offlineAllowed comes from the reviewed licence record", lic.includes("export const offlineAllowed = (r: TranslationRow) => r.permits_offline === true;") && (reader.match(/offlineAllowed: offlineAllowed\(t\)/g) ?? []).length === 2);
+ok("api: offlineAllowed comes from the reviewed licence record (never for YouVersion, display-only)", lic.includes("export const offlineAllowed = (r: TranslationRow) => providerOf(r) !== \"youversion\" && r.permits_offline === true;") && (reader.match(/offlineAllowed: offlineAllowed\(t\)/g) ?? []).length === 2);
 
 // ── Daily Word ──
 const dw = src("app/daily-word.tsx"), dwl = src("lib/dailyWord.ts");

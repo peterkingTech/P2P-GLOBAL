@@ -44,7 +44,7 @@ export default function ConcordanceScreen() {
   useEffect(() => {
     Promise.all([loadPosition().catch(() => null), getTranslations().catch(() => ({ translations: [] as BibleTranslation[] }))]).then(([pos, list]) => {
       const all = list.translations;
-      const searchable = all.filter((x) => x.provider !== "helloao" && !x.preview);
+      const searchable = all.filter((x) => x.provider !== "helloao" && x.provider !== "youversion" && !x.preview);
       const mine = searchable.find((x) => x.code === pos?.translation);
       const pick = mine ?? searchable.find((x) => /^KJV$/i.test(x.abbreviation ?? x.code)) ?? searchable.find((x) => x.language?.startsWith("en")) ?? searchable[0];
       if (pick) setTrans({ code: pick.code, name: pick.name, fallback: !mine });

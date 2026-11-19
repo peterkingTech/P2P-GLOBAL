@@ -4,6 +4,7 @@ import { attributionOf, canCache, canPlayRecordedAudio, isServable, offlineAllow
 import { getHelloAoBooks, getHelloAoCatalogue, getHelloAoChapter, HelloAoError, type HelloAoTranslation } from "./bibleProviders/helloao";
 import { CURATED_TRANSLATIONS } from "./bibleProviders/helloaoRegistry";
 import { audioEditionFor } from "./bibleAudio";
+import { getYvChapter, getYvMeta, YouVersionError } from "./bibleProviders/youversion";
 
 // The Bible reader (full chapters, translations, search, related lessons).
 // Scripture text comes ONLY from API.Bible for translations marked
@@ -111,8 +112,8 @@ export const textCopyAllowed = (r: TRow) => licenceTextCopyAllowed(r);
 export const publicTranslation = (r: TRow) => ({
   code: r.translation_code, name: r.translation_name, language: r.language, isDefault: r.is_default_for_language, textCopyAllowed: textCopyAllowed(r),
   // Additions (older app versions ignore them):
-  provider: providerOf(r) === "helloao" ? "helloao" : "api.bible",
-  providerName: providerOf(r) === "helloao" ? "Free Use Bible API (AO Lab)" : "API.Bible",
+  provider: providerOf(r) === "helloao" ? "helloao" : providerOf(r) === "youversion" ? "youversion" : "api.bible",
+  providerName: providerOf(r) === "helloao" ? "Free Use Bible API (AO Lab)" : providerOf(r) === "youversion" ? "YouVersion" : "API.Bible",
   abbreviation: r.abbreviation ?? r.translation_code,
   textDirection: r.text_direction === "rtl" ? "rtl" : "ltr",
   attribution: attributionOf(r),
@@ -263,6 +264,10 @@ async function helloAoChapter(t: TRow, book: { code: string; name: string; chapt
 /** The books a translation actually has (AO Lab translations may be incomplete); API.Bible: the full canon. */
 export async function booksFor(translationCode: string) {
   const t = translationCode ? (await licensedTranslations()).find((r) => r.translation_code === translationCode) : null;
+  if (t && providerOf(t) === "youversion") {
+    try { const have = new Set((await getYvMeta(String(t.provider_translation_id))).books); return have.size ? CANON.filter((b) => have.has(b.code)) : CANON; }
+    catch (e) { if (e instanceof YouVersionError) throw new BibleError(e.message, e.status); throw e; }
+  }
   if (!t || providerOf(t) !== "helloao") return CANON;
   try {
     const have = new Map((await getHelloAoBooks(String(t.provider_translation_id))).map((b) => [b.id, b.numberOfChapters]));
@@ -297,6 +302,8 @@ export async function getChapter(bookCode: string, chapter: number, translationC
     return value;
   }
 
+  if (providerOf(t) === "youversion") return youVersionChapter(t, book, chapter);
+
   const params = new URLSearchParams({ "content-type": "json", "include-notes": "false", "include-titles": "true",
     "include-chapter-numbers": "false", "include-verse-numbers": "false", "include-verse-spans": "false" });
   const json = await providerGet(`/bibles/${t.api_bible_id}/chapters/${book.code}.${chapter}?${params}`);
@@ -319,6 +326,31 @@ export async function getChapter(bookCode: string, chapter: number, translationC
   return value;
 }
 
+/** A YouVersion chapter (owner 2026-11-19): display-only under the copyright rule — not kept in the chapter cache,
+ *  not offered offline, verse text not copyable, copyright shown from the version's own record on every load. */
+async function youVersionChapter(t: TRow, book: { code: string; name: string; chapters: number }, chapter: number): Promise<Chapter> {
+  try {
+    const c = await getYvChapter(String(t.provider_translation_id), book.code, chapter);
+    const inVersion = (code: string) => !c.books.length || c.books.includes(code);
+    // Previous / next: within the canon, skipping books this version doesn't have.
+    const idx = CANON.findIndex((b) => b.code === book.code);
+    let previous: Chapter["previous"] = null, next: Chapter["next"] = null;
+    if (chapter > 1) previous = { bookCode: book.code, chapter: chapter - 1 };
+    else for (let i = idx - 1; i >= 0; i--) if (inVersion(CANON[i].code)) { previous = { bookCode: CANON[i].code, chapter: CANON[i].chapters }; break; }
+    if (chapter < book.chapters) next = { bookCode: book.code, chapter: chapter + 1 };
+    else for (let i = idx + 1; i < CANON.length; i++) if (inVersion(CANON[i].code)) { next = { bookCode: CANON[i].code, chapter: 1 }; break; }
+    return {
+      translation: { code: t.translation_code, name: t.translation_name, textCopyAllowed: false, provider: "youversion", textDirection: t.text_direction === "rtl" ? "rtl" : "ltr", offlineAllowed: false },
+      book: { code: book.code, name: book.name, chapters: book.chapters }, chapter,
+      verses: c.verses.map((v) => withJesusRanges(v)), headings: c.headings,
+      copyright: c.copyright, previous, next,
+    };
+  } catch (e) {
+    if (e instanceof YouVersionError) throw new BibleError(e.message, e.status);
+    throw new BibleError("The Bible couldn't be loaded. Please try again.", 502);
+  }
+}
+
 // ── Search ──────────────────────────────────────────────────────────────────
 /** Concordance options (2026-11-18, additive): Bible order instead of relevance, a testament, a bigger page. */
 export interface SearchOptions { order?: "relevance" | "canonical"; testament?: "ot" | "nt" | null; limit?: number }
@@ -331,6 +363,7 @@ export async function searchBible(q: string, translationCode: string, offset: nu
   const t = (await licensedTranslations()).find((r) => r.translation_code === translationCode);
   if (!t) throw new BibleError("That translation isn't available", 404);
   // AO Lab offers no search; references (above) still work in every translation.
+  if (providerOf(t) === "youversion") throw new BibleError("Word search isn't available for this translation. Search by reference (e.g. John 3:16), or switch translation to search words.", 400);
   if (providerOf(t) === "helloao") throw new BibleError("Word search isn't available for this translation yet. Search by reference (e.g. John 3:16), or switch translation to search words.", 400);
   const limit = Math.max(1, Math.min(50, Math.floor(opts.limit ?? 20)));
   const params = new URLSearchParams({ query, limit: String(limit), offset: String(Math.max(0, Math.min(1000, offset | 0))), sort: opts.order === "canonical" ? "canonical" : "relevance" });

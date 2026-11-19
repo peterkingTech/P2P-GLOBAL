@@ -112,7 +112,7 @@ export default function AddScripture() {
         <AppButton label="Browse the Bible" icon="book-outline" variant="secondary" fullWidth
           onPress={() => router.push({ pathname: "/bible", params: { book: pos?.book ?? "JHN", chapter: String(pos?.chapter ?? 1), ...(t ? { t } : {}), ...(to ? { addTo: String(to) } : {}) } } as any)}
           accessibilityLabel="Browse the Bible: select verses there, then Add to playlist" />
-        {hint ? <Text style={s.hint}>{hint}{tInfo?.provider === "helloao" && kind.kind !== "reference" ? " — this translation can only be searched by reference. Switch translation to search words." : ""}</Text> : null}
+        {hint ? <Text style={s.hint}>{hint}{(tInfo?.provider === "helloao" || tInfo?.provider === "youversion") && kind.kind !== "reference" ? " — this translation can only be searched by reference. Switch translation to search words." : ""}</Text> : null}
         {flash ? <Text style={s.flash} accessibilityLiveRegion="polite">{flash}</Text> : null}
         {error ? <Text style={s.error} accessibilityLiveRegion="polite">{error}</Text> : null}
         {note ? <Text style={s.hint}>{note}</Text> : null}

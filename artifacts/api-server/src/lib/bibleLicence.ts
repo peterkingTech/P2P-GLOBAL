@@ -12,7 +12,7 @@
 //     off unless it was explicitly recorded as permitted. Unknown = no.
 // The database enforces the same approval rule (migration 225 check).
 
-export type Provider = "api.bible" | "helloao" | "dbp" | "local";
+export type Provider = "api.bible" | "helloao" | "dbp" | "local" | "youversion";
 export type LicenceStatus = "unreviewed" | "approved" | "rejected" | "needs_information";
 export const LICENCE_STATUSES: readonly LicenceStatus[] = ["unreviewed", "approved", "rejected", "needs_information"];
 
@@ -35,13 +35,15 @@ export interface TranslationRow {
   preview?: boolean;
 }
 
-export const providerOf = (r: Pick<TranslationRow, "provider">): Provider => (r.provider === "helloao" ? "helloao" : r.provider === "dbp" ? "dbp" : r.provider === "local" ? "local" : "api.bible");
+export const providerOf = (r: Pick<TranslationRow, "provider">): Provider => (r.provider === "helloao" ? "helloao" : r.provider === "youversion" ? "youversion" : r.provider === "dbp" ? "dbp" : r.provider === "local" ? "local" : "api.bible");
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
 /** May people read this translation in the app? */
 export function isServable(r: TranslationRow): boolean {
   const p = providerOf(r);
   if (p === "api.bible") return r.is_licensed_confirmed !== false && !!r.api_bible_id;
+  // YouVersion (owner 2026-11-19): a version licensed to the owner's YouVersion app key, by its numeric id.
+  if (p === "youversion") return r.is_licensed_confirmed === true && !!r.provider_translation_id && /^\d{1,7}$/.test(r.provider_translation_id);
   if (p === "helloao") {
     if (!r.provider_translation_id || !ID_RE.test(r.provider_translation_id)) return false;
     if (r.preview) return true;   // development preview (lib/bibleReader.ts honours it only outside production)
@@ -51,19 +53,19 @@ export function isServable(r: TranslationRow): boolean {
 }
 
 /** May the server keep chapters in its short memory cache? */
-export const canCache = (r: TranslationRow) => (providerOf(r) === "helloao" ? r.permits_caching === true : true);
+export const canCache = (r: TranslationRow) => (providerOf(r) === "helloao" ? r.permits_caching === true : providerOf(r) === "youversion" ? false : true);
 /** May the APP keep this translation's chapters for reading offline? Only when the licence record says so
  *  explicitly (permits_offline = true) — never assumed, never for a translation whose terms weren't reviewed. */
-export const offlineAllowed = (r: TranslationRow) => r.permits_offline === true;
+export const offlineAllowed = (r: TranslationRow) => providerOf(r) !== "youversion" && r.permits_offline === true;
 /** May verse TEXT leave the app (copy / share)? Otherwise only the reference is shared. */
 export const textCopyAllowed = (r: TranslationRow) =>
-  providerOf(r) === "helloao" ? r.permits_sharing === true : /public domain/i.test(r.license_notes ?? "");
+  providerOf(r) === "helloao" ? r.permits_sharing === true : providerOf(r) === "youversion" ? false : /public domain/i.test(r.license_notes ?? "");
 /** May a P2P Voice (Azure / Google synthesis, cached as audio) read this translation aloud? Owner 2026-11-19:
  *  P2P Voice only, and for the Bible ONLY public-domain translations — turning a copyrighted text into stored
  *  audio isn't something its licence grants. AO Lab: an approved row whose licence is "Public domain".
  *  API.Bible: the licence notes begin "Public domain". Open licences (Biblica Open, CC BY-SA) are not enough. */
 export function syntheticSpeechAllowed(r: TranslationRow): boolean {
-  if (r.preview) return false;
+  if (r.preview || providerOf(r) === "youversion") return false;
   if (providerOf(r) === "helloao") return r.licence_status === "approved" && /^public domain$/i.test(String(r.licence_name ?? "").trim());
   return /^\s*public domain\b/i.test(r.license_notes ?? "");
 }

@@ -102,7 +102,7 @@ export default function TranslationPicker({ visible, onClose, translations, curr
                     <View style={styles.groupRow}><LanguageFlag language={lang} size={14} /><Text style={[styles.group, { paddingHorizontal: 0 }]}>{nameOf(lang)}</Text></View>
                     {list.map((t) => {
                       const selected = t.code === current;
-                      const showSource = shared.has(`${t.language}:${norm(t.abbreviation ?? t.code)}`) || t.provider === "helloao";
+                      const showSource = shared.has(`${t.language}:${norm(t.abbreviation ?? t.code)}`) || t.provider === "helloao" || t.provider === "youversion";
                       return (
                         <TouchableOpacity key={t.code} style={[styles.row, selected && styles.rowSelected]} onPress={() => onSelect(t.code)}
                           accessibilityRole="radio" accessibilityState={{ selected }}

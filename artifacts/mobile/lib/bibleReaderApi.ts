@@ -65,7 +65,7 @@ export const SCRIPTURE_FONT = Platform.select({ ios: "Georgia", android: "serif"
  */
 export interface BibleTranslation {
   code: string; name: string; language: string; isDefault: boolean; textCopyAllowed: boolean;
-  provider?: "api.bible" | "helloao"; providerName?: string; abbreviation?: string;
+  provider?: "api.bible" | "helloao" | "youversion"; providerName?: string; abbreviation?: string;
   textDirection?: "ltr" | "rtl"; attribution?: string | null; licenceUrl?: string | null; preview?: boolean;
   /** The language's name from the server (for languages the app has no name for). */
   languageName?: string | null;
