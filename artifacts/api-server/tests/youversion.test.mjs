@@ -94,7 +94,15 @@ Y2.setYouVersionStateForTests(null);
 ok("sync: before the first successful sync nothing is hidden", Y2.yvLicensedNow("999"));
 ok("reader filters YouVersion rows by the live licence list", reader.includes("yvLicensedNow(r.provider_translation_id)"));
 const syncSrc = readFileSync(path.join(root, "src/lib/bibleProviders/youversionSync.ts"), "utf8");
-ok("sync is additive (inserts only, never updates or deletes rows)", !/\.update\(|\.delete\(/.test(syncSrc) && syncSrc.includes("ignoreDuplicates: true"));
+ok("sync is additive (inserts only, never updates or deletes rows)", !/\.update\(|\)\s*\.delete\(/.test(syncSrc) && (syncSrc.match(/db\.from\(/g) ?? []).length === 3 && syncSrc.includes("ignoreDuplicates: true"));
 ok("sync never hides everything on an empty answer", syncSrc.includes("if (!list.length) throw"));
+// Gentle on the key's request allowance (2026-11-19: a full sweep hit YouVersion's 429 and briefly blocked readers).
+const plan2 = Y2.planSync(list, existing, (id) => (id === "916" ? "© ok" : undefined));
+ok("sync: Bibles not checked yet wait for a later run (not shown, not marked 'no notice')", plan2.rows.map((r) => r.provider_translation_id).join() === "916" && plan2.waiting.some((w) => w.id === "1264") && !plan2.noAttribution.length);
+const pick = Y2.pickBatch([{ id: "1", language: "mgj" }, { id: "2", language: "sv" }, { id: "3", language: "en" }, { id: "4", language: "kad" }], new Set(["en", "sv"]), 3);
+ok("sync: app languages are checked first, at most one batch per run", pick.join() === "2,3,1", pick.join());
+ok("sync: at most 50 new Bibles per run, one call every 2 s", Y2.BATCH === 50 && syncSrc.includes("const GAP_MS = 2_000;"));
+ok("sync: a 429 stops the run at once — no retrying into the limit", syncSrc.includes("e.upstream === 429) throw new RateLimited") && /if \(res\.status === 429\) throw new YouVersionError\([^)]*503, 429\)/.test(readFileSync(path.join(root, "src/lib/bibleProviders/youversion.ts"), "utf8")));
+ok("sync: runs hourly", readFileSync(path.join(root, "src/index.ts"), "utf8").includes('cron.schedule("17 * * * *", () => { void syncYouVersion(); });'));
 console.log(`youversion (api): ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

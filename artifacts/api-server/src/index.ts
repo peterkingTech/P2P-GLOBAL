@@ -52,10 +52,11 @@ app.listen(port, (err) => {
 });
 
 // YouVersion Bibles (owner 2026-11-19): every Bible licensed to the key shows in P2P, withdrawn ones hide.
-// 90 s after start, then every 6 hours. YOUVERSION_AUTO_SYNC=off stops it.
+// 90 s after start, then hourly (a few Bibles per run — the key's request allowance is shared with readers).
+// YOUVERSION_AUTO_SYNC=off stops it.
 if (process.env.YOUVERSION_AUTO_SYNC !== "off") {
   setTimeout(() => { void syncYouVersion(); }, 90_000).unref();
-  cron.schedule("17 */6 * * *", () => { void syncYouVersion(); });
+  cron.schedule("17 * * * *", () => { void syncYouVersion(); });
 }
 
 // Publishing Studio — runs scheduled publish/unpublish/archive jobs. No-op

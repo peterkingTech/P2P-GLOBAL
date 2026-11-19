@@ -24,7 +24,7 @@ type Row = {
   permits_display: boolean | null; permits_commercial: boolean | null; permits_caching: boolean | null; permits_offline: boolean | null; permits_audio: boolean | null; permits_sharing: boolean | null;
 };
 type SyncReport = { at: string; ok: boolean; error?: string; licensed: number; inP2P: number; added: { code: string; name: string; language: string }[];
-  duplicates: { id: string; abbr: string; language: string; sameAs: string }[]; noAttribution: { id: string; abbr: string; language: string }[]; withdrawn: { code: string; name: string }[] };
+  duplicates: { id: string; abbr: string; language: string; sameAs: string }[]; noAttribution: { id: string; abbr: string; language: string }[]; withdrawn: { code: string; name: string }[]; waiting?: number; paused?: string };
 type CatalogueItem = { id: string; name: string; englishName: string; shortName: string; language: string; languageEnglishName?: string | null; licenseUrl: string | null; review: { statement: string; questions: string[] }; ours: { code: string; status: string | null } | null };
 const call = <T,>(path: string, init: RequestInit = {}) => apiRequest<T>(`/admin/bible-translations${path}`, init, { fallbackError: "Something went wrong." });
 const json = (method: string, body: unknown): RequestInit => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -79,7 +79,7 @@ export default function BibleLicencesAdmin() {
     try {
       const r = await call<{ report: SyncReport }>("/youversion/sync", json("POST", {}));
       setYv(r.report);
-      say(!r.report.ok ? r.report.error ?? "The check didn't finish." : r.report.added.length ? `${r.report.added.length} new Bible${r.report.added.length === 1 ? "" : "s"} added — visible to people now.` : "Up to date — no new licences.");
+      say(!r.report.ok ? r.report.error ?? "The check didn't finish." : r.report.paused ? `${r.report.added.length} added — ${r.report.paused}` : r.report.added.length ? `${r.report.added.length} new Bible${r.report.added.length === 1 ? "" : "s"} added — visible to people now.` : "Up to date — no new licences.");
       await load();
     } catch (e) { say((e as Error).message); } finally { setBusy(false); }
   };
@@ -104,13 +104,15 @@ export default function BibleLicencesAdmin() {
 
       {tab === "yv" ? (
         <>
-          <Text style={s.small}>Every Bible licensed to your YouVersion key shows in P2P automatically — the server checks every 6 hours. Add a licence on YouVersion, then tap "Check now" to see it straight away. A licence you remove hides that Bible at the next check. All are display only: no copying, offline, P2P Voice or AI.</Text>
+          <Text style={s.small}>Every Bible licensed to your YouVersion key shows in P2P automatically — the server checks every hour and adds up to 50 new Bibles each time (YouVersion limits how many requests the key may make, and readers share that allowance). Add a licence on YouVersion, then tap "Check now" to see it straight away. A licence you remove hides that Bible at the next check. All are display only: no copying, offline, P2P Voice or AI.</Text>
           <AppButton label="Check now" icon="refresh" onPress={syncNow} loading={busy} />
           {yv === undefined ? <Text style={s.small}>Loading…</Text> : !yv ? <EmptyNote text="No check has run since the server started. Tap Check now." /> : (
             <>
               <View style={s.card}>
                 <Text style={s.title}>{yv.ok ? `${yv.inP2P} of ${yv.licensed} licensed Bibles are in P2P` : "The last check didn't finish"}</Text>
                 <Text style={s.meta}>Checked {new Date(yv.at).toLocaleString()}</Text>
+                {yv.waiting ? <Text style={s.small}>{yv.waiting} more licensed Bible{yv.waiting === 1 ? "" : "s"} will be added over the next hourly checks.</Text> : null}
+                {yv.paused ? <Text style={s.small}>{yv.paused}</Text> : null}
                 {yv.error ? <Text style={s.small}>{yv.error} Nothing was changed; the next check tries again.</Text> : null}
               </View>
               {([

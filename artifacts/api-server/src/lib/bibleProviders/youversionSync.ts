@@ -5,11 +5,13 @@
 //       – a Bible whose own record carries no copyright / attribution text (owner rule: unknown = no);
 //   • a Bible the key can no longer use is hidden at once (licensedTranslations() filters it) — nothing is deleted,
 //     so it returns by itself if the licence comes back.
-// Runs shortly after the server starts and every 6 hours (index.ts); a super admin can run it now from
+// Gentle on YouVersion's per-key request allowance (the same key serves every reader): one call every 2 s, at most
+// BATCH new Bibles per run, app languages first, and a 429 stops the run at once (no retries into the limit).
+// Runs shortly after the server starts and every hour (index.ts); a super admin can run it now from
 // Admin Centre → Bible licences → YouVersion. Additive only: it inserts rows and never updates or deletes one.
 import { supabaseServiceRole as db } from "../supabase";
 import { logger } from "../logger";
-import { yvGet, yvKey } from "./youversion";
+import { yvGet as yvGetOnce, yvKey, YouVersionError } from "./youversion";
 import { currentLicensedCount, hasYvLanguageName, recordYouVersionSync, setYvLanguageName } from "./youversionState";
 
 export interface YvListItem { id: number | string; abbreviation?: string; localized_abbreviation?: string; title?: string; localized_title?: string; language_tag?: string; copyright?: string; promotional_content?: string; books?: string[] }
@@ -21,6 +23,10 @@ export interface SyncReport {
   duplicates: { id: string; abbr: string; language: string; sameAs: string }[];
   noAttribution: { id: string; abbr: string; language: string }[];
   withdrawn: { code: string; name: string }[];
+  /** Licensed Bibles not checked yet — added by the next runs (a few per run, so readers keep YouVersion's allowance). */
+  waiting: number;
+  /** Set when YouVersion's request allowance ran out mid-run: what was done is kept, the rest waits for the next run. */
+  paused?: string;
 }
 
 // Editions decided by the owner's review on 2026-11-19 (migration 257) — kept out on purpose.
@@ -39,8 +45,9 @@ const nameNorm = (s: unknown) => String(s ?? "").toLowerCase().replace(/biblica�
 const RTL = new Set(["ar", "he", "fa", "ur", "ps", "sd", "ug", "yi", "dv", "ckb"]);
 const clean = (s: string) => s.replace(/\s*\(In Review\)\s*/i, " (in review)").replace(/\s+/g, " ").trim();
 
-/** Pure planning step (tested): which licensed Bibles become new rows, which are skipped and why, which were withdrawn. */
-export function planSync(list: YvListItem[], existing: ExistingRow[], attributionOf: (id: string) => string | null, rtlOf: (tag: string) => boolean = () => false) {
+/** Pure planning step (tested): which licensed Bibles become new rows, which are skipped and why, which were withdrawn.
+ *  attributionOf: the copyright text; null = checked and has none; undefined = not checked yet (waits). */
+export function planSync(list: YvListItem[], existing: ExistingRow[], attributionOf: (id: string) => string | null | undefined, rtlOf: (tag: string) => boolean = () => false) {
   const yvIds = new Set(existing.filter((r) => r.provider === "youversion").map((r) => String(r.provider_translation_id)));
   const others = existing.filter((r) => r.provider !== "youversion");
   const codes = new Set(existing.map((r) => r.translation_code.toLowerCase()));
@@ -48,6 +55,7 @@ export function planSync(list: YvListItem[], existing: ExistingRow[], attributio
   const rows: NewRow[] = [];
   const duplicates: SyncReport["duplicates"] = [];
   const noAttribution: SyncReport["noAttribution"] = [];
+  const waiting: { id: string; language: string }[] = [];
   const seen = new Set<string>();
   for (const b of list) {
     const id = String(b.id);
@@ -60,6 +68,7 @@ export function planSync(list: YvListItem[], existing: ExistingRow[], attributio
       && (norm(r.abbreviation ?? r.translation_code) === norm(abbr) || norm(r.translation_code) === norm(abbr) || (!!nameNorm(r.translation_name) && nameNorm(r.translation_name) === nameNorm(b.title))));
     if (dup) { duplicates.push({ id, abbr, language: lang, sameAs: `${dup.translation_code} (${dup.provider ?? "api.bible"})` }); continue; }
     const attribution = attributionOf(id);
+    if (attribution === undefined) { waiting.push({ id, language: lang }); continue; }
     if (!attribution) { noAttribution.push({ id, abbr, language: lang }); continue; }
     let code = `YV-${abbr.replace(/[^A-Za-z0-9-]/g, "")}`.slice(0, 30);
     if (code === "YV-" || codes.has(code.toLowerCase())) code = `${code}-${id}`.slice(0, 40);
@@ -75,11 +84,34 @@ export function planSync(list: YvListItem[], existing: ExistingRow[], attributio
     });
   }
   const withdrawn = existing.filter((r) => r.provider === "youversion" && !licensed.has(String(r.provider_translation_id)));
-  return { rows, duplicates, noAttribution, withdrawn, licensed };
+  return { rows, duplicates, noAttribution, withdrawn, licensed, waiting };
+}
+
+/** Which waiting Bibles to check this run: app languages first, then the rest; at most `batch`. */
+export function pickBatch(waiting: { id: string; language: string }[], appLangs: Set<string>, batch: number) {
+  return [...waiting].sort((a, b) => Number(!appLangs.has(a.language)) - Number(!appLangs.has(b.language))).slice(0, batch).map((w) => w.id);
 }
 
 let running: Promise<SyncReport> | null = null;
 export { lastYouVersionSync, yvLicensedNow, yvLanguageName, setYouVersionStateForTests } from "./youversionState";
+
+export const BATCH = 50;
+const GAP_MS = 2_000;
+const NO_NOTICE_RECHECK_MS = 24 * 3600_000;
+const noNotice = new Map<string, number>(); // id → when it was found without a notice (re-checked daily, not every run)
+class RateLimited extends Error {}
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** One paced call. 429 → stop the run (RateLimited), never retry into the limit. 5xx/network → one retry later. */
+async function yvGet(path: string): Promise<any> {
+  for (let attempt = 0; ; attempt++) {
+    try { const j = await yvGetOnce(path); await pause(GAP_MS); return j; }
+    catch (e) {
+      if (e instanceof YouVersionError && e.upstream === 429) throw new RateLimited("YouVersion's request allowance for the key is used up for now");
+      if ((e instanceof YouVersionError && (e.status === 404 || e.status === 503)) || attempt >= 1) throw e;
+      await pause(10_000);
+    }
+  }
+}
 
 async function listKeyBibles(): Promise<YvListItem[]> {
   const out: YvListItem[] = [];
@@ -100,7 +132,7 @@ export function syncYouVersion(): Promise<SyncReport> {
 
 async function run(): Promise<SyncReport> {
   const at = new Date().toISOString();
-  const empty = { licensed: 0, inP2P: 0, added: [], duplicates: [], noAttribution: [], withdrawn: [] };
+  const empty = { licensed: 0, inP2P: 0, added: [], duplicates: [], noAttribution: [], withdrawn: [], waiting: 0 };
   if (!yvKey()) { const r: SyncReport = { at, ok: false, error: "The YouVersion key isn't set on the server.", ...empty }; recordYouVersionSync(r); return r; }
   try {
     const list = await listKeyBibles();
@@ -110,44 +142,54 @@ async function run(): Promise<SyncReport> {
     const existing = (data ?? []) as ExistingRow[];
     const { data: langs } = await db.from("p2p_languages").select("code");
     const appLangs = new Set(((langs ?? []) as { code: string }[]).map((l) => l.code));
-    // Language names + direction for languages the app doesn't know (fetched once per server run).
+    // Which Bibles still need their copyright record (no-notice ones only once a day).
+    const now = Date.now();
+    const known = (id: string): null | undefined => { const t = noNotice.get(id); return t && now - t < NO_NOTICE_RECHECK_MS ? null : undefined; };
+    const first = planSync(list, existing, known);
+    const batch = pickBatch(first.waiting, appLangs, BATCH);
+    const attribution = new Map<string, string | null>();
     const dir = new Map<string, boolean>();
-    for (const tag of [...new Set(list.map((b) => String(b.language_tag ?? "")).filter(Boolean))]) {
-      const code = p2pLanguage(tag);
-      if (appLangs.has(code) || hasYvLanguageName(code)) continue;
-      try {
-        const l = await yvGet(`/languages/${encodeURIComponent(tag)}`);
+    let paused: string | undefined;
+    try {
+      for (const id of batch) {
+        const m = await yvGet(`/bibles/${id}`).catch((e) => { if (e instanceof RateLimited) throw e; return undefined; });
+        if (m === undefined) continue; // not reachable now — waits for the next run
+        const a = String(m?.copyright || m?.promotional_content || "").replace(/\s+/g, " ").trim();
+        attribution.set(id, a || null);
+        if (!a) noNotice.set(id, now); else noNotice.delete(id);
+      }
+      // Language names + direction, only for languages of Bibles added now that the app doesn't know.
+      const tags = new Set(list.filter((b) => attribution.get(String(b.id))).map((b) => String(b.language_tag ?? "")).filter(Boolean));
+      for (const tag of tags) {
+        const code = p2pLanguage(tag);
+        if (appLangs.has(code) || hasYvLanguageName(code)) continue;
+        const l = await yvGet(`/languages/${encodeURIComponent(tag)}`).catch((e) => { if (e instanceof RateLimited) throw e; return null; });
         const n = String(l?.display_names?.en || l?.localized_name || "").trim();
         if (n) setYvLanguageName(code, n);
         dir.set(tag, l?.text_direction === "rtl");
-      } catch { /* the app falls back to the language code's own name */ }
-    }
-    // The copyright text lives on each Bible's own record — fetched only for Bibles not yet in P2P.
-    const yvIds = new Set(existing.filter((r) => r.provider === "youversion").map((r) => String(r.provider_translation_id)));
-    const attribution = new Map<string, string>();
-    for (const b of list) {
-      const id = String(b.id);
-      if (yvIds.has(id) || EXCLUDED[id] || attribution.has(id)) continue;
-      try { const m = await yvGet(`/bibles/${id}`); const a = String(m?.copyright || m?.promotional_content || "").replace(/\s+/g, " ").trim(); if (a) attribution.set(id, a); } catch { /* skipped until next run */ }
-    }
-    const plan = planSync(list, existing, (id) => attribution.get(id) ?? null, (tag) => dir.get(tag) === true);
-    if (plan.rows.length) {
-      for (let i = 0; i < plan.rows.length; i += 100) {
-        const { error: e } = await db.from("p2p_bible_translations").upsert(plan.rows.slice(i, i + 100), { onConflict: "translation_code", ignoreDuplicates: true });
-        if (e) throw new Error(`Couldn't add the new Bibles (${e.code ?? "error"})`);
       }
+    } catch (e) {
+      if (!(e instanceof RateLimited)) throw e;
+      paused = `${e.message}; the rest continues at the next run.`;
+    }
+    const plan = planSync(list, existing, (id) => (attribution.has(id) ? attribution.get(id)! : known(id)), (tag) => dir.get(tag) === true);
+    for (let i = 0; i < plan.rows.length; i += 100) {
+      const { error: e } = await db.from("p2p_bible_translations").upsert(plan.rows.slice(i, i + 100), { onConflict: "translation_code", ignoreDuplicates: true });
+      if (e) throw new Error(`Couldn't add the new Bibles (${e.code ?? "error"})`);
     }
     const report: SyncReport = {
       at, ok: true, licensed: plan.licensed.size, inP2P: existing.filter((r) => r.provider === "youversion" && plan.licensed.has(String(r.provider_translation_id))).length + plan.rows.length,
       added: plan.rows.map((r) => ({ code: r.translation_code, name: r.translation_name, language: r.language })),
       duplicates: plan.duplicates, noAttribution: plan.noAttribution, withdrawn: plan.withdrawn.map((r) => ({ code: r.translation_code, name: r.translation_name })),
+      waiting: plan.waiting.length, ...(paused ? { paused } : {}),
     };
     recordYouVersionSync(report, plan.licensed);
-    logger.info({ licensed: report.licensed, added: report.added.length, withdrawn: report.withdrawn.length }, "YouVersion sync complete");
+    logger.info({ licensed: report.licensed, added: report.added.length, waiting: report.waiting, withdrawn: report.withdrawn.length, paused: !!paused }, "YouVersion sync complete");
     return report;
   } catch (err) {
-    logger.warn({ err: (err as Error).message }, "YouVersion sync failed — previous state kept");
-    const r: SyncReport = { at, ok: false, error: (err as Error).message, ...empty, licensed: currentLicensedCount() };
+    const msg = err instanceof RateLimited ? `${err.message} — nothing changed; the next run tries again.` : (err as Error).message;
+    logger.warn({ err: msg }, "YouVersion sync failed — previous state kept");
+    const r: SyncReport = { at, ok: false, error: msg, ...empty, licensed: currentLicensedCount() };
     recordYouVersionSync(r);
     return r;
   }

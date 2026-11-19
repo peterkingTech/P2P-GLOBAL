@@ -10,7 +10,7 @@ const WJ = { open: "", close: "" };
 const BASE = "https://api.youversion.com/v1";
 export const yvKey = () => process.env.YouVersion_API_Key || process.env.YOUVERSION_API_KEY || "";
 export const YV_ID_RE = /^\d{1,7}$/;
-export class YouVersionError extends Error { constructor(message: string, public status: number) { super(message); } }
+export class YouVersionError extends Error { constructor(message: string, public status: number, public upstream?: number) { super(message); } }
 type Fetcher = (url: string, init: { headers: Record<string, string> }) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>;
 let fetcher: Fetcher = (u, i) => fetch(u, i) as never;
 export const setYouVersionFetcherForTests = (f: Fetcher) => { fetcher = f; };
@@ -21,7 +21,9 @@ export async function yvGet(path: string): Promise<any> {
   const res = await fetcher(`${BASE}${path}`, { headers: { "X-YVP-App-Key": key, Accept: "application/json" } });
   if (res.status === 404 || res.status === 422) throw new YouVersionError("That passage isn't available in this translation.", 404);
   if (res.status === 401 || res.status === 403) throw new YouVersionError("This Bible isn't available right now.", 503);
-  if (!res.ok) throw new YouVersionError("The Bible couldn't be loaded. Please try again.", 502);
+  // 429: the key's request allowance is used up for now (YouVersion: "Limits are applied per App Key"; honour Retry-After).
+  if (res.status === 429) throw new YouVersionError("This Bible is very busy right now. Please try again in a few minutes.", 503, 429);
+  if (!res.ok) throw new YouVersionError("The Bible couldn't be loaded. Please try again.", 502, res.status);
   return res.json();
 }
 
