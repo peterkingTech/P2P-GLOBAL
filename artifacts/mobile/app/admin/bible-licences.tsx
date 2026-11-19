@@ -5,6 +5,8 @@
 //       reject — with the permissions for caching, offline, recorded audio and sharing. Approval makes it visible.
 //       API.Bible and YouVersion: shown read-only — their licences come from the owner's plan / accepted agreements.
 //   • Add from AO Lab: search AO Lab's catalogue (their licence statement shown), import as HIDDEN, then review.
+//   • YouVersion: the automatic sync (server, every 6 hours) — every Bible licensed to your key shows; what was added,
+//       skipped (same edition already in P2P / no copyright notice) and withdrawn; "Check now".
 // Owner's copyright rule: nothing becomes visible without a recorded human decision; unknown = no.
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TextInput, Switch, Linking } from "react-native";
@@ -21,6 +23,8 @@ type Row = {
   licence_questions: string | null; license_notes: string | null; reviewed_at: string | null;
   permits_display: boolean | null; permits_commercial: boolean | null; permits_caching: boolean | null; permits_offline: boolean | null; permits_audio: boolean | null; permits_sharing: boolean | null;
 };
+type SyncReport = { at: string; ok: boolean; error?: string; licensed: number; inP2P: number; added: { code: string; name: string; language: string }[];
+  duplicates: { id: string; abbr: string; language: string; sameAs: string }[]; noAttribution: { id: string; abbr: string; language: string }[]; withdrawn: { code: string; name: string }[] };
 type CatalogueItem = { id: string; name: string; englishName: string; shortName: string; language: string; languageEnglishName?: string | null; licenseUrl: string | null; review: { statement: string; questions: string[] }; ours: { code: string; status: string | null } | null };
 const call = <T,>(path: string, init: RequestInit = {}) => apiRequest<T>(`/admin/bible-translations${path}`, init, { fallbackError: "Something went wrong." });
 const json = (method: string, body: unknown): RequestInit => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -34,7 +38,8 @@ export default function BibleLicencesAdmin() {
   const { colors: c } = useTheme();
   const s = useMemo(() => makeStyles(c), [c]);
   const width = useAdminContentWidth();
-  const [tab, setTab] = useState<"ours" | "add">("ours");
+  const [tab, setTab] = useState<"ours" | "add" | "yv">("ours");
+  const [yv, setYv] = useState<SyncReport | null | undefined>(undefined);
   const [rows, setRows] = useState<Row[] | null>(null);
   const [filter, setFilter] = useState<"all" | "visible" | "hidden" | "helloao" | "api.bible" | "youversion">("all");
   const [q, setQ] = useState("");
@@ -68,6 +73,16 @@ export default function BibleLicencesAdmin() {
       setOpen(null); await load();
     } catch (e) { say((e as Error).message); } finally { setBusy(false); }
   };
+  useEffect(() => { if (tab === "yv" && yv === undefined) call<{ report: SyncReport | null }>("/youversion/sync").then((r) => setYv(r.report), (e) => { setYv(null); say((e as Error).message); }); }, [tab, yv]);
+  const syncNow = async () => {
+    setBusy(true);
+    try {
+      const r = await call<{ report: SyncReport }>("/youversion/sync", json("POST", {}));
+      setYv(r.report);
+      say(!r.report.ok ? r.report.error ?? "The check didn't finish." : r.report.added.length ? `${r.report.added.length} new Bible${r.report.added.length === 1 ? "" : "s"} added — visible to people now.` : "Up to date — no new licences.");
+      await load();
+    } catch (e) { say((e as Error).message); } finally { setBusy(false); }
+  };
   const searchCatalogue = async () => {
     setBusy(true);
     try { const r = await call<{ translations: CatalogueItem[] }>(`/helloao/catalogue?language=${encodeURIComponent(catLang.trim())}&q=${encodeURIComponent(catQ.trim())}`); setCat(r.translations); }
@@ -84,10 +99,35 @@ export default function BibleLicencesAdmin() {
       <Stack.Screen options={{ title: "Bible licences" }} />
       <Text style={s.lead}>A Bible is shown in P2P only after its licence is recorded here. Unknown means no.</Text>
       {msg ? <Text style={s.msg} accessibilityLiveRegion="polite">{msg}</Text> : null}
-      <SegmentedControl accessibilityLabel="Section" value={tab} onChange={(v) => setTab(v as "ours" | "add")}
-        options={[{ value: "ours", label: `P2P's Bibles${rows ? ` · ${rows.length}` : ""}` }, { value: "add", label: "Add from AO Lab" }]} />
+      <SegmentedControl accessibilityLabel="Section" value={tab} onChange={(v) => setTab(v as "ours" | "add" | "yv")}
+        options={[{ value: "ours", label: `P2P's Bibles${rows ? ` · ${rows.length}` : ""}` }, { value: "add", label: "Add from AO Lab" }, { value: "yv", label: "YouVersion" }]} />
 
-      {tab === "ours" ? (
+      {tab === "yv" ? (
+        <>
+          <Text style={s.small}>Every Bible licensed to your YouVersion key shows in P2P automatically — the server checks every 6 hours. Add a licence on YouVersion, then tap "Check now" to see it straight away. A licence you remove hides that Bible at the next check. All are display only: no copying, offline, P2P Voice or AI.</Text>
+          <AppButton label="Check now" icon="refresh" onPress={syncNow} loading={busy} />
+          {yv === undefined ? <Text style={s.small}>Loading…</Text> : !yv ? <EmptyNote text="No check has run since the server started. Tap Check now." /> : (
+            <>
+              <View style={s.card}>
+                <Text style={s.title}>{yv.ok ? `${yv.inP2P} of ${yv.licensed} licensed Bibles are in P2P` : "The last check didn't finish"}</Text>
+                <Text style={s.meta}>Checked {new Date(yv.at).toLocaleString()}</Text>
+                {yv.error ? <Text style={s.small}>{yv.error} Nothing was changed; the next check tries again.</Text> : null}
+              </View>
+              {([
+                ["Added in this check", yv.added.map((a) => `${a.name} · ${a.language} · ${a.code}`)],
+                ["Licence removed — hidden", yv.withdrawn.map((w) => `${w.name} · ${w.code}`)],
+                ["Not added: no copyright notice in YouVersion's record (unknown = no)", yv.noAttribution.map((n) => `${n.abbr} · ${n.language}`)],
+                ["Not added: P2P already has the same edition", yv.duplicates.map((d) => `${d.abbr} · ${d.language} = ${d.sameAs}`)],
+              ] as const).filter(([, items]) => items.length).map(([label, items]) => (
+                <View key={label} style={s.card}>
+                  <Text style={s.label}>{label} · {items.length}</Text>
+                  {items.slice(0, 400).map((t) => <Text key={t} style={s.small}>{t}</Text>)}
+                </View>
+              ))}
+            </>
+          )}
+        </>
+      ) : tab === "ours" ? (
         <>
           <TextInput value={q} onChangeText={setQ} placeholder="Find a translation, code or language" placeholderTextColor={c.textMuted} style={s.input} accessibilityLabel="Find a translation" />
           <ChipRow accessibilityLabel="Show" single>

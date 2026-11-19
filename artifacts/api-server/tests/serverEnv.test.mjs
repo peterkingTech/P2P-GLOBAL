@@ -41,7 +41,7 @@ ok("malformed URL rejected", has(S.checkServerEnv({ ...good, SUPABASE_URL: "http
 ok("error messages never contain key material", S.checkServerEnv({ ...good, SUPABASE_SERVICE_ROLE_KEY: jwt({ ref: PROD, role: "service_role" }) }).errors.every((m) => !m.includes("synthetic") && !m.includes("eyJ")));
 
 const idx = readFileSync(path.join(root, "src/index.ts"), "utf8");
-const firstImport = idx.split("\n").find((l) => /^import /.test(l));
+const firstImport = idx.split(/\r?\n/).find((l) => /^import /.test(l));
 ok("index.ts: envGuard is the very first import", firstImport === 'import "./lib/envGuard";', firstImport);
 
 // In-memory bundle: guard code must precede every createClient( call.

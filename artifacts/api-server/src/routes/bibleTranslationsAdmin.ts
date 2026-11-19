@@ -4,12 +4,15 @@ import { requireAdmin, requireRole } from "../middleware/adminAuth";
 import { getHelloAoCatalogue } from "../lib/bibleProviders/helloao";
 import { approvalProblems, LICENCE_STATUSES, reviewNotes, type LicenceStatus, type TranslationRow } from "../lib/bibleLicence";
 import { clearTranslationCache } from "../lib/bibleReader";
+import { syncYouVersion } from "../lib/bibleProviders/youversionSync";
+import { lastYouVersionSync } from "../lib/bibleProviders/youversionState";
 
 // Bible translation licence review — SUPER ADMIN ONLY (requireRole() with no
 // other roles). Mounted at /admin/bible-translations. Needs migration 225.
 //   GET   /helloao/catalogue?language=eng&q=berean   AO Lab's catalogue + review notes + our status
 //   POST  /helloao/import { ids }                    add as UNREVIEWED (hidden) rows
 //   PATCH /:code/licence { status, permits…, notes } record a decision; approval publishes it
+//   GET/POST /youversion/sync                       the YouVersion auto-sync report / run it now
 // Nothing here can make a translation visible without a recorded, complete
 // approval (lib/bibleLicence.ts approvalProblems + the migration 225 check).
 
@@ -29,6 +32,10 @@ router.get("/", async (_req: Request, res: Response) => {
   if (error) return res.status(500).json({ error: "Couldn't load the translations." });
   return res.json({ translations: data ?? [] });
 });
+
+// YouVersion auto-sync: what the last run did, and "check now" (the same run the server does every 6 hours).
+router.get("/youversion/sync", (_req: Request, res: Response) => res.json({ report: lastYouVersionSync() }));
+router.post("/youversion/sync", async (_req: Request, res: Response) => res.json({ report: await syncYouVersion() }));
 
 router.get("/helloao/catalogue", async (req: Request, res: Response) => {
   try {

@@ -16,6 +16,7 @@ import { sweepUnansweredCalls } from "./lib/callSweep";
 import { sweep as sweepAdminNotifications } from "./lib/adminNotifications";
 import { processScheduledDeletions } from "./lib/accountDeletion";
 import { runStudioScheduler } from "./lib/studio/runtime";
+import { syncYouVersion } from "./lib/bibleProviders/youversionSync";
 
 // Translation calls fail silently into an English fallback (see
 // curriculum.ts's GET /lessons/:lessonId) by design — a missing key would
@@ -49,6 +50,13 @@ app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
 });
+
+// YouVersion Bibles (owner 2026-11-19): every Bible licensed to the key shows in P2P, withdrawn ones hide.
+// 90 s after start, then every 6 hours. YOUVERSION_AUTO_SYNC=off stops it.
+if (process.env.YOUVERSION_AUTO_SYNC !== "off") {
+  setTimeout(() => { void syncYouVersion(); }, 90_000).unref();
+  cron.schedule("17 */6 * * *", () => { void syncYouVersion(); });
+}
 
 // Publishing Studio — runs scheduled publish/unpublish/archive jobs. No-op
 // unless STUDIO_SCHEDULER_ENABLED=true (set only after migration 188 is

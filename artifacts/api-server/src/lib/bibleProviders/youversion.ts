@@ -15,7 +15,7 @@ type Fetcher = (url: string, init: { headers: Record<string, string> }) => Promi
 let fetcher: Fetcher = (u, i) => fetch(u, i) as never;
 export const setYouVersionFetcherForTests = (f: Fetcher) => { fetcher = f; };
 
-async function get(path: string): Promise<any> {
+export async function yvGet(path: string): Promise<any> {
   const key = yvKey();
   if (!key) throw new YouVersionError("This Bible isn't available right now.", 503);
   const res = await fetcher(`${BASE}${path}`, { headers: { "X-YVP-App-Key": key, Accept: "application/json" } });
@@ -29,7 +29,7 @@ async function get(path: string): Promise<any> {
  *  every chapter so the attribution shown is always current (YouVersion's guidance). */
 export async function getYvMeta(id: string): Promise<{ copyright: string; books: string[]; title: string }> {
   if (!YV_ID_RE.test(id)) throw new YouVersionError("That translation isn't available", 404);
-  const m = await get(`/bibles/${id}`);
+  const m = await yvGet(`/bibles/${id}`);
   const attribution = String(m?.copyright || m?.promotional_content || "").trim();
   if (!attribution) throw new YouVersionError("This Bible can't be shown without its copyright notice.", 503);
   return { copyright: attribution, books: Array.isArray(m?.books) ? m.books.map(String) : [], title: String(m?.localized_title || m?.title || "") };
@@ -88,7 +88,7 @@ export function parseYouVersionHtml(html: string): { verses: ParsedVerse[]; head
 
 export async function getYvChapter(id: string, book: string, chapter: number) {
   if (!YV_ID_RE.test(id)) throw new YouVersionError("That translation isn't available", 404);
-  const [meta, passage] = await Promise.all([getYvMeta(id), get(`/bibles/${id}/passages/${book}.${chapter}?format=html`)]);
+  const [meta, passage] = await Promise.all([getYvMeta(id), yvGet(`/bibles/${id}/passages/${book}.${chapter}?format=html`)]);
   const parsed = parseYouVersionHtml(String(passage?.content ?? ""));
   if (!parsed.verses.length) throw new YouVersionError("That passage isn't available in this translation.", 404);
   return { ...parsed, copyright: meta.copyright, books: meta.books };

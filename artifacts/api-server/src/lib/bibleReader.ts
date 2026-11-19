@@ -5,6 +5,7 @@ import { getHelloAoBooks, getHelloAoCatalogue, getHelloAoChapter, HelloAoError, 
 import { CURATED_TRANSLATIONS } from "./bibleProviders/helloaoRegistry";
 import { audioEditionFor } from "./bibleAudio";
 import { getYvChapter, getYvMeta, YouVersionError } from "./bibleProviders/youversion";
+import { onYouVersionChange, yvLanguageName, yvLicensedNow } from "./bibleProviders/youversionState";
 
 // The Bible reader (full chapters, translations, search, related lessons).
 // Scripture text comes ONLY from API.Bible for translations marked
@@ -66,15 +67,17 @@ export async function licensedTranslations(): Promise<TRow[]> {
   const { data, error } = await db.from("p2p_bible_translations")
     .select("*").eq("is_licensed_confirmed", true).order("language").order("translation_code");
   if (error) throw new Error("Couldn't load translations");
-  const rows = ((data ?? []) as TRow[]).filter(isServable);
+  // YouVersion: only while the key can still use the Bible (auto-sync, lib/bibleProviders/youversionSync.ts).
+  const rows = ((data ?? []) as TRow[]).filter((r) => isServable(r) && (providerOf(r) !== "youversion" || yvLicensedNow(r.provider_translation_id)));
   // Language names for every language a translation uses (the app knows only its own interface languages).
   const { data: langs } = await db.from("p2p_languages").select("code,name_en");
   const names = new Map(((langs ?? []) as { code: string; name_en: string | null }[]).map((l) => [l.code, l.name_en]));
   const all = [...rows, ...(await previewRows(rows))];
-  tCache = { at: Date.now(), rows: all.map((r) => ({ ...r, language_name: r.language_name ?? names.get(r.language) ?? null })) };
+  tCache = { at: Date.now(), rows: all.map((r) => ({ ...r, language_name: r.language_name ?? names.get(r.language) ?? yvLanguageName(r.language) ?? null })) };
   return tCache.rows;
 }
 export const clearTranslationCache = () => { tCache = null; };
+onYouVersionChange(clearTranslationCache);
 
 // Local machine only: HELLOAO_PREVIEW=BSB,arb_vdv shows those AO Lab
 // translations BEFORE review so the integration can be tried. Ignored on the

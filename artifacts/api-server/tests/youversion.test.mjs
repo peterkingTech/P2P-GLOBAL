@@ -9,11 +9,11 @@ const { build } = createRequire(path.join(root, "package.json"))("esbuild");
 let pass = 0, fail = 0;
 const ok = (n, c, d = "") => { if (c) pass++; else { fail++; console.log(`FAIL ${n} ${d}`); } };
 const tmp = mkdtempSync(path.join(root, ".tmp-yv-"));
-let Y, L, G, B;
+let Y, Y2, L, G, B;
 try {
-  await build({ stdin: { contents: `export * as Y from "./src/lib/bibleProviders/youversion"; export * as L from "./src/lib/bibleLicence"; export * as G from "./src/lib/aiGovernance"; export { withJesusRanges } from "./src/lib/bibleReader";`, resolveDir: root, loader: "ts" },
+  await build({ stdin: { contents: `export * as Y from "./src/lib/bibleProviders/youversion"; export * as Y2 from "./src/lib/bibleProviders/youversionSync"; export * as L from "./src/lib/bibleLicence"; export * as G from "./src/lib/aiGovernance"; export { withJesusRanges } from "./src/lib/bibleReader";`, resolveDir: root, loader: "ts" },
     bundle: true, platform: "node", format: "esm", outfile: path.join(tmp, "m.mjs"), logLevel: "silent", packages: "external", loader: { ".txt": "text" } });
-  ({ Y, L, G, withJesusRanges: B } = await import(pathToFileURL(path.join(tmp, "m.mjs")).href));
+  ({ Y, Y2, L, G, withJesusRanges: B } = await import(pathToFileURL(path.join(tmp, "m.mjs")).href));
 } finally { rmSync(tmp, { recursive: true, force: true }); }
 
 const html = `<div><div class="d">A song for testing.</div><div class="q1"><span class="yv-v" v="1"></span><span class="yv-vlbl">1</span>First line &amp; more</div><div class="q2">second line.</div>`
@@ -62,5 +62,39 @@ const mig = readFileSync(path.join(root, "../../migrations/257_youversion_transl
 // The one deliberate DDL: the provider check is dropped and re-added with 'youversion' (existing values still allowed).
 const migNoCheck = mig.split("alter table public.p2p_bible_translations drop constraint p2p_bible_translations_provider_check;").join("");
 ok("migration 257: inserts + the widened provider check only; never overwrites; display-only notice on every row", !/\bupdate |delete from|drop /i.test(migNoCheck.replace(/--.*$/gm, "")) && mig.includes("check (provider in ('api.bible', 'dbp', 'local', 'helloao', 'youversion'))") && mig.includes("where not exists") && (mig.match(/DISPLAY ONLY/g) ?? []).length === (mig.match(/^\s{2}\(/gm) ?? []).length);
+// Auto-sync (owner 2026-11-19: "any new licence I add on my API should show").
+const existing = [
+  { translation_code: "YV-NIV11", translation_name: "New International Version", language: "en", abbreviation: "NIV11", provider: "youversion", provider_translation_id: "111" },
+  { translation_code: "YV-OLD", translation_name: "Old licence", language: "en", abbreviation: "OLD", provider: "youversion", provider_translation_id: "999" },
+  { translation_code: "BSB", translation_name: "Berean Standard Bible", language: "en", abbreviation: "BSB", provider: "api.bible", provider_translation_id: null },
+];
+const list = [
+  { id: 111, abbreviation: "NIV11", language_tag: "en", title: "New International Version" },
+  { id: 3034, abbreviation: "BSB", language_tag: "en", title: "Berean Standard Bible" },
+  { id: 916, abbreviation: "NUB", language_tag: "sv", title: "nuBibeln" },
+  { id: 3381, abbreviation: "MGJ", language_tag: "mgj", title: "Abureni" },
+  { id: 1264, abbreviation: "ASD", language_tag: "fil", title: "Ang Salita ng Diyos" },
+  { id: 51, abbreviation: "DELUT", language_tag: "de", title: "Luther 1912" },
+  { id: 777, abbreviation: "NIV11", language_tag: "es", title: "Same abbreviation, other language" },
+];
+const plan = Y2.planSync(list, existing, (id) => (id === "3381" ? null : `© publisher ${id}`));
+const codesAdded = plan.rows.map((r) => r.translation_code);
+ok("sync: new licences are added", codesAdded.includes("YV-NUB") && codesAdded.includes("YV-ASD"), codesAdded.join());
+ok("sync: already-added YouVersion Bibles are not added again", !plan.rows.some((r) => r.provider_translation_id === "111"));
+ok("sync: the same edition P2P already has (API.Bible BSB) is not duplicated", plan.duplicates.some((d) => d.id === "3034") && !codesAdded.includes("YV-BSB"));
+ok("sync: owner's 257 exclusions stay out (DELUT)", plan.duplicates.some((d) => d.id === "51"));
+ok("sync: no copyright notice → not shown (unknown = no)", plan.noAttribution.some((d) => d.id === "3381") && !plan.rows.some((r) => r.provider_translation_id === "3381"));
+ok("sync: a code clash gets the id appended", codesAdded.includes("YV-NIV11-777"));
+ok("sync: Filipino maps to the app's Tagalog code", plan.rows.find((r) => r.provider_translation_id === "1264")?.language === "tl");
+ok("sync: every added row is display-only, licensed, never a default", plan.rows.every((r) => r.provider === "youversion" && r.is_licensed_confirmed === true && r.is_default_for_language === false && /DISPLAY ONLY/.test(r.license_notes) && /Publisher notice: ©/.test(r.license_notes)));
+ok("sync: a Bible the key lost is reported as withdrawn", plan.withdrawn.map((r) => r.translation_code).join() === "YV-OLD");
+Y2.setYouVersionStateForTests(["111"], { mgj: "Abureni" });
+ok("sync: withdrawn Bibles stop being served; current ones still are", Y2.yvLicensedNow("111") && !Y2.yvLicensedNow("999") && Y2.yvLanguageName("mgj") === "Abureni");
+Y2.setYouVersionStateForTests(null);
+ok("sync: before the first successful sync nothing is hidden", Y2.yvLicensedNow("999"));
+ok("reader filters YouVersion rows by the live licence list", reader.includes("yvLicensedNow(r.provider_translation_id)"));
+const syncSrc = readFileSync(path.join(root, "src/lib/bibleProviders/youversionSync.ts"), "utf8");
+ok("sync is additive (inserts only, never updates or deletes rows)", !/\.update\(|\.delete\(/.test(syncSrc) && syncSrc.includes("ignoreDuplicates: true"));
+ok("sync never hides everything on an empty answer", syncSrc.includes("if (!list.length) throw"));
 console.log(`youversion (api): ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);
