@@ -25,6 +25,8 @@ export interface SyncReport {
   withdrawn: { code: string; name: string }[];
   /** Licensed Bibles not checked yet — added by the next runs (a few per run, so readers keep YouVersion's allowance). */
   waiting: number;
+  /** Licensed Bibles whose language isn't in P2P's language list (p2p_languages; the database requires it) — by language. */
+  otherLanguages: { language: string; count: number }[];
   /** Set when YouVersion's request allowance ran out mid-run: what was done is kept, the rest waits for the next run. */
   paused?: string;
 }
@@ -132,7 +134,7 @@ export function syncYouVersion(): Promise<SyncReport> {
 
 async function run(): Promise<SyncReport> {
   const at = new Date().toISOString();
-  const empty = { licensed: 0, inP2P: 0, added: [], duplicates: [], noAttribution: [], withdrawn: [], waiting: 0 };
+  const empty = { licensed: 0, inP2P: 0, added: [], duplicates: [], noAttribution: [], withdrawn: [], waiting: 0, otherLanguages: [] };
   if (!yvKey()) { const r: SyncReport = { at, ok: false, error: "The YouVersion key isn't set on the server.", ...empty }; recordYouVersionSync(r); return r; }
   try {
     const list = await listKeyBibles();
@@ -146,7 +148,8 @@ async function run(): Promise<SyncReport> {
     const now = Date.now();
     const known = (id: string): null | undefined => { const t = noNotice.get(id); return t && now - t < NO_NOTICE_RECHECK_MS ? null : undefined; };
     const first = planSync(list, existing, known);
-    const batch = pickBatch(first.waiting, appLangs, BATCH);
+    const inApp = (lang: string) => appLangs.has(lang);
+    const batch = pickBatch(first.waiting.filter((w) => inApp(w.language)), appLangs, BATCH);
     const attribution = new Map<string, string | null>();
     const dir = new Map<string, boolean>();
     let paused: string | undefined;
@@ -172,7 +175,10 @@ async function run(): Promise<SyncReport> {
       if (!(e instanceof RateLimited)) throw e;
       paused = `${e.message}; the rest continues at the next run.`;
     }
-    const plan = planSync(list, existing, (id) => (attribution.has(id) ? attribution.get(id)! : known(id)), (tag) => dir.get(tag) === true);
+    const full = planSync(list, existing, (id) => (attribution.has(id) ? attribution.get(id)! : known(id)), (tag) => dir.get(tag) === true);
+    const other = new Map<string, number>();
+    for (const w of full.waiting) if (!inApp(w.language)) other.set(w.language, (other.get(w.language) ?? 0) + 1);
+    const plan = { ...full, rows: full.rows.filter((r) => inApp(r.language)), waiting: full.waiting.filter((w) => inApp(w.language)) };
     for (let i = 0; i < plan.rows.length; i += 100) {
       const { error: e } = await db.from("p2p_bible_translations").upsert(plan.rows.slice(i, i + 100), { onConflict: "translation_code", ignoreDuplicates: true });
       if (e) throw new Error(`Couldn't add the new Bibles (${e.code ?? "error"})`);
@@ -181,7 +187,7 @@ async function run(): Promise<SyncReport> {
       at, ok: true, licensed: plan.licensed.size, inP2P: existing.filter((r) => r.provider === "youversion" && plan.licensed.has(String(r.provider_translation_id))).length + plan.rows.length,
       added: plan.rows.map((r) => ({ code: r.translation_code, name: r.translation_name, language: r.language })),
       duplicates: plan.duplicates, noAttribution: plan.noAttribution, withdrawn: plan.withdrawn.map((r) => ({ code: r.translation_code, name: r.translation_name })),
-      waiting: plan.waiting.length, ...(paused ? { paused } : {}),
+      waiting: plan.waiting.length, otherLanguages: [...other].map(([language, count]) => ({ language, count })).sort((a, b) => b.count - a.count), ...(paused ? { paused } : {}),
     };
     recordYouVersionSync(report, plan.licensed);
     logger.info({ licensed: report.licensed, added: report.added.length, waiting: report.waiting, withdrawn: report.withdrawn.length, paused: !!paused }, "YouVersion sync complete");

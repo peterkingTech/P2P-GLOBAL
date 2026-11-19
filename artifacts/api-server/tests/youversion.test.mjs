@@ -103,6 +103,7 @@ const pick = Y2.pickBatch([{ id: "1", language: "mgj" }, { id: "2", language: "s
 ok("sync: app languages are checked first, at most one batch per run", pick.join() === "2,3,1", pick.join());
 ok("sync: at most 50 new Bibles per run, one call every 2 s", Y2.BATCH === 50 && syncSrc.includes("const GAP_MS = 2_000;"));
 ok("sync: a 429 stops the run at once — no retrying into the limit", syncSrc.includes("e.upstream === 429) throw new RateLimited") && /if \(res\.status === 429\) throw new YouVersionError\([^)]*503, 429\)/.test(readFileSync(path.join(root, "src/lib/bibleProviders/youversion.ts"), "utf8")));
+ok("sync: only Bibles in P2P's language list are added (translations.language → p2p_languages FK, 23503 on 2026-11-19)", syncSrc.includes("rows: full.rows.filter((r) => inApp(r.language))") && syncSrc.includes("first.waiting.filter((w) => inApp(w.language))"));
 ok("sync: runs hourly", readFileSync(path.join(root, "src/index.ts"), "utf8").includes('cron.schedule("17 * * * *", () => { void syncYouVersion(); });'));
 console.log(`youversion (api): ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

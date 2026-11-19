@@ -24,7 +24,7 @@ type Row = {
   permits_display: boolean | null; permits_commercial: boolean | null; permits_caching: boolean | null; permits_offline: boolean | null; permits_audio: boolean | null; permits_sharing: boolean | null;
 };
 type SyncReport = { at: string; ok: boolean; error?: string; licensed: number; inP2P: number; added: { code: string; name: string; language: string }[];
-  duplicates: { id: string; abbr: string; language: string; sameAs: string }[]; noAttribution: { id: string; abbr: string; language: string }[]; withdrawn: { code: string; name: string }[]; waiting?: number; paused?: string };
+  duplicates: { id: string; abbr: string; language: string; sameAs: string }[]; noAttribution: { id: string; abbr: string; language: string }[]; withdrawn: { code: string; name: string }[]; waiting?: number; paused?: string; otherLanguages?: { language: string; count: number }[] };
 type CatalogueItem = { id: string; name: string; englishName: string; shortName: string; language: string; languageEnglishName?: string | null; licenseUrl: string | null; review: { statement: string; questions: string[] }; ours: { code: string; status: string | null } | null };
 const call = <T,>(path: string, init: RequestInit = {}) => apiRequest<T>(`/admin/bible-translations${path}`, init, { fallbackError: "Something went wrong." });
 const json = (method: string, body: unknown): RequestInit => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -113,6 +113,7 @@ export default function BibleLicencesAdmin() {
                 <Text style={s.meta}>Checked {new Date(yv.at).toLocaleString()}</Text>
                 {yv.waiting ? <Text style={s.small}>{yv.waiting} more licensed Bible{yv.waiting === 1 ? "" : "s"} will be added over the next hourly checks.</Text> : null}
                 {yv.paused ? <Text style={s.small}>{yv.paused}</Text> : null}
+                {yv.otherLanguages?.length ? <Text style={s.small}>{yv.otherLanguages.reduce((n, l) => n + l.count, 0)} licensed Bibles are in {yv.otherLanguages.length} languages that aren't in P2P's language list yet, so they can't be shown: {yv.otherLanguages.map((l) => `${l.language} (${l.count})`).join(", ")}.</Text> : null}
                 {yv.error ? <Text style={s.small}>{yv.error} Nothing was changed; the next check tries again.</Text> : null}
               </View>
               {([
