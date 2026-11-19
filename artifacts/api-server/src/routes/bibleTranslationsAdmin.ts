@@ -19,6 +19,17 @@ const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const CODE_RE = /^[A-Za-z0-9_-]{1,40}$/;
 const notReady = (e: { code?: string } | null) => !!e && ["42703", "PGRST204", "23514"].includes(String(e.code));
 
+// Every translation P2P has — visible or not — with its licence record (owner 2026-11-19: the Admin Centre screen
+// "Bible licences"). Read-only; only AO Lab rows are decided here (API.Bible / YouVersion follow the owner's plans).
+router.get("/", async (_req: Request, res: Response) => {
+  const { data, error } = await db.from("p2p_bible_translations")
+    .select("translation_code,translation_name,language,provider,provider_translation_id,api_bible_id,abbreviation,is_licensed_confirmed,licence_status,licence_name,licence_url,copyright_notice,attribution,licence_questions,license_notes,permits_display,permits_commercial,permits_caching,permits_offline,permits_audio,permits_sharing,reviewed_at")
+    .order("language").order("translation_code");
+  if (notReady(error)) return res.status(503).json({ error: "Licence review needs migration 225 first." });
+  if (error) return res.status(500).json({ error: "Couldn't load the translations." });
+  return res.json({ translations: data ?? [] });
+});
+
 router.get("/helloao/catalogue", async (req: Request, res: Response) => {
   try {
     const language = typeof req.query.language === "string" ? req.query.language.toLowerCase() : "";

@@ -100,7 +100,7 @@ const src = readFileSync(path.join(root, "app/admin/_layout.tsx"), "utf8");
 // Learning · Content · Platform · Help & Support); each area keeps the original order.
 const EXPECTED = {
   // "Kingdom Wins" review: Wins moderators + the admin_content P2P Impact reviewer (migration 189).
-  super_admin: ["Dashboard", "Registrations", "Moderation", "Kingdom Wins", "Usernames", "Verification", "Discipleship & Growth", "Peer Evaluations", "Content", "Kingdom Stories", "Story Narration", "Publishing Studio", "Translations", "Recycle Bin", "Access & Audit", "Team", "Help Requests", "P2P Official Mail"],
+  super_admin: ["Dashboard", "Registrations", "Moderation", "Kingdom Wins", "Usernames", "Verification", "Discipleship & Growth", "Peer Evaluations", "Content", "Kingdom Stories", "Story Narration", "Bible Licences", "Publishing Studio", "Translations", "Recycle Bin", "Access & Audit", "Team", "Help Requests", "P2P Official Mail"],
   admin_content: ["Dashboard", "Kingdom Wins", "Content", "Kingdom Stories", "Publishing Studio", "Recycle Bin"],
   admin_moderation: ["Dashboard", "Moderation", "Kingdom Wins", "Publishing Studio"],
   moderator: ["Dashboard", "Moderation", "Kingdom Wins", "Usernames", "Verification", "Publishing Studio", "Help Requests"],

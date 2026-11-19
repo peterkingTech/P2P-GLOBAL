@@ -131,7 +131,6 @@ export default function BibleVersions() {
               </TouchableOpacity>
             );
           }}
-          ListFooterComponent={total ? <Text style={s.foot}>More versions appear here once their licences are approved for P2P Global.</Text> : null}
         />
       )}
     </View>

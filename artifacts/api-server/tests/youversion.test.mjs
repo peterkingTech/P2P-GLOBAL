@@ -59,6 +59,8 @@ ok("no AI processing", G.aiAllowedFor(row, "send_to_provider") === false && G.ai
 const reader = readFileSync(path.join(root, "src/lib/bibleReader.ts"), "utf8");
 ok("reader: YouVersion chapters bypass the chapter cache; no word search", reader.includes('if (providerOf(t) === "youversion") return youVersionChapter(t, book, chapter);') && reader.includes('if (providerOf(t) === "youversion") throw new BibleError("Word search'));
 const mig = readFileSync(path.join(root, "../../migrations/257_youversion_translations.sql"), "utf8").replace(/^--.*$/gm, "");
-ok("migration 257: additive inserts only, never overwrites, display-only notice on every row", !/\bupdate |delete from|drop /i.test(mig.replace(/--.*$/gm, "")) && mig.includes("where not exists") && (mig.match(/DISPLAY ONLY/g) ?? []).length === (mig.match(/^\s{2}\(/gm) ?? []).length);
+// The one deliberate DDL: the provider check is dropped and re-added with 'youversion' (existing values still allowed).
+const migNoCheck = mig.split("alter table public.p2p_bible_translations drop constraint p2p_bible_translations_provider_check;").join("");
+ok("migration 257: inserts + the widened provider check only; never overwrites; display-only notice on every row", !/\bupdate |delete from|drop /i.test(migNoCheck.replace(/--.*$/gm, "")) && mig.includes("check (provider in ('api.bible', 'dbp', 'local', 'helloao', 'youversion'))") && mig.includes("where not exists") && (mig.match(/DISPLAY ONLY/g) ?? []).length === (mig.match(/^\s{2}\(/gm) ?? []).length);
 console.log(`youversion (api): ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);
