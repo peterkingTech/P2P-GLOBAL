@@ -10,7 +10,7 @@
 //     an explicit verification flag — advertising a language is not enough.
 //   • Secrets live only in the server environment; they never appear in responses, logs or errors.
 
-export type ProviderId = "azure" | "google" | "elevenlabs" | "spitch";
+export type ProviderId = "azure" | "google" | "elevenlabs" | "spitch" | "naijalingo";
 export type Presentation = "female" | "male";
 export type Characteristic = "warm" | "deep" | "gentle" | "expressive" | "conversational" | "narrator" | "calm" | "clear";
 export const CHARACTERISTICS: Characteristic[] = ["warm", "deep", "gentle", "expressive", "conversational", "narrator", "calm", "clear"];

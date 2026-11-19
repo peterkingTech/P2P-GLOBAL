@@ -134,7 +134,14 @@ function cloudUrl(voiceId: string, o: VoiceOpts, text: string): Promise<string> 
   let p = cloudUrls.get(k);
   if (!p) {
     p = speakChunk({ voiceId, contentKind: o.kind ?? "general", contentKey: safeKey(o.contentKey), language: o.language, text, ...(o.translation ? { translation: o.translation } : {}) })
-      .then((r) => { markOnline(); keepVoice(keptName(voiceId, o, text), r.url); return r.url; });
+      .then((r) => {
+        markOnline();
+        // Keep a copy for offline listening only when the voice's terms allow it (9jaLingo: live only — no copy, and its
+        // short-lived link is forgotten before it expires).
+        if (r.offlineAllowed) keepVoice(keptName(voiceId, o, text), r.url);
+        else setTimeout(() => cloudUrls.delete(k), 15 * 60_000);
+        return r.url;
+      });
     p.catch(() => cloudUrls.delete(k));
     cloudUrls.set(k, p);
     if (cloudUrls.size > 120) { const oldest = cloudUrls.keys().next().value; if (oldest !== undefined) cloudUrls.delete(oldest); }

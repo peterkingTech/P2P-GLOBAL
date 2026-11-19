@@ -141,5 +141,62 @@ ok("official narration comes first unless the listener chose otherwise", listenS
 const mig = readFileSync(path.join(root, "../../migrations/254_p2p_voices.sql"), "utf8");
 ok("migration 254: additive, RLS on, API-only, one published recording per chapter", !/drop table|alter table [^;]* drop|delete from/i.test(mig.replace(/-- .*$/gm, "")) && (mig.match(/enable row level security/g) ?? []).length === 5 && mig.includes("where status = 'published'"));
 
+// ── 9jaLingo (owner 2026-11-19): Igbo / Hausa / Pidgin / Yoruba, LIVE ONLY (terms silent on storing → no copies) ──
+{
+  const nl = V.P.naijalingo;
+  ok("9jaLingo: live only — no server cache, no offline copy", nl.policy.cacheAllowed === false && nl.policy.offlineAllowed === false && nl.policy.retentionDays === 0);
+  const prevKey = process.env.P2P_Global_Igbo_Voice;
+  delete process.env.P2P_Global_Igbo_Voice; delete process.env.NAIJALINGO_API_KEY;
+  ok("9jaLingo: off without the key", nl.status().enabled === false);
+  process.env.P2P_Global_Igbo_Voice = "k";
+  ok("9jaLingo: on with the owner's Railway key (P2P_Global_Igbo_Voice)", nl.status().enabled === true);
+  process.env.VOICES_NAIJALINGO = "off"; ok("9jaLingo: VOICES_NAIJALINGO=off switches it off", nl.status().enabled === false); delete process.env.VOICES_NAIJALINGO;
+  ok("9jaLingo: covers Igbo, Hausa, Pidgin and Yoruba", V.P.NAIJALINGO_LANGUAGES.join() === "ig,ha,pcm,yo");
+  // Real adapter against a fake 9jaLingo server: request shape + header.
+  const realFetch = globalThis.fetch; const calls = [];
+  globalThis.fetch = async (url, init = {}) => {
+    calls.push({ url: String(url), key: init.headers?.["X-API-Key"], body: init.body ? JSON.parse(init.body) : null });
+    if (String(url).includes("/v1/speakers")) return new Response(JSON.stringify([{ id: "adaeze_ig", name: "Adaeze", language: "ig", gender: "female", domain: "Everyday Conversation" }, { id: "bad id!", name: "x" }]), { status: 200 });
+    return new Response(Buffer.alloc(800, 2), { status: 200, headers: { "Content-Type": "audio/mpeg" } });
+  };
+  const voices = await nl.listVoices();
+  ok("9jaLingo: speakers listed per language, odd ids dropped, the key sent as X-API-Key", voices.length === 4 && voices[0].id === "naijalingo:adaeze_ig" && voices[0].presentation === "female" && calls.every((c) => c.key === "k") && calls.some((c) => c.url.endsWith("/v1/speakers?language=pcm")));
+  const out = await nl.synthesize("Nnoo", voices[0]);
+  const sc = calls.find((c) => c.url.endsWith("/v1/audio/speech"));
+  ok("9jaLingo: speech request = { input, voice, lang, model, mp3 }", out.audio.length === 800 && sc?.body?.input === "Nnoo" && sc.body.voice === "adaeze_ig" && sc.body.lang === "ig" && sc.body.model === "9jalingo-tts-1" && sc.body.response_format === "mp3");
+  globalThis.fetch = async () => new Response(JSON.stringify({ status: "queued", job_id: "j" }), { status: 202 });
+  let e202 = null; try { await nl.synthesize("Nnoo", voices[0]); } catch (e) { e202 = e; }
+  ok("9jaLingo: engine still starting (202) → a soft failure, not an empty clip", e202?.code === "unavailable");
+  globalThis.fetch = realFetch;
+  if (prevKey === undefined) delete process.env.P2P_Global_Igbo_Voice; else process.env.P2P_Global_Igbo_Voice = prevKey;
+
+  // Live-only delivery through speak(): clip under live/, short link, never reused, older apps refused.
+  let nlSynth = 0;
+  const fakeNl = { id: "naijalingo", name: "9jaLingo", role: "", policy: nl.policy, status: () => ({ enabled: true, reason: null }),
+    async listVoices() { return [mk("naijalingo", "adaeze_ig", "ig", "female")]; },
+    async synthesize(text) { nlSynth++; return { audio: Buffer.alloc(600, 3), contentType: "audio/mpeg", characters: text.length }; } };
+  V.setProvidersForTests([azure, google, eleven, off, fakeNl]);
+  const req = { userId: "u-nl", voiceId: "naijalingo:adaeze_ig", contentKind: "lesson", contentKey: "lesson:1", language: "ig", text: "Nnoo, kedu?", baseUrl: "http://x" };
+  let old = null; try { await V.speak(req); } catch (e) { old = e; }
+  ok("older app builds (keep every clip) can't use a live-only voice", old?.code === "needs_update" && nlSynth === 0);
+  const a1 = await V.speak({ ...req, honoursPolicy: true });
+  const liveKeys = [...store.keys()].filter((k) => k.startsWith("live/"));
+  ok("live-only clip stored only under live/ and marked not for offline", liveKeys.length === 1 && a1.offlineAllowed === false && !store.has(liveKeys[0].slice(5)));
+  ok("live-only link lasts minutes, not hours", new Date(a1.expiresAt).getTime() - Date.now() <= V.LIVE_MS + 5000);
+  await V.speak({ ...req, honoursPolicy: true });
+  ok("live-only audio is never replayed from storage (generated each time)", nlSynth === 2);
+  const catOld = await V.catalogue({ language: "ig" }), catNew = await V.catalogue({ language: "ig", honoursPolicy: true });
+  ok("catalogue: older apps don't see live-only voices; new builds do", catOld.total === 0 && catNew.total === 1);
+  const dOld = await V.defaultVoices(), dNew = await V.defaultVoices(true);
+  ok("default voice for Igbo only for builds that honour the policy", !dOld.ig && dNew.ig?.id === "naijalingo:adaeze_ig");
+  ok("ElevenLabs (listed for previews, never generated) is still shown to every build", (await V.catalogue({ language: "en" })).voices.some((v) => v.provider === "elevenlabs"));
+  ok("preview samples exist for Igbo, Hausa, Pidgin and Yoruba", ["ig", "ha", "pcm", "yo"].every((l) => (V.PREVIEW_SAMPLES[l] ?? "").length > 20));
+  ok("hourly sweep removes delivered live clips", typeof V.sweepLiveAudio === "function" && readFileSync(path.join(root, "src/index.ts"), "utf8").includes('cron.schedule("41 * * * *", () => { void sweepLiveAudio(); });'));
+  V.setProvidersForTests([azure, google, eleven, off]);
+}
+const voiceLib = readFileSync(path.join(mobile, "lib/voices/index.ts"), "utf8");
+ok("app: tells the server it keeps no copy of live-only voices (policy=1 / honoursPolicy)", voiceLib.includes("/voices/catalogue?policy=1") && voiceLib.includes("/voices/defaults?policy=1") && voiceLib.includes("json({ ...b, honoursPolicy: true })"));
+ok("app: keeps a P2P Voice clip for offline only when the voice allows it", listenSrc.includes("if (r.offlineAllowed) keepVoice(keptName(voiceId, o, text), r.url);"));
+
 console.log(`voices (api): ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

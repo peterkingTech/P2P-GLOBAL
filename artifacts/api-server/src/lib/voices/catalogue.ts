@@ -68,6 +68,10 @@ export async function allVoices(force = false): Promise<{ voices: Voice[]; provi
   const voices = entries.flatMap(({ e }) => e?.voices ?? []);
   return { voices, providers: entries.map(({ p, e }) => ({ id: p.id, name: p.name, role: p.role, ...p.status(), policy: p.policy, refreshedAt: e?.refreshedAt ?? null, stale: !!e?.stale, count: e?.voices.length ?? 0 })) };
 }
+/** A provider whose audio may not be kept (policy.offlineAllowed false) is offered only to app versions that keep no
+ *  copy (they send policy=1 / honoursPolicy). Older apps keep every P2P Voice clip for offline use. */
+export const liveOnly = (v: Voice) => v.canSynthesize && providers().find((p) => p.id === v.provider)?.policy.offlineAllowed === false;
+const forClient = (vs: Voice[], honoursPolicy: boolean) => (honoursPolicy ? vs : vs.filter((v) => !liveOnly(v)));
 export async function voiceById(id: string): Promise<Voice | null> {
   const provider = id.split(":")[0] as ProviderId;
   const p = providers().find((x) => x.id === provider);
@@ -76,12 +80,12 @@ export async function voiceById(id: string): Promise<Voice | null> {
 }
 
 export interface CatalogueQuery { language?: string | null; accent?: string | null; provider?: ProviderId | null; presentation?: Presentation | null; characteristic?: Characteristic | null;
-  q?: string | null; purpose?: "everyday" | "story" | null; page?: number; pageSize?: number }
+  q?: string | null; purpose?: "everyday" | "story" | null; page?: number; pageSize?: number; honoursPolicy?: boolean }
 /** Filtered, paginated, with facets that only list values present (so the app never shows an empty filter). */
 export async function catalogue(cq: CatalogueQuery) {
   const { voices, providers: ps } = await allVoices();
   // Purpose: ElevenLabs voices are listed for previews/official narration context only; synthesis needs canSynthesize.
-  const base = voices.filter((v) => v.status === "available" && (cq.purpose === "story" || cq.purpose === "everyday" ? v.canSynthesize : true));
+  const base = forClient(voices, !!cq.honoursPolicy).filter((v) => v.status === "available" && (cq.purpose === "story" || cq.purpose === "everyday" ? v.canSynthesize : true));
   const q = (cq.q ?? "").trim().toLowerCase();
   const match = (v: Voice, skip?: keyof CatalogueQuery) =>
     (skip === "language" || !cq.language || v.language === cq.language.toLowerCase())
@@ -113,9 +117,9 @@ export async function catalogue(cq: CatalogueQuery) {
 // chosen from the real catalogue: the language's main locale (English → British English, as in the owner's brief),
 // a narrator voice, female first (the brief's example), a synthesis-capable provider.
 const MAIN_LOCALE: Record<string, string> = { en: "en-GB", fr: "fr-FR", de: "de-DE", es: "es-ES", pt: "pt-BR", sw: "sw-KE", ar: "ar-SA", hi: "hi-IN", yo: "yo-NG", ha: "ha-NG", ig: "ig-NG", am: "am-ET", zu: "zu-ZA", af: "af-ZA" };
-export async function defaultVoices(): Promise<Record<string, Voice>> {
+export async function defaultVoices(honoursPolicy = false): Promise<Record<string, Voice>> {
   const { voices } = await allVoices();
-  const usable = voices.filter((v) => v.status === "available" && v.canSynthesize);
+  const usable = forClient(voices, honoursPolicy).filter((v) => v.status === "available" && v.canSynthesize);
   let overrides: Record<string, string> = {};
   try { overrides = JSON.parse(process.env.VOICES_DEFAULTS ?? "{}"); } catch { overrides = {}; }
   const out: Record<string, Voice> = {};
@@ -130,8 +134,9 @@ export async function defaultVoices(): Promise<Record<string, Voice>> {
 }
 
 /** Which languages P2P can actually speak, and through whom (only enabled providers' real voices). */
-export async function capabilities() {
-  const { voices } = await allVoices();
+export async function capabilities(honoursPolicy = false) {
+  const { voices: all } = await allVoices();
+  const voices = forClient(all, honoursPolicy);
   const m = new Map<string, { language: string; languageName: string; providers: Set<ProviderId>; presentations: Set<string>; synth: boolean }>();
   for (const v of voices.filter((x) => x.status === "available")) {
     const c = m.get(v.language) ?? { language: v.language, languageName: v.languageName, providers: new Set(), presentations: new Set(), synth: false };

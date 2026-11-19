@@ -9,7 +9,7 @@ import { useSyncExternalStore } from "react";
 import { apiRequest } from "@/lib/apiClient";
 import { getOfflineUser } from "@/lib/offline";
 
-export type VoiceProviderId = "azure" | "google" | "elevenlabs" | "spitch";
+export type VoiceProviderId = "azure" | "google" | "elevenlabs" | "spitch" | "naijalingo";
 export type Presentation = "female" | "male";
 export interface P2PVoice {
   id: string; provider: VoiceProviderId; providerVoiceId: string; name: string; language: string; languageName: string; locale: string; accent: string;
@@ -27,13 +27,13 @@ const json = (body: unknown): RequestInit => ({ method: "POST", headers: { "Cont
 
 export const getCatalogue = (f: CatalogueFilter) => {
   const qs = Object.entries(f).filter(([, v]) => v !== undefined && v !== null && v !== "").map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join("&");
-  return apiRequest<Catalogue>(`/voices/catalogue${qs ? `?${qs}` : ""}`, {}, { fallbackError: "Voices aren't available right now." });
+  return apiRequest<Catalogue>(`/voices/catalogue?policy=1${qs ? `&${qs}` : ""}`, {}, { fallbackError: "Voices aren't available right now." });
 };
 export const getCapabilities = () => apiRequest<{ languages: { language: string; languageName: string; providers: string[]; presentations: string[]; canListen: boolean }[]; eligibleKinds: string[] }>(
-  "/voices/capabilities", {}, { fallbackError: "" });
+  "/voices/capabilities?policy=1", {}, { fallbackError: "" });
 export const speakChunk = (b: { voiceId: string; contentKind: string; contentKey: string; contentVersion?: string; language: string; text: string; translation?: string }) =>
-  apiRequest<{ url: string; expiresAt: string; cached: boolean; voice: { id: string; name: string; provider: string; synthetic: true }; offlineAllowed: boolean }>("/voices/speak", json(b), { fallbackError: "This voice isn't available at the moment." });
-export const previewVoiceAudio = (voiceId: string) => apiRequest<{ url: string; kind: "provider" | "sample" }>("/voices/preview", json({ voiceId }), { fallbackError: "There's no preview for this voice right now." });
+  apiRequest<{ url: string; expiresAt: string; cached: boolean; voice: { id: string; name: string; provider: string; synthetic: true }; offlineAllowed: boolean }>("/voices/speak", json({ ...b, honoursPolicy: true }), { fallbackError: "This voice isn't available at the moment." });
+export const previewVoiceAudio = (voiceId: string) => apiRequest<{ url: string; kind: "provider" | "sample" }>("/voices/preview", json({ voiceId, honoursPolicy: true }), { fallbackError: "There's no preview for this voice right now." });
 
 /** Content kinds a P2P Voice may read (mirrors the server's ELIGIBLE_KINDS — the server decides; this only avoids a wasted call).
  *  Owner 2026-11-19: P2P Voice is the ONLY reading voice — the Bible and playlists too, in public-domain translations
@@ -99,7 +99,7 @@ export function loadVoiceDefaults(): Promise<Record<string, ChosenVoice>> {
 async function fetchDefaults() {
   try { const raw = await AsyncStorage.getItem("p2p.voices.defaults"); if (raw) defaults = JSON.parse(raw); } catch { /* none kept */ }
   try {
-    const r = await apiRequest<{ defaults: Record<string, ChosenVoice> }>("/voices/defaults", {}, { fallbackError: "" });
+    const r = await apiRequest<{ defaults: Record<string, ChosenVoice> }>("/voices/defaults?policy=1", {}, { fallbackError: "" });
     defaults = r.defaults ?? {}; defaultsLoaded = true;
     void AsyncStorage.setItem("p2p.voices.defaults", JSON.stringify(defaults)).catch(() => {});
     emit();
@@ -142,4 +142,4 @@ export function setReadingSource(s: ReadingSource) {
 /** A short, friendly note (never a provider's technical error). */
 export function setVoiceNotice(n: string | null) { if (n === notice) return; notice = n; snapshot = { source, notice }; rtEmit(); }
 export const useReadingSource = () => useSyncExternalStore((l) => { rtListeners.add(l); return () => { rtListeners.delete(l); }; }, () => snapshot, () => snapshot);
-export const PROVIDER_LABEL: Record<string, string> = { azure: "Azure", google: "Google", elevenlabs: "ElevenLabs", spitch: "Verified specialist provider" };
+export const PROVIDER_LABEL: Record<string, string> = { azure: "Azure", google: "Google", elevenlabs: "ElevenLabs", spitch: "Verified specialist provider", naijalingo: "9jaLingo" };

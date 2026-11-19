@@ -17,6 +17,7 @@ import { sweep as sweepAdminNotifications } from "./lib/adminNotifications";
 import { processScheduledDeletions } from "./lib/accountDeletion";
 import { runStudioScheduler } from "./lib/studio/runtime";
 import { syncYouVersion } from "./lib/bibleProviders/youversionSync";
+import { sweepLiveAudio } from "./lib/voices/synth";
 
 // Translation calls fail silently into an English fallback (see
 // curriculum.ts's GET /lessons/:lessonId) by design — a missing key would
@@ -58,6 +59,9 @@ if (process.env.YOUVERSION_AUTO_SYNC !== "off") {
   setTimeout(() => { void syncYouVersion(); }, 90_000).unref();
   cron.schedule("17 * * * *", () => { void syncYouVersion(); });
 }
+
+// Live-only voices (9jaLingo): delete delivered clips older than 20 minutes (timers do it too; this catches restarts).
+cron.schedule("41 * * * *", () => { void sweepLiveAudio(); });
 
 // Publishing Studio — runs scheduled publish/unpublish/archive jobs. No-op
 // unless STUDIO_SCHEDULER_ENABLED=true (set only after migration 188 is

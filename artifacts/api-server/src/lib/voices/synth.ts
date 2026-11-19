@@ -13,7 +13,7 @@
 // Storage: Supabase Storage bucket `p2p-voices-audio` (private; signed links) when it exists (migration 254
 // creates it); otherwise — local development — a folder on this server, served by a signed link.
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { mkdirSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, existsSync, readFileSync, writeFileSync, unlinkSync, readdirSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { supabaseServiceRole as db } from "../supabase";
@@ -39,6 +39,11 @@ export const isEligible = (k: string): k is EligibleKind => (ELIGIBLE_KINDS as r
 export const MAX_CHARS = 1500;
 export const PREVIEW_SAMPLES: Record<string, string> = {
   en: "Peace be with you. This is how I sound when I read to you in P2P Global.",
+  // Igbo / Hausa / Pidgin / Yoruba samples: written by P2P (2026-11-19) — native-speaker review welcome.
+  ig: "Udo dịrị gị. Otu a ka olu m na-ada mgbe m na-agụrụ gị ihe na P2P Global.",
+  ha: "Salama a gare ka. Haka muryata take idan ina karanta maka a cikin P2P Global.",
+  pcm: "Peace be unto you. Na so my voice dey sound when I dey read for you for P2P Global.",
+  yo: "Àlàáfíà fún ọ. Báyìí ni ohùn mi ṣe rí nígbà tí mo bá ń kà fún ọ ní P2P Global.",
   de: "Friede sei mit dir. So klinge ich, wenn ich dir in P2P Global vorlese.",
   fr: "Que la paix soit avec toi. Voici ma voix quand je te lis un texte dans P2P Global.",
   es: "La paz sea contigo. Así sueno cuando te leo en P2P Global.",
@@ -100,21 +105,58 @@ async function exists(key: string): Promise<boolean> {
   if (await hasBucket()) { const { data } = await db.storage.from(BUCKET).list("", { search: `${key}.mp3`, limit: 1 }); return !!data?.length; }
   return existsSync(localAudioPath(key));
 }
+// LIVE-ONLY providers (policy.cacheAllowed false): the clip is kept only long enough to be played, under live/,
+// and deleted after LIVE_MS (timer + an hourly sweep that also catches files left by a restart).
+export const LIVE_MS = 20 * 60_000;
+const liveName = (key: string) => `live/${key}.mp3`;
+const liveLocal = (key: string) => path.join(LOCAL_DIR, "live", `${key}.mp3`);
+async function putLive(key: string, audio: Buffer) {
+  if (testStore) { testStore.set(`live/${key}`, audio); return; }
+  if (await hasBucket()) { const { error } = await db.storage.from(BUCKET).upload(liveName(key), audio, { contentType: "audio/mpeg", upsert: true }); if (!error) { scheduleRemoval(key); return; } }
+  mkdirSync(path.dirname(liveLocal(key)), { recursive: true }); writeFileSync(liveLocal(key), audio); scheduleRemoval(key);
+}
+async function removeLive(key: string) {
+  if (testStore) { testStore.delete(`live/${key}`); return; }
+  try { if (await hasBucket()) await db.storage.from(BUCKET).remove([liveName(key)]); } catch { /* the sweep retries */ }
+  try { if (existsSync(liveLocal(key))) unlinkSync(liveLocal(key)); } catch { /* the sweep retries */ }
+}
+const scheduleRemoval = (key: string) => { setTimeout(() => { void removeLive(key); }, LIVE_MS).unref?.(); };
+/** Deletes live clips older than LIVE_MS (hourly from index.ts). */
+export async function sweepLiveAudio(): Promise<number> {
+  let n = 0;
+  const cutoff = Date.now() - LIVE_MS;
+  try {
+    if (await hasBucket()) {
+      const { data } = await db.storage.from(BUCKET).list("live", { limit: 1000 });
+      const old = (data ?? []).filter((f) => new Date(f.created_at ?? 0).getTime() < cutoff).map((f) => `live/${f.name}`);
+      if (old.length) { await db.storage.from(BUCKET).remove(old); n += old.length; }
+    }
+  } catch { /* next sweep */ }
+  try {
+    const dir = path.join(LOCAL_DIR, "live");
+    if (existsSync(dir)) for (const f of readdirSync(dir)) { const p = path.join(dir, f); if (statSync(p).mtimeMs < cutoff) { unlinkSync(p); n++; } }
+  } catch { /* next sweep */ }
+  return n;
+}
 async function put(key: string, audio: Buffer) {
   if (testStore) { testStore.set(key, audio); return; }
   if (await hasBucket()) { const { error } = await db.storage.from(BUCKET).upload(`${key}.mp3`, audio, { contentType: "audio/mpeg", upsert: true }); if (!error) return; }
   mkdirSync(LOCAL_DIR, { recursive: true }); writeFileSync(localAudioPath(key), audio);
 }
 const SIGNED_SECONDS = 6 * 3600;
-async function urlFor(key: string, baseUrl: string): Promise<{ url: string; expiresAt: string }> {
-  const exp = Math.floor(Date.now() / 1000) + SIGNED_SECONDS;
+async function urlFor(key: string, baseUrl: string, live = false): Promise<{ url: string; expiresAt: string }> {
+  const seconds = live ? Math.floor(LIVE_MS / 1000) : SIGNED_SECONDS;
+  const exp = Math.floor(Date.now() / 1000) + seconds;
   if (!testStore && (await hasBucket())) {
-    const { data } = await db.storage.from(BUCKET).createSignedUrl(`${key}.mp3`, SIGNED_SECONDS);
+    const { data } = await db.storage.from(BUCKET).createSignedUrl(live ? liveName(key) : `${key}.mp3`, seconds);
     if (data?.signedUrl) return { url: data.signedUrl, expiresAt: new Date(exp * 1000).toISOString() };
   }
   return { url: `${baseUrl}/api/voices/audio/${key}?exp=${exp}&sig=${signLocal(key, exp)}`, expiresAt: new Date(exp * 1000).toISOString() };
 }
-export const readLocal = (key: string) => (testStore ? testStore.get(key) ?? null : existsSync(localAudioPath(key)) ? readFileSync(localAudioPath(key)) : null);
+export const readLocal = (key: string) => (testStore ? testStore.get(key) ?? testStore.get(`live/${key}`) ?? null
+  : existsSync(localAudioPath(key)) ? readFileSync(localAudioPath(key)) : existsSync(liveLocal(key)) ? readFileSync(liveLocal(key)) : null);
+/** A live-only clip (the audio route sends it with no-store so nothing keeps a copy). */
+export const isLiveLocal = (key: string) => (testStore ? testStore.has(`live/${key}`) : existsSync(liveLocal(key)));
 
 export const cacheKey = (v: Voice, o: { language: string; contentKey: string; contentVersion: string; text: string }) =>
   createHash("sha256").update([v.provider, v.providerVoiceId, v.model ?? "", o.language, o.contentKey, o.contentVersion, o.text].join("\u0001")).digest("hex");
@@ -123,7 +165,9 @@ const inflight = new Map<string, Promise<void>>();
 let generations = 0;
 export const generationCount = () => generations;
 
-export interface SpeakRequest { userId: string; voiceId: string; contentKind: string; contentKey: string; contentVersion?: string; language: string; text: string; baseUrl: string; translation?: string }
+export interface SpeakRequest { userId: string; voiceId: string; contentKind: string; contentKey: string; contentVersion?: string; language: string; text: string; baseUrl: string; translation?: string;
+  /** The app keeps no copy of a live-only voice's audio (new builds send it; older builds keep every clip). */
+  honoursPolicy?: boolean }
 /** One chunk of eligible content in a P2P Voice: the cached recording, or a new one (once). */
 export async function speak(r: SpeakRequest): Promise<{ url: string; expiresAt: string; cached: boolean; voice: { id: string; name: string; provider: string; synthetic: true }; offlineAllowed: boolean }> {
   if (!isEligible(r.contentKind)) throw new VoicesError(400, "P2P Voice can't read this yet.", "not_eligible");
@@ -146,8 +190,10 @@ export async function speak(r: SpeakRequest): Promise<{ url: string; expiresAt: 
   // The text is spoken in its own language — never translated, never read by a voice of another language.
   if (voice.language !== String(r.language).toLowerCase().split(/[-_]/)[0]) throw new VoicesError(400, "That voice speaks a different language from this text.", "language_mismatch");
   if (!underLimit(r.userId, "speak")) throw new VoicesError(429, "You've listened to a lot in a short time. Please wait a little and try again.", "rate_limited");
-  const key = cacheKey(voice, { language: voice.language, contentKey: r.contentKey, contentVersion: r.contentVersion ?? "", text });
   const policy = p.policy;
+  if (!policy.offlineAllowed && !r.honoursPolicy) throw new VoicesError(400, "Please update P2P Global to listen with this voice.", "needs_update");
+  const live = !policy.cacheAllowed;
+  const key = cacheKey(voice, { language: voice.language, contentKey: r.contentKey, contentVersion: r.contentVersion ?? "", text });
   let cached = policy.cacheAllowed && (await exists(key));
   if (cached) record(voice.provider, "cached", 0, { userId: r.userId, contentKind: r.contentKind });
   else {
@@ -158,7 +204,7 @@ export async function speak(r: SpeakRequest): Promise<{ url: string; expiresAt: 
         try {
           generations++;
           const out = await p.synthesize!(text, voice, ctl.signal);
-          await put(key, out.audio);
+          if (live) await putLive(key, out.audio); else await put(key, out.audio);
           record(voice.provider, "generated", out.characters, { userId: r.userId, contentKind: r.contentKind });
         } catch (e) {
           record(voice.provider, "error", 0, { userId: r.userId, contentKind: r.contentKind, code: (e as ProviderError)?.code });
@@ -170,18 +216,18 @@ export async function speak(r: SpeakRequest): Promise<{ url: string; expiresAt: 
     } else cached = false;
     try { await job; } catch { throw new VoicesError(503, "P2P Voice isn't available at the moment. Please try again shortly.", "provider_failed"); }
   }
-  const link = await urlFor(key, r.baseUrl);
+  const link = await urlFor(key, r.baseUrl, live);
   return { ...link, cached, voice: { id: voice.id, name: voice.name, provider: voice.provider, synthetic: true }, offlineAllowed: policy.offlineAllowed };
 }
 
 /** A short, fixed sample in the voice's language (never a lesson): the provider's own preview link, or one cached sample. */
-export async function preview(userId: string, voiceId: string, baseUrl: string): Promise<{ url: string; kind: "provider" | "sample" }> {
+export async function preview(userId: string, voiceId: string, baseUrl: string, honoursPolicy = false): Promise<{ url: string; kind: "provider" | "sample" }> {
   const voice = await voiceById(voiceId);
   if (!voice) throw new VoicesError(404, "That voice isn't available right now.", "voice_unavailable");
   if (voice.preview?.kind === "url") return { url: voice.preview.url, kind: "provider" }; // ElevenLabs' own sample — no generation, no credits
   const sample = PREVIEW_SAMPLES[voice.language];
   if (!sample || voice.preview?.kind !== "generate") throw new VoicesError(404, "There's no preview for this voice yet.", "no_preview");
   if (!underLimit(userId, "preview")) throw new VoicesError(429, "Please wait a little before previewing more voices.", "rate_limited");
-  const r = await speak({ userId, voiceId, contentKind: "general", contentKey: "p2p:voice-preview", contentVersion: "1", language: voice.language, text: sample, baseUrl });
+  const r = await speak({ userId, voiceId, contentKind: "general", contentKey: "p2p:voice-preview", contentVersion: "1", language: voice.language, text: sample, baseUrl, honoursPolicy });
   return { url: r.url, kind: "sample" };
 }

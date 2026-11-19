@@ -5,6 +5,7 @@
 //   Google Cloud TTS    GOOGLE_TTS_API_KEY                               everyday content + story fallback
 //   ElevenLabs          ELEVENLABS_API_KEY (+ VOICES_ELEVENLABS_CATALOGUE=true)   catalogue + previews ONLY
 //   Spitch (Igbo…)      SPITCH_API_KEY + VOICES_SPITCH_VERIFIED=true     specialist; off until verified by the owner
+//   9jaLingo            P2P_Global_Igbo_Voice (owner 2026-11-19)          Igbo, Hausa, Pidgin, Yoruba — LIVE ONLY (no copies)
 import { characteristicsFrom, describeLocale, fetchWithTimeout, isChildVoice, ProviderError, type ProviderPolicy, type Voice, type VoiceProvider } from "./types";
 
 const now = () => new Date().toISOString();
@@ -172,11 +173,59 @@ export const spitch: VoiceProvider = {
   },
 };
 
-export const PROVIDERS: VoiceProvider[] = [azure, google, elevenlabs, spitch];
+// ── 9jaLingo (Naija Speech) — Igbo, Hausa, Nigerian Pidgin, Yoruba (owner 2026-11-19: "use it for igbo … hausa and pidgin").
+// API (official SDK github.com/9jaLingo/9jalingo-sdk): https://api.9jalingo.org, header X-API-Key, GET /v1/speakers?language=,
+// POST /v1/audio/speech { input, voice, lang, model: "9jalingo-tts-1", response_format }. The engine sleeps when idle and
+// answers 202 (queued) while it starts — that request fails softly and the next one, once warm, works.
+// TERMS (9jalingo.org/pricing + /terms-of-service, read 2026-11-19): commercial use allowed on every plan, no watermark;
+// storing, caching, redistribution and offline use of generated audio are NOT addressed → owner's rule (unknown = no):
+// LIVE ONLY — the server keeps a clip only long enough to deliver it, phones never keep a copy, no offline.
+// VOICES_NAIJALINGO=off switches it off without removing the key.
+const NL_BASE = "https://api.9jalingo.org";
+const nlKey = () => process.env.P2P_Global_Igbo_Voice || process.env.NAIJALINGO_API_KEY || "";
+export const NAIJALINGO_LANGUAGES = ["ig", "ha", "pcm", "yo"] as const;
+const NL_DOMAIN: Record<string, string> = { "Everyday Conversation": "everyday", "Business Conversation": "business", "Health Conversation": "health", "Agricultural Conversation": "agriculture" };
+export const naijalingo: VoiceProvider = {
+  id: "naijalingo", name: "9jaLingo (Nigerian languages)", role: "Igbo, Hausa, Nigerian Pidgin and Yoruba",
+  policy: { cacheAllowed: false, offlineAllowed: false, retentionDays: 0,
+    note: "Commercial use is allowed on every 9jaLingo plan. Their terms say nothing about storing or offline use, so P2P plays these voices live only: no copies are kept on the server or on phones." },
+  status() {
+    if (!nlKey()) return { enabled: false, reason: "Not connected: no 9jaLingo key on the server." };
+    if (process.env.VOICES_NAIJALINGO === "off") return { enabled: false, reason: "Switched off (VOICES_NAIJALINGO=off)." };
+    return { enabled: true, reason: null };
+  },
+  async listVoices() {
+    const at = now();
+    const out: Voice[] = [];
+    for (const lang of NAIJALINGO_LANGUAGES) {
+      const r = await fetchWithTimeout(`${NL_BASE}/v1/speakers?language=${lang}`, { provider: "naijalingo", headers: { "X-API-Key": nlKey(), Accept: "application/json" }, timeoutMs: 20_000 });
+      const j = (await r.json()) as unknown;
+      const list = (Array.isArray(j) ? j : ((j as { speakers?: unknown[] })?.speakers ?? [])) as { id?: string; name?: string; language?: string; gender?: string; domain?: string | null }[];
+      for (const s of list) {
+        if (!s?.id || !/^[a-z0-9_-]{1,64}$/i.test(s.id)) continue;
+        const loc = describeLocale(lang);
+        const g = String(s.gender ?? "").toLowerCase();
+        out.push({ id: `naijalingo:${s.id}`, provider: "naijalingo", providerVoiceId: s.id, name: s.name || s.id, ...loc, presentation: g === "female" || g === "male" ? g : null,
+          characteristics: [], model: "9jalingo-tts-1", preview: { kind: "generate" }, canSynthesize: true, status: "available",
+          source: `9jaLingo speaker list${s.domain && NL_DOMAIN[s.domain] ? ` (${s.domain})` : ""}`, refreshedAt: at });
+      }
+    }
+    return out;
+  },
+  async synthesize(text, voice, signal) {
+    const r = await fetchWithTimeout(`${NL_BASE}/v1/audio/speech`, { provider: "naijalingo", signal, method: "POST", timeoutMs: 45_000,
+      headers: { "X-API-Key": nlKey(), "Content-Type": "application/json", Accept: "audio/mpeg" },
+      body: JSON.stringify({ input: text, voice: voice.providerVoiceId, lang: voice.language, model: "9jalingo-tts-1", response_format: "mp3" }) });
+    if (r.status === 202) throw new ProviderError("naijalingo", "unavailable", "9jaLingo's voice engine is starting.", 202);
+    const audio = Buffer.from(await r.arrayBuffer());
+    if (audio.length < 100) throw new ProviderError("naijalingo", "bad_response", "9jaLingo returned no audio.");
+    return { audio, contentType: "audio/mpeg", characters: text.length };
+  },
+};
+
+export const PROVIDERS: VoiceProvider[] = [azure, google, elevenlabs, spitch, naijalingo];
 /** Advertised candidates that have NO adapter yet (not shown to anyone but admins). */
 export const CANDIDATES = [
-  { id: "naija-speech", name: "Naija Speech API / 9jaLingo", languages: ["ig", "yo", "ha", "pcm"], advertisedVoices: ["igbo_female1", "igbo_female2", "igbo_male2"],
-    finding: "Documentation found only on a development domain; the advertised Igbo voice ids could not be confirmed (2026-11-18)." },
   { id: "orinode", name: "Orinode", languages: ["ig"], advertisedVoices: ["Chiamaka (female)", "Obi (male)"],
     finding: "No public API documentation could be found (2026-11-18)." },
 ];

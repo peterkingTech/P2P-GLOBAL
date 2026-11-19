@@ -11,7 +11,7 @@ import { Router, type Request, type Response } from "express";
 import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
 import { requireAdmin } from "../middleware/adminAuth";
 import { capabilities, catalogue, candidates, defaultVoices, providerStatuses } from "../lib/voices/catalogue";
-import { preview, readLocal, speak, usageSummary, verifyLocal, VoicesError, ELIGIBLE_KINDS } from "../lib/voices/synth";
+import { preview, readLocal, speak, usageSummary, verifyLocal, isLiveLocal, VoicesError, ELIGIBLE_KINDS } from "../lib/voices/synth";
 import { CHARACTERISTICS, type Characteristic, type ProviderId } from "../lib/voices/types";
 
 const router = Router();
@@ -32,21 +32,21 @@ router.get("/catalogue", async (req, res) => {
   try {
     const presentation = req.query.presentation === "female" || req.query.presentation === "male" ? req.query.presentation : null;
     const characteristic = CHARACTERISTICS.includes(req.query.characteristic as Characteristic) ? (req.query.characteristic as Characteristic) : null;
-    const provider = ["azure", "google", "elevenlabs", "spitch"].includes(String(req.query.provider)) ? (req.query.provider as ProviderId) : null;
+    const provider = ["azure", "google", "elevenlabs", "spitch", "naijalingo"].includes(String(req.query.provider)) ? (req.query.provider as ProviderId) : null;
     const purpose = req.query.purpose === "story" || req.query.purpose === "everyday" ? req.query.purpose : null;
     return res.json(await catalogue({ language: str(req.query.language, 8), accent: str(req.query.accent), provider, presentation, characteristic, q: str(req.query.q), purpose,
-      page: Number(req.query.page) || 0, pageSize: Number(req.query.pageSize) || 40 }));
+      page: Number(req.query.page) || 0, pageSize: Number(req.query.pageSize) || 40, honoursPolicy: req.query.policy === "1" }));
   } catch (e) { return fail(res, e); }
 });
 router.get("/capabilities", async (req, res) => {
   if (!(await caller(req, res))) return;
-  try { return res.json({ languages: await capabilities(), eligibleKinds: ELIGIBLE_KINDS }); } catch (e) { return fail(res, e); }
+  try { return res.json({ languages: await capabilities(req.query.policy === "1"), eligibleKinds: ELIGIBLE_KINDS }); } catch (e) { return fail(res, e); }
 });
 // The default P2P Voice for each language (used until a participant chooses another, or their phone's voice).
 router.get("/defaults", async (req, res) => {
   if (!(await caller(req, res))) return;
   try {
-    const d = await defaultVoices();
+    const d = await defaultVoices(req.query.policy === "1");
     return res.json({ defaults: Object.fromEntries(Object.entries(d).map(([l, v]) => [l, { voiceId: v.id, name: v.name, provider: v.provider, accent: v.accent, language: v.language, presentation: v.presentation }])) });
   } catch (e) { return fail(res, e); }
 });
@@ -56,13 +56,13 @@ router.post("/speak", async (req, res) => {
     const b = req.body ?? {};
     const out = await speak({ userId, voiceId: String(b.voiceId ?? "").slice(0, 200), contentKind: String(b.contentKind ?? ""), contentKey: String(b.contentKey ?? ""),
       contentVersion: b.contentVersion ? String(b.contentVersion).slice(0, 80) : "", language: String(b.language ?? "").slice(0, 16), text: String(b.text ?? ""), baseUrl: baseUrl(req),
-      translation: b.translation ? String(b.translation).slice(0, 64) : undefined });
+      translation: b.translation ? String(b.translation).slice(0, 64) : undefined, honoursPolicy: b.honoursPolicy === true });
     return res.json(out);
   } catch (e) { return fail(res, e); }
 });
 router.post("/preview", async (req, res) => {
   const userId = await caller(req, res); if (!userId) return;
-  try { return res.json(await preview(userId, String(req.body?.voiceId ?? "").slice(0, 200), baseUrl(req))); } catch (e) { return fail(res, e); }
+  try { return res.json(await preview(userId, String(req.body?.voiceId ?? "").slice(0, 200), baseUrl(req), req.body?.honoursPolicy === true)); } catch (e) { return fail(res, e); }
 });
 // Signed and expiring — the link itself is the permission (same model as a storage signed URL).
 router.get("/audio/:key", (req, res) => {
@@ -71,7 +71,7 @@ router.get("/audio/:key", (req, res) => {
   const audio = readLocal(key);
   if (!audio) return res.status(404).json({ error: "Not found." });
   res.setHeader("Content-Type", "audio/mpeg");
-  res.setHeader("Cache-Control", "private, max-age=21600");
+  res.setHeader("Cache-Control", isLiveLocal(key) ? "no-store" : "private, max-age=21600");
   res.setHeader("Accept-Ranges", "bytes");
   const range = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range ?? ""));
   if (range) {
