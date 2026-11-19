@@ -53,6 +53,7 @@ import { checkTitle, COMPREHENSIVE_CHECK } from "@/lib/terminology";
 import { useStudyTimeTracker } from "@/lib/studyTime";
 import { AppButton } from "@/components/ui";
 import { showAlert } from "@/lib/alerts";
+import { electiveAccess } from "@/lib/planOrganiserApi";
 
 interface LessonContent {
   title: string;
@@ -788,13 +789,21 @@ export default function LessonScreen() {
   // path into a locked lesson's content or submission UI.
   const [lockChecked, setLockChecked] = useState(false);
   const [isLessonLocked, setIsLessonLocked] = useState(false);
+  const [electiveOf, setElectiveOf] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     (async () => {
       if (!id) return;
       const state = await getKingdomSchoolLockState(user?.id);
+      let locked = state.lessonLocked.get(id) ?? false;
+      // Plan-scoped elective (owner brief 2026-11-19 §5): a lesson that one of this person's organised Learning Plans
+      // includes opens from that plan straight away. The curriculum's own lock state above is unchanged — the server
+      // answers for this one lesson, from this person's own plans only.
+      if (locked) {
+        try { const r = await electiveAccess(id); if (r?.allowed) { locked = false; if (!cancelled) setElectiveOf(r.planTitle ?? ""); } } catch { /* stays locked */ }
+      }
       if (!cancelled) {
-        setIsLessonLocked(state.lessonLocked.get(id) ?? false);
+        setIsLessonLocked(locked);
         setLockChecked(true);
       }
     })();
@@ -1036,6 +1045,7 @@ export default function LessonScreen() {
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <GatheringReturnBar />
+      {electiveOf !== null ? <Text style={{ fontSize: 12.5, color: colors.textMuted, fontFamily: "Inter_600SemiBold", paddingHorizontal: 16, paddingTop: 6 }} accessibilityLiveRegion="polite">{electiveOf ? `Opened from your Learning Plan “${electiveOf}”.` : "Opened from your Learning Plan."}</Text> : null}
       <View style={styles.header}>
         <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />

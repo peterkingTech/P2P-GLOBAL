@@ -58,6 +58,15 @@ export const offlineAllowed = (r: TranslationRow) => r.permits_offline === true;
 /** May verse TEXT leave the app (copy / share)? Otherwise only the reference is shared. */
 export const textCopyAllowed = (r: TranslationRow) =>
   providerOf(r) === "helloao" ? r.permits_sharing === true : /public domain/i.test(r.license_notes ?? "");
+/** May a P2P Voice (Azure / Google synthesis, cached as audio) read this translation aloud? Owner 2026-11-19:
+ *  P2P Voice only, and for the Bible ONLY public-domain translations — turning a copyrighted text into stored
+ *  audio isn't something its licence grants. AO Lab: an approved row whose licence is "Public domain".
+ *  API.Bible: the licence notes begin "Public domain". Open licences (Biblica Open, CC BY-SA) are not enough. */
+export function syntheticSpeechAllowed(r: TranslationRow): boolean {
+  if (r.preview) return false;
+  if (providerOf(r) === "helloao") return r.licence_status === "approved" && /^public domain$/i.test(String(r.licence_name ?? "").trim());
+  return /^\s*public domain\b/i.test(r.license_notes ?? "");
+}
 /** May a provider's RECORDED audio be played? (Device read-aloud reads displayed text and is not a recording.) */
 export const canPlayRecordedAudio = (r: TranslationRow) => providerOf(r) === "helloao" && r.permits_audio === true && !r.preview;
 

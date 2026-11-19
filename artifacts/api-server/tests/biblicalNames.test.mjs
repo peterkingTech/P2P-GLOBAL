@@ -40,7 +40,7 @@ ok("original-language words are real STEPBible records (lemma/gloss from the lex
 ok("verified entries with original words: at least one is tagged in the primary verse", verified.filter((e) => e.original.length).every((e) => e.original.some((o) => o.inPrimary)));
 ok("worship expressions: no Scripture wording claimed, no original-language word invented", E.filter((e) => e.kind === "worship" && !e.primary).every((e) => e.status === "no_scripture_wording" && !e.original.length));
 ok("devotional expressions all show their Scripture basis", E.filter((e) => e.kind === "devotional").every((e) => e.primary && e.status === "verified"));
-ok("every entry with a draft note is flagged as a draft by the API", N.entry("el-roi").noteLabel.includes("awaiting editor review"));
+ok("entries carry no draft label (owner 2026-11-19)", N.entry("el-roi").noteLabel === "" && N.about().notesStatus === "");
 ok("Aramaic only with quoted evidence (lexicon language or Easton's own words)", E.filter((e) => e.languages.includes("aramaic")).every((e) => e.original.some((o) => o.language === "aramaic") || /aram|chaldee|syriac/i.test(e.aramaicWord?.quote ?? "")));
 ok("Hebrew, Greek and Aramaic all present", ["hebrew", "greek", "aramaic"].every((l) => E.some((e) => e.languages.includes(l))));
 ok("Daniel's Aramaic (Ancient of Days) comes from the lexicon's own language tag", by("ancient-of-days").original.some((o) => o.language === "aramaic" && o.inPrimary));
@@ -75,7 +75,7 @@ ok("a two-word expression does not match its one-word part (Way Maker ≠ Maker)
 ok("ordinary words name nothing", S("grace of God") === null);
 const route = readFileSync(path.join(root, "src/routes/studyWorkspace.ts"), "utf8");
 ok("route: no names panel for a typed Scripture reference", route.includes("names = reference ? null : namesForSearch(q)"));
-ok("route: names returned with the search; collection and entry endpoints", route.includes("meaning, names });") && route.includes('router.get("/names"') && route.includes('router.get("/names/:id"'));
+ok("route: names returned with the search; collection and entry endpoints", route.includes("meaning, names };") && route.includes('router.get("/names"') && route.includes('router.get("/names/:id"'));
 
 // ── collections, filters, sorting ──
 const greek = N.collection({ section: "son", language: "greek" });

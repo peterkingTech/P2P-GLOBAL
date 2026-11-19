@@ -13,6 +13,7 @@
 // provider error, incomplete or implausible output, or the per-member hourly
 // cap all mean no translation is recorded, so the database holds the post.
 import Anthropic from "@anthropic-ai/sdk";
+import { governedSystemPrompt } from "./aiGovernance";
 import { supabaseServiceRole as db } from "./supabase";
 import { logger } from "./logger";
 
@@ -55,7 +56,7 @@ async function claudeTranslate(text: string): Promise<string> {
   const msg = await client.messages.create({
     model: WINS_TRANSLATION_MODEL,
     max_tokens: 4096,
-    system: SYSTEM,
+    system: governedSystemPrompt("wins_moderation_translation", SYSTEM), // P2P AI governance (lib/aiGovernance)
     messages: [{ role: "user", content: `<post>\n${text}\n</post>` }],
   });
   const out = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");

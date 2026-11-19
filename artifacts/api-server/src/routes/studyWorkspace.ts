@@ -1,6 +1,8 @@
 import { Router, type Request, type Response } from "express";
 import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
-import { EDITORIAL_FLOW, isUuid, validatePassage } from "../lib/studyPlans";
+import { EDITORIAL_FLOW, isUuid, validatePassage, type Passage, type Resource } from "../lib/studyPlans";
+import { organise, resourceKeyOf, sessionsFrom, signElectives, type OrganiseInput } from "../lib/planOrganiser";
+import { aiOrganise, applyAiPlan } from "../lib/planOrganiserAI";
 import { access as collectionAccess } from "./scriptureCollections";
 import { BOOK_BY_CODE } from "../lib/planDiscovery";
 import { discoveryIndex } from "./planDiscovery";
@@ -232,13 +234,18 @@ router.get("/search", async (req, res) => {
   try {
     const q = String(req.query.q ?? "").replace(/\s+/g, " ").trim().slice(0, 120);
     if (q.length < 2) throw new WsError(400, "Type at least 2 characters.");
+    return res.json(await studySearch(userId, q, String(req.query.t ?? "")));
+  } catch (e) { return fail(res, e); }
+});
+/** The whole Bible Study search for one person (also used by the Learning Plan organiser, lib/planOrganiser). */
+export async function studySearch(userId: string, q: string, want: string) {
+  {
     const ix = await discoveryIndex();
     // "John 3:16", "Psalm 23", "Romans 8:28-30": study that passage from every side.
     const pr = parseReference(q);
     const reference = pr ? { book: pr.bookCode, chapter: pr.chapter, ...(pr.startVerse ? { startVerse: pr.startVerse, endVerse: pr.endVerse ?? pr.startVerse } : {}) } : null;
     // Words in the Bible text: the person's translation when it can be searched, else the first one that can.
     const all = await licensedTranslations();
-    const want = String(req.query.t ?? "");
     const searchable = all.filter((r) => providerOf(r) === "api.bible");
     const tr = searchable.find((r) => r.translation_code === want) ?? searchable.find((r) => r.translation_code === "KJV") ?? searchable[0];
     let bible: SearchInputs["bible"];
@@ -366,9 +373,9 @@ router.get("/search", async (req, res) => {
     let names: ReturnType<typeof namesForSearch> = null;
     try { names = reference ? null : namesForSearch(q); } catch { names = null; }
     const perWord = terms.length >= 2 ? terms.flatMap((t) => (termVerses[t] ? [{ term: termVerses[t]!.searchedAs, translation: termVerses[t]!.translation, results: termVerses[t]!.results }] : [])) : [];
-    return res.json({ ...buildStudy({ q, ix, bible, articles, words, concepts, reference, referenceText, mine: mine.slice(0, 40), termVerses: perWord }), meaning, names });
-  } catch (e) { return fail(res, e); }
-});
+    return { ...buildStudy({ q, ix, bible, articles, words, concepts, reference, referenceText, mine: mine.slice(0, 40), termVerses: perWord }), meaning, names };
+  }
+}
 
 // ── Biblical names, titles and descriptions (owner brief 2026-11-18) ───────────────────────────────────────────────
 //   GET /names?section=&person=&language=&testament=&kind=&interpretive=1&q=&sort=   a collection with filters
@@ -435,6 +442,67 @@ router.delete("/collections/items/:itemId/read", async (req, res) => {
     const it = await itemFor(userId, String(req.params.itemId));
     await db.from("p2p_scripture_collection_reads").delete().eq("item_id", it.id).eq("user_id", userId);
     return res.json({ read: false });
+  } catch (e) { return fail(res, e); }
+});
+
+// ── LEARNING PLAN ORGANISER (owner brief 2026-11-19) ─────────────────────────────────────────────────────────────
+//   POST /organise  { q, start?: { type: "bible_book" | "core_foundations" | "kingdom_school", key }, deeperOf?: planId, t? }
+// The participant's subject or question is searched across ALL authorised P2P resources (the Bible Study search,
+// published lessons of Core Foundations and Kingdom School, Kingdom Stories, Reference, Deep Study and their own
+// Scripture library), organised into a PROPOSED journey (lib/planOrganiser; the governed AI step only when the owner
+// has switched it on). Nothing is saved: the builder shows it for review, editing and explicit confirmation.
+// `deeperOf` = Study Deeper: only for a plan this person COMPLETED; what they already studied on this subject is left
+// out and the journey goes further. The answer carries a signed electives token (lessons this proposal offered).
+router.post("/organise", async (req, res) => {
+  const userId = await caller(req, res); if (!userId) return;
+  try {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    let q = String(b.q ?? "").replace(/\s+/g, " ").trim().slice(0, 200);
+    // Study Deeper: the completed plan, its lineage and everything already studied in it.
+    let lineage: { deeperOf: string; root: string; depth: number } | null = null;
+    const exclude = new Set<string>();
+    if (b.deeperOf != null && b.deeperOf !== "") {
+      const pid = String(b.deeperOf);
+      if (!isUuid(pid)) throw new WsError(400, "That plan isn't available.");
+      const { data: plan } = await db.from("p2p_study_plans").select("id,owner_id,focus_ref,focus_label").eq("id", pid).maybeSingle();
+      const p = plan as { id: string; owner_id: string | null; focus_ref: Record<string, unknown> | null; focus_label: string } | null;
+      if (!p) throw new WsError(404, "That plan isn't available.");
+      const { data: done } = await db.from("p2p_study_plan_enrollments").select("id").eq("plan_id", pid).eq("user_id", userId).eq("status", "completed").limit(1);
+      if (!((done ?? []) as unknown[]).length) throw new WsError(409, "Study Deeper opens when you've completed this whole plan.");
+      const fr = p.focus_ref ?? {};
+      const root = typeof fr.root === "string" && isUuid(fr.root) ? fr.root : p.id;
+      lineage = { deeperOf: p.id, root, depth: (Number(fr.depth) || 0) + 1 };
+      if (!q) q = String(fr.question ?? p.focus_label ?? "").slice(0, 200);
+      // Everything in this person's journeys on this subject (the root and every deeper journey they made).
+      const { data: fam } = await db.from("p2p_study_plans").select("id,focus_ref").or(`id.eq.${root},focus_ref->>root.eq.${root}`).eq("owner_id", userId);
+      const ids = [...new Set([root, p.id, ...((fam ?? []) as { id: string }[]).map((x) => x.id)])];
+      const { data: ss } = await db.from("p2p_study_plan_sessions").select("passages,primary_resource,supporting").in("plan_id", ids);
+      for (const s of (ss ?? []) as { passages: Passage[]; primary_resource: Resource | null; supporting: Resource[] | null }[]) {
+        for (const ps of s.passages ?? []) exclude.add(resourceKeyOf({ kind: "bible_passage", ...ps }));
+        for (const r of [s.primary_resource, ...(s.supporting ?? [])]) if (r) exclude.add(resourceKeyOf(r));
+      }
+    }
+    if (q.length < 2) throw new WsError(400, "Tell us what you'd like to learn about.");
+    const st = b.start as { type?: unknown; key?: unknown } | undefined;
+    const start: OrganiseInput["start"] = st?.type === "bible_book" && typeof st.key === "string" && BOOK_BY_CODE.has(st.key) ? { type: "bible_book", book: st.key }
+      : st?.type === "core_foundations" ? { type: "core_foundations" }
+      : st?.type === "kingdom_school" && isUuid(st.key) ? { type: "kingdom_school", curriculumId: st.key as string } : null;
+    const [search, ix] = await Promise.all([studySearch(userId, q, String(b.t ?? "")), discoveryIndex()]);
+    // A starting book adds that book's own search (it widens the journey; nothing is restricted to it).
+    let findings = search.findings;
+    if (start?.type === "bible_book") {
+      try {
+        const more = await studySearch(userId, `${q} ${BOOK_BY_CODE.get(start.book)!.name}`.slice(0, 120), String(b.t ?? ""));
+        findings = [...findings, ...more.findings.filter((f) => !findings.some((x) => x.key === f.key))];
+      } catch { /* the main search still answers */ }
+    }
+    const library = search.findings.filter((f) => f.group === "mine" && f.kind === "playlist").map((f) => ({ id: String((f.ref as { id?: string }).id ?? ""), title: f.title, subtitle: f.subtitle })).filter((c) => isUuid(c.id));
+    const names = [...(search.names?.matches ?? []), ...(search.names?.collection?.preview ?? [])].slice(0, 12)
+      .map((n) => ({ id: n.id, name: n.name, primary: n.primary ? { display: n.primary.display, book: n.primary.book, chapter: n.primary.chapter, start: n.primary.start, end: n.primary.end } : null }));
+    let journey = organise({ question: q, findings, ix, library, names, start, exclude, depth: lineage?.depth ?? 0 });
+    const ai = journey.stages.length ? await aiOrganise(journey) : null;
+    if (ai) journey = applyAiPlan(journey, ai);
+    return res.json({ journey, sessions: sessionsFrom(journey), token: signElectives(userId, journey.electiveLessons), lineage, meaning: search.meaning ?? null });
   } catch (e) { return fail(res, e); }
 });
 

@@ -90,7 +90,7 @@
           "color": "#1D9E75"
         }
       ],
-      "expo-audio",
+      ["expo-audio", { "enableBackgroundPlayback": true }],
       "expo-video",
       "expo-asset",
       "./modules/call-system/app.plugin.js",

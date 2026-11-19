@@ -1,6 +1,6 @@
 // Client for Biblical Names, Titles and Descriptions (api-server lib/biblicalNames.ts, routes /study-workspace/names).
 // Verified data only: Scripture wording checked in BSB/KJV/ASV/WEB/YLT, lexicon data from STEPBible, Easton links.
-// "note" / "interp" are DRAFT P2P study notes awaiting editor review — the screen says so.
+// "note" / "interp" are P2P study notes (no draft label since 2026-11-19).
 import { apiRequest } from "@/lib/apiClient";
 import { cached } from "@/lib/offline";
 

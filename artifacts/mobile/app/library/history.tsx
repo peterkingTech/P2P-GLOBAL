@@ -22,10 +22,22 @@ export default function HistoryScreen() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // Loaded a page at a time (UI refinement 2026-11-19): 30, then "Show more". Each record stays separate —
+  // listened, completed and partly listened passages are never merged, even for the same reference.
+  const PAGE = 30;
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const load = useCallback(async () => {
-    try { setItems((await listHistory(100)).items); setError(null); }
+    try { const r = (await listHistory(PAGE)).items; setItems(r); setHasMore(r.length === PAGE); setError(null); }
     catch (e: any) { setError(e?.status === 503 ? "Listening history is coming soon." : e?.message ?? "Couldn't load your history."); setItems((x) => x ?? []); }
   }, []);
+  const more = async () => {
+    const last = items?.at(-1);
+    if (!last) return;
+    setLoadingMore(true);
+    try { const r = (await listHistory(PAGE, last.startedAt)).items; setItems((x) => [...(x ?? []), ...r.filter((h) => !(x ?? []).some((y) => y.id === h.id))]); setHasMore(r.length === PAGE); }
+    catch (e: any) { setNotice(e?.message ?? "Couldn't load more."); } finally { setLoadingMore(false); }
+  };
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const clear = () => {
@@ -69,6 +81,7 @@ export default function HistoryScreen() {
           </View>
         );
       })}
+      {hasMore ? <AppButton label="Show more" variant="secondary" onPress={more} loading={loadingMore} style={{ marginTop: 12 }} /> : null}
       {items?.length ? <AppButton label="Clear listening history" icon="trash-outline" variant="tertiary" onPress={clear} style={{ marginTop: 12 }} /> : null}
     </ScrollView>
   );

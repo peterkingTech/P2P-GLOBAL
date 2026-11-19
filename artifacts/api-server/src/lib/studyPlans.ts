@@ -20,7 +20,7 @@ export type DurationKey = (typeof DURATIONS)[number];
 export const DURATION_DAYS: Record<Exclude<DurationKey, "daily" | "custom">, number> = { weekly: 7, monthly: 30, quarterly: 91, half_year: 182, yearly: 365 };
 export const QUESTION_KINDS = ["observe", "context", "interpret", "consider", "apply"] as const;
 export type QuestionKind = (typeof QUESTION_KINDS)[number];
-export const RESOURCE_KINDS = ["bible_passage", "lesson", "kingdom_story", "scripture_topic", "deep_study", "word_study", "commentary", "dictionary_term", "curriculum", "reference_article"] as const;
+export const RESOURCE_KINDS = ["bible_passage", "lesson", "kingdom_story", "scripture_topic", "deep_study", "word_study", "commentary", "dictionary_term", "curriculum", "reference_article", "scripture_collection"] as const;
 export type ResourceKind = (typeof RESOURCE_KINDS)[number];
 export const EDITORIAL_FLOW: Record<string, string[]> = {
   draft: ["under_review", "archived"], under_review: ["draft", "approved"], approved: ["published", "draft"], published: ["archived"], archived: ["draft"],
@@ -61,7 +61,9 @@ export type Resource =
   | ({ kind: "deep_study" | "commentary" } & Passage)
   | { kind: "word_study"; strongs: string }
   | { kind: "dictionary_term"; key: string }
-  | { kind: "reference_article"; id: string };
+  | { kind: "reference_article"; id: string }
+  // A Scripture playlist / collection from the P2P Library (opened with its own sharing rules).
+  | { kind: "scripture_collection"; id: string };
 /** An existing P2P resource, by reference (its own id / slug / Strong's number). A note says why it belongs. */
 export function validateResource(r: unknown): (Resource & { note?: string; title?: string }) | null {
   if (!r || typeof r !== "object") return null;
@@ -69,7 +71,7 @@ export function validateResource(r: unknown): (Resource & { note?: string; title
   const extra = { ...(text(o.note, 300) ? { note: text(o.note, 300)! } : {}), ...(text(o.title, 200) ? { title: text(o.title, 200)! } : {}) };
   switch (o.kind) {
     case "bible_passage": case "deep_study": case "commentary": { const p = validatePassage(o); return p ? { kind: o.kind, ...p, ...extra } : null; }
-    case "lesson": case "curriculum": return isUuid(o.id) ? { kind: o.kind, id: o.id, ...extra } : null;
+    case "lesson": case "curriculum": case "scripture_collection": return isUuid(o.id) ? { kind: o.kind, id: o.id, ...extra } : null;
     case "kingdom_story": return isUuid(o.id) && (o.chapterId === undefined || isUuid(o.chapterId)) ? { kind: "kingdom_story", id: o.id, ...(o.chapterId ? { chapterId: o.chapterId as string } : {}), ...extra } : null;
     case "scripture_topic": return typeof o.slug === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(o.slug) && o.slug.length <= 80 ? { kind: "scripture_topic", slug: o.slug, ...extra } : null;
     case "word_study": return typeof o.strongs === "string" && /^[HG]\d{1,5}[a-z]?$/.test(o.strongs) ? { kind: "word_study", strongs: o.strongs, ...extra } : null;

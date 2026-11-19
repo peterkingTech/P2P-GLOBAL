@@ -8,7 +8,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { AppButton, IconButton, FilterChip, ChipRow, SegmentedControl } from "@/components/ui";
 import { listen, listenUi, useListenAppState, useListenState, useListenUi, RATES, LISTEN_MODES, TEXT_SCALES, type ListenMode, type ListenState, type BibleContinue } from "@/lib/listen";
-import { baseLanguage, voiceTier } from "@/lib/listen/voices";
+import { baseLanguage } from "@/lib/listen/voices";
 import { getLanguageName } from "@/lib/languageNames";
 import { withAlpha } from "@/lib/colorUtils";
 import { ARTWORK_FILL } from "@/constants/artwork";
@@ -16,8 +16,8 @@ import { LARGE_TABLET_BREAKPOINT, TABLET_BREAKPOINT } from "@/hooks/useLayout";
 import ReadAlongText from "./ReadAlongText";
 import LanguageFlag from "@/components/language/LanguageFlag";
 import PlaylistControls from "./PlaylistControls";
-import VoicesSheet from "./VoicesSheet";
-import { PROVIDER_LABEL, useReadingSource } from "@/lib/voices";
+import VoicesLibrary from "./VoicesLibrary";
+import { PROVIDER_LABEL, chosenVoiceFor, useReadingSource, useVoicePrefs } from "@/lib/voices";
 import { listenTime, playbackTiming, progressLine } from "@/lib/listen/timing";
 
 // P2P GLOBAL — READ & LISTEN. One shared player for every Listen button:
@@ -31,7 +31,7 @@ import { listenTime, playbackTiming, progressLine } from "@/lib/listen/timing";
 // Layout follows the space: phones stack text over controls; tablets use a
 // wider column; desktops / web and phones in landscape put the text beside a
 // controls panel (the text column never stretches past a readable width).
-// The voice is the phone's own speech engine — said plainly, no narrator
+// The voice is a P2P Voice (owner 2026-11-19: never the device speech engine) — said plainly, no narrator
 // persona. Steps are "a sentence back / forward". Progress is a line, the
 // percentage played and the time left (lib/listen/timing, owner request
 // 2026-11-10): device speech reports no length, so its times are estimates
@@ -45,7 +45,6 @@ const LOGO = require("@/assets/images/logo.png");
 const APP_ICON = require("@/assets/images/icon.png");
 
 const langName = (code: string) => (baseLanguage(code) === "en" ? "English" : getLanguageName(baseLanguage(code)));
-const TIER_LABEL: Record<string, string> = { premium: "Premium", enhanced: "Enhanced", robotic: "Basic" };
 const CONTINUE_OPTIONS: { value: BibleContinue; label: string; hint: string }[] = [
   { value: "stop", label: "Stop", hint: "Stop when this chapter ends." },
   { value: "again", label: "Listen again", hint: "Play this chapter once more from the beginning, then stop." },
@@ -146,7 +145,6 @@ export function ListenHost() {
 function ListenScreen({ st, c, s, dark }: { st: ListenState; c: AppColors; s: Styles; dark: boolean }) {
   const ui = useListenUi();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [voicesOpen, setVoicesOpen] = useState(false);
   const { source: voiceSrc, notice: voiceNotice } = useReadingSource();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -154,7 +152,8 @@ function ListenScreen({ st, c, s, dark }: { st: ListenState; c: AppColors; s: St
   const playing = st.status === "playing";
   const many = content.sectionTitles.length > 1;
   const sectionTitle = content.sectionTitles[st.section] ?? "";
-  const chosenVoice = st.voice && st.voice.kind !== "unavailable" ? st.voice.voice : null;
+  useVoicePrefs(); // re-render when the listener picks another P2P Voice
+  const currentVoice = chosenVoiceFor(content.language);
   const err = st.status === "error" ? st.error : null;
   const finished = st.status === "completed";
   const text = statusLine(st);
@@ -208,6 +207,10 @@ function ListenScreen({ st, c, s, dark }: { st: ListenState; c: AppColors; s: St
           {many ? sectionTitle : timing ? `${timing.exact ? "" : "about "}${listenTime(timing.totalSeconds)} in all` : ""}
         </Text>
       </View>
+      {/* Offline only (owner 2026-11-19): say plainly why the voice changed. */}
+      {voiceSrc?.mode === "device" ? (
+        <Text style={s.progressText} accessibilityLiveRegion="polite">You're offline — your phone's voice is reading until you're back online.</Text>
+      ) : null}
     </View>
   );
 
@@ -282,25 +285,6 @@ function ListenScreen({ st, c, s, dark }: { st: ListenState; c: AppColors; s: St
     </View>
   );
 
-  const voiceRow = (v: ListenState["allVoices"][number], showLang: boolean) => {
-    const tier = TIER_LABEL[voiceTier(v)];
-    const selected = chosenVoice === v.identifier;
-    return (
-      <View key={v.identifier} style={[s.voiceRow, selected && s.voiceRowOn]}>
-        <Pressable style={{ flex: 1, minHeight: 44, justifyContent: "center" }} onPress={() => listen.setVoice(v.identifier)} accessibilityRole="radio" accessibilityState={{ checked: selected }}
-          accessibilityLabel={`${v.name}${tier ? `, ${tier}` : ""}${showLang ? `, ${v.language}` : ""}`}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            {showLang ? <LanguageFlag language={v.language} size={14} /> : null}
-            <Text style={s.voiceName}>{v.name}{showLang ? ` (${v.language})` : ""}</Text>
-          </View>
-          {!!tier && <Text style={s.voiceTier}>{tier}</Text>}
-        </Pressable>
-        <IconButton icon={st.previewing === v.identifier ? "volume-high" : "play-circle-outline"} size="sm" accessibilityLabel={`Preview ${v.name}`} onPress={() => listen.previewVoice(v.identifier)} />
-        {selected && <Ionicons name="checkmark" size={18} color={c.accentGreen} accessibilityElementsHidden />}
-      </View>
-    );
-  };
-
   const settings = settingsOpen && (
     <View style={s.panel}>
       {away && <AppButton label="Go to the text" icon="document-text-outline" size="sm" variant="secondary" onPress={() => { close(); router.navigate(content.route as any); }} />}
@@ -312,29 +296,17 @@ function ListenScreen({ st, c, s, dark }: { st: ListenState; c: AppColors; s: St
         <LanguageFlag language={content.language} size={14} />
         <Text style={s.label}>Voice · {langName(content.language)}</Text>
       </View>
-      {st.voices.length > 0 ? (
-        <View accessibilityRole="radiogroup" accessibilityLabel="Voices">{st.voices.slice(0, 12).map((v) => voiceRow(v, false))}</View>
-      ) : st.allVoices.length === 0 ? (
-        <Text style={s.note}>This phone's default voice for {langName(content.language)} is used.</Text>
-      ) : (
-        <>
-          <Text style={s.note}>This phone has no {langName(content.language)} voice. You can add one in your phone's speech settings, keep reading silently, or choose a voice in another language below. It will read the same words, with that language's pronunciation.</Text>
-          <View accessibilityRole="radiogroup" accessibilityLabel="Voices in other languages">{st.allVoices.slice(0, 30).map((v) => voiceRow(v, true))}</View>
-          <AppButton label="Keep reading silently" variant="tertiary" onPress={() => { close(); listen.stop(); }} />
-        </>
-      )}
-      {st.voice?.kind === "override" && <Text style={s.note}>Reading with a {langName(st.voice.language)} voice, as you chose.</Text>}
-      {/* P2P Voices — the shared voice library, inside this same player (owner brief 2026-11-18). */}
-      <AppButton label="P2P Voices" icon="mic-outline" size="sm" variant="secondary" onPress={() => setVoicesOpen(true)} accessibilityLabel="P2P Voices: choose a natural voice, official narration or your phone's voice" />
-      <VoicesSheet visible={voicesOpen} onClose={() => setVoicesOpen(false)} />
+      {/* Owner 2026-11-19: P2P Voice only — device speech voices are never offered or used. */}
+      <Text style={s.note}>{currentVoice ? `P2P Voice: ${currentVoice.name}${currentVoice.accent ? ` (${currentVoice.accent})` : ""}.` : `There's no P2P Voice for ${langName(content.language)} yet.`}</Text>
       {voiceNotice ? <Text style={s.note} accessibilityLiveRegion="polite">{voiceNotice}</Text> : null}
-      <Text style={s.note}>Better voices can be downloaded in your phone's settings (on iPhone: Accessibility › Spoken Content › Voices). The app never downloads voices by itself.</Text>
+      {/* Owner 2026-11-19: no "P2P Voices" button or separate page — the voices are listed right here, as you scroll. */}
+      <VoicesLibrary visible={!!settingsOpen} />
 
       <View style={s.autoRow}>
         <View style={{ flexShrink: 1 }}>
           <Text style={s.autoLabel}>Background playback</Text>
           <Text style={s.autoHint}>Continue listening while using other apps or when your screen is locked.</Text>
-          <Text style={s.autoHint}>{Platform.OS === "ios" ? "Lock-screen controls aren't available for device voices yet." : Platform.OS === "android" ? "Android may stop device voices after a while with the screen off; there are no notification controls yet." : "Your browser may pause speech while this tab is in the background."}</Text>
+          <Text style={s.autoHint}>{Platform.OS === "web" ? "Your browser may pause audio while this tab is in the background." : "Play and pause also work from your lock screen, notifications and headphones. Offline, your phone's voice has no lock-screen controls."}</Text>
         </View>
         <Switch value={st.background} onValueChange={(v) => listen.setBackground(v)} accessibilityLabel="Background playback: continue listening while using other apps or when your screen is locked"
           trackColor={{ true: c.accentGreen, false: c.borderBeige }} thumbColor="#fff" />
@@ -347,7 +319,7 @@ function ListenScreen({ st, c, s, dark }: { st: ListenState; c: AppColors; s: St
         </View>
       )}
       <AppButton label="Stop listening" icon="stop" size="sm" variant="tertiary" onPress={() => { close(); listen.stop(); }} />
-      <Text style={s.note}>{voiceSrc?.mode === "official" ? `Official narration (${voiceSrc.voice}).` : voiceSrc?.mode === "p2p" ? `Synthetic voice: ${voiceSrc.voice} (${PROVIDER_LABEL[voiceSrc.provider] ?? voiceSrc.provider}).` : "Read aloud by your phone's own voice."} Listening doesn't mark anything complete.</Text>
+      <Text style={s.note}>{voiceSrc?.mode === "official" ? `Official narration (${voiceSrc.voice}).` : voiceSrc?.mode === "p2p" ? `Synthetic voice: ${voiceSrc.voice} (${PROVIDER_LABEL[voiceSrc.provider] ?? voiceSrc.provider}).` : voiceSrc?.mode === "device" ? "You're offline: read by your phone's voice until you're back online." : "Read aloud by P2P Voice."} Listening doesn't mark anything complete.</Text>
     </View>
   );
 

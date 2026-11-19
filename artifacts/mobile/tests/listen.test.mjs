@@ -400,22 +400,35 @@ for (const [owner, f] of Object.entries(screens)) {
 const engineSrc = src("lib/listen/engine.ts") + src("lib/listen/index.ts") + src("components/listen/ListenPlayer.tsx");
 ok("listening never touches learning progress (no completion/progress calls)", !/markLessonComplete|completeLesson|finishKingdomStoryChapter|handleComplete|DataContext|useData|p2p_lesson_progress|supabase/.test(engineSrc));
 ok("Listen handlers in screens don't complete anything", [src(screens.lesson).match(/const onListen = [\s\S]*?\n  \};/)?.[0] ?? "x", src(screens.story).match(/const onListen = [\s\S]*?\n  \};/)?.[0] ?? "x"].every((h) => !/complete|finish|submit/i.test(h)));
-ok("only lib/listen imports expo-speech", /from "expo-speech"/.test(src("lib/listen/index.ts")));
+ok("P2P Voice first; the phone's voice ONLY with no internet (or before P2P's voices ever loaded) — never for an online refusal (owner 2026-11-19)", (() => { const ix = src("lib/listen/index.ts"); const calls = ix.match(/phoneSpeech\.speak\(/g) ?? []; const uses = ix.match(/phoneVoice\(text, o\)/g) ?? [];
+  return calls.length === 1 && ix.includes("function phoneVoice(text: string, o: Parameters<SpeechDriver[\"speak\"]>[1]) {") && uses.length === 2
+    && ix.includes("const noInternet = () => { if (token !== cloudToken) return; markOffline(); phoneVoice(text, o); };")
+    && ix.includes("if (isOffline() || !voiceDefaultsKnown()) { markOffline(); return phoneVoice(text, o); }")
+    && ix.includes("(e) => (isNetworkFailure(e) ? noInternet() : refused((e as Error).message))")
+    && !/from "expo-speech"/.test(src("lib/listen/engine.ts") + src("components/listen/ListenPlayer.tsx")); })());
+ok("offline: a P2P Voice copy kept on this phone plays first; every voice heard (and fetched ahead) is kept", src("lib/listen/index.ts").includes("cachedVoiceUri(keptName(voice.voiceId, o, source)).then((uri) => (uri ? play(uri, true) : fresh()), fresh);")
+  && src("lib/listen/index.ts").includes("keepVoice(keptName(voiceId, o, text), r.url)") && /File\.downloadFileAsync\(url, f\)/.test(src("lib/listen/voiceCache.ts")) && /MAX_FILES = \d+/.test(src("lib/listen/voiceCache.ts")));
+ok("back online: P2P Voice takes over again (retried every 15 s; any server answer ends offline mode)", src("lib/listen/index.ts").includes("const RETRY_MS = 15_000;") && src("lib/listen/index.ts").includes("if (isOffline() && Date.now() - offlineSince < RETRY_MS) return noInternet();") && src("lib/listen/index.ts").includes(".then((r) => { markOnline();"));
 ok("leaving or closing a Listen screen never stops the session; the app going to the background pauses only when Background playback is off",
   /listen\.setFocusedOwner\(owner\); return \(\) => listen\.clearFocusedOwner\(owner\)/.test(src("lib/listen/index.ts")) && !/release\(owner/.test(src("lib/listen/index.ts"))
   && /if \(s !== "active" && !listen\.getState\(\)\.background\) listen\.pause\(\)/.test(src("lib/listen/index.ts")));
-ok("iOS: the app's playback session only for Background playback with NO live call; otherwise the system-managed session (calls untouched)",
-  /const appSession = Platform\.OS === "ios" && !!o\.background && !getActiveGathering\(\);/.test(src("lib/listen/index.ts")) && /useApplicationAudioSession: appSession/.test(src("lib/listen/index.ts"))
-  && /setAudioModeAsync\(\{ playsInSilentMode: true, shouldPlayInBackground: true, interruptionMode: "doNotMix" \}\)/.test(src("lib/listen/index.ts")) && /if \(token !== speakToken\) return;/.test(src("lib/listen/index.ts")));
+ok("the app's playback session is never set during a live call or Gathering (calls untouched); every player goes through that guard",
+  /function playbackSession\(background: boolean\) \{\n  if \(getActiveGathering\(\)\) return;/.test(src("lib/listen/index.ts"))
+  && (src("lib/listen/index.ts").match(/playbackSession\(!!o\.background\)/g) ?? []).length === 2
+  && /const appSession = Platform\.OS === "ios" && !!o\.background && !getActiveGathering\(\);/.test(src("lib/listen/index.ts")) && /useApplicationAudioSession: appSession/.test(src("lib/listen/index.ts")));
 const bible = src(screens.bible) + src("lib/listen/bibleContent.ts");
 ok("Bible: voice language from the translation; none known → not offered", /translations\?\.find\(\(t\) => t\.code === d\.translation\.code\)\?\.language/.test(bible) && /if \(!language\) return null/.test(bible));
 ok("Bible: one verse per part (no verse numbers or headings spoken)", /parts: \[\{ key: String\(v\.verse\), text: v\.text \}\]/.test(bible));
 ok("Bible: never moves to the next chapter by itself; Listen from a selected verse", !/continueToNext/.test(bible + src("lib/listen/engine.ts")) && /listen\.seekPart\(String\(sel\.start\)\)/.test(bible));
 ok("Bible: the verse being read is marked at verse level only (no word timing)", /speakingVerse === v\.verse/.test(bible) && !/onBoundary/.test(bible));
 ok("player: speed, voice, sections, stop, accessible labels", /Speaking speed/.test(engineSrc) && /setVoice/.test(engineSrc) && /accessibilityLabel="Stop listening"/.test(engineSrc) && engineSrc.includes("accessibilityLabel={`Previous ${partWord}`}") && engineSrc.includes('const partWord = playlist ? "passage" : "part";'));
-ok("player: says plainly it's the phone's own voice (no narrator persona)", /Read aloud by your phone's own voice/.test(engineSrc)
+ok("player: says plainly it's a P2P Voice (no narrator persona)", /Read aloud by P2P Voice\./.test(engineSrc) && !/phone's own voice/.test(src("components/listen/ListenPlayer.tsx"))
   && !/\bAI\b|narrator|teacher|mentor/i.test(src("components/listen/ListenPlayer.tsx").replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "")));
 
+ok("lock screen: one implementation on the shared players; play/pause synced; no misleading Previous/Next; cleared when listening ends; never during a call",
+  src("lib/listen/index.ts").includes("p.setActiveForLockScreen(true, meta, { showSeekForward: false, showSeekBackward: false });") && src("lib/listen/index.ts").includes("function systemPause()")
+  && src("lib/listen/index.ts").includes("p.clearLockScreenControls();") && /if \(Platform\.OS === "web" \|\| !o\.background \|\| getActiveGathering\(\)\) return;/.test(src("lib/listen/index.ts"))
+  && (src("lib/listen/index.ts").match(/lockScreenFor\(p, o\)/g) ?? []).length >= 2);
 // ── Branded listening screen ──────────────────────────────────────────────
 const player = src("components/listen/ListenPlayer.tsx");
 ok("artwork: always the small cover, so it never covers the background logo (every screen, every mode)", /const ART = 96;/.test(player) && !/big \? art/.test(player)
@@ -624,9 +637,9 @@ ok("'Go to the text' from anywhere (content routes)", /label="Go to the text"/.t
 ok("Bible: switching chapters and continuing work after leaving the Bible (built outside the screen)", /export async function playBibleChapter/.test(src("lib/listen/bibleContent.ts")) && /bibleListenContent\(d, language, part, \[/.test(src("app/bible/index.tsx"))
   && /Now listening: \{listeningChapter\.label\}/.test(src("app/bible/index.tsx")));
 ok("story chapter links play directly (no dependency on the screen still being open)", /if \(next\) void listen\.play\(next, "start"/.test(src("app/kingdom-stories/chapter.tsx")) && /if \(mounted\.current\) go\(to\)/.test(src("app/kingdom-stories/chapter.tsx")));
-ok("voice rows: name, quality, preview button, selection", /accessibilityLabel=\{`Preview \$\{v\.name\}`\}/.test(host) && /listen\.previewVoice\(v\.identifier\)/.test(host) && /TIER_LABEL\[voiceTier\(v\)\]/.test(host));
+ok("voice: no phone-voice list; the voices listed right in the settings (no separate P2P Voices page, owner 2026-11-19)", !/listen\.previewVoice\(|voiceRow\(/.test(host) && /P2P Voice: \$\{currentVoice\.name\}/.test(host) && host.includes("<VoicesLibrary visible={!!settingsOpen} />") && !host.includes('label="P2P Voices"'));
 ok("Bible: 'When this chapter ends' (Stop / Listen again / Next chapter) with a range, in place of Auto Listen Again", /accessibilityLabel="When this chapter ends"/.test(host) && /Continue through \{bookName\}/.test(host) && /bible && bibleChapter \?/.test(host) && /: !bible \? \(/.test(host));
-ok("Background playback setting with its plain description and honest limits", /Continue listening while using other apps or when your screen is locked\./.test(host) && /Lock-screen controls aren't available for device voices yet\./.test(host));
+ok("Background playback setting with its plain description and honest limits", /Continue listening while using other apps or when your screen is locked\./.test(host) && /Play and pause also work from your lock screen, notifications and headphones\./.test(host) && !/device voices/.test(host));
 
 // ── Responsive layout ──────────────────────────────────────────────────────
 ok("desktop / large tablet / phone landscape: text beside a controls panel", /const wide = width >= LARGE_TABLET_BREAKPOINT \|\| landscapePhone/.test(host) && /s\.wideRow/.test(host) && /width: sidePanel/.test(host));

@@ -6,10 +6,11 @@ import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
-import { AppButton, ChipRow, FilterChip, IconButton } from "@/components/ui";
+import { AppButton, ChipRow, FilterChip, IconButton, SectionHeader } from "@/components/ui";
 import { withScreenBoundary } from "@/components/ScreenErrorBoundary";
 import { getMyPlans, getPlans, type MyPlans, type PlanCard, type RunItem } from "@/lib/studyPlansApi";
 import { dueKey, shelves, todayIso } from "@/lib/studyPlansUi";
+import { loadPlanReminders, reconcilePlanReminders, type PlanReminder } from "@/lib/planReminders";
 
 // P2P PLANS — HOME (owner brief 2026-11-14; simplified 2026-11-18). Continue your plans; MY PLAN search — study
 // any word, subject or question (not predefined topics; the subject tiles and focus-filter chips were removed by
@@ -29,9 +30,17 @@ function PlansHome() {
   const [error, setError] = useState<string | null>(null);
   const [studyQ, setStudyQ] = useState("");
   const [tab, setTab] = useState<MineTab>("active");
+  const [reminders, setReminders] = useState<PlanReminder[]>([]);
+  const [openShelf, setOpenShelf] = useState<string | null>(null);
   const load = useCallback(() => {
     setError(null);
-    Promise.all([getPlans(), getMyPlans()]).then(([p, m]) => { setPlans(p.plans); setMine(m); }, (e) => setError(e?.status === 503 ? t("p2pPlans.notAvailable") : e?.message ?? t("p2pPlans.notAvailable")));
+    Promise.all([getPlans(), getMyPlans()]).then(([p, m]) => {
+      setPlans(p.plans); setMine(m);
+      // Plan reminders follow the plans (owner brief 2026-11-19 §7): completed, left or deleted plans stop all future
+      // reminders; a paused plan holds them until it's resumed.
+      const status = new Map<string, "active" | "paused">([...m.active.map((i) => [i.plan.id, "active"] as const), ...m.paused.map((i) => [i.plan.id, "paused"] as const)]);
+      reconcilePlanReminders(status).catch(() => {}).finally(() => loadPlanReminders().then(setReminders, () => {}));
+    }, (e) => setError(e?.status === 503 ? t("p2pPlans.notAvailable") : e?.message ?? t("p2pPlans.notAvailable")));
   }, [t]);
   useFocusEffect(load);
   const today = todayIso();
@@ -62,7 +71,8 @@ function PlansHome() {
         </View>
         <Text style={s.cardTitle}>{i.plan.title}</Text>
         {i.group ? <Text style={s.small}>{t("p2pPlans.home.withGroup", { name: i.group.name ?? "" })}</Text> : null}
-        <Text style={s.progress}>{t("p2pPlans.progress", { completed: i.progress.completed, total: i.progress.total })} · {t(`p2pPlans.pace.${i.run.pace}`)}{i.run.status === "paused" ? ` · ${t("p2pPlans.status.paused")}` : ""}</Text>
+        <View style={s.bar} accessibilityElementsHidden><View style={[s.barFill, { width: `${i.progress.total ? Math.round((i.progress.completed / i.progress.total) * 100) : 0}%` as any }]} /></View>
+        <Text style={s.progress}>{t("p2pPlans.progress", { completed: i.progress.completed, total: i.progress.total })} · {t(`p2pPlans.pace.${i.run.pace}`)}{i.run.status === "paused" ? ` · ${t("p2pPlans.status.paused")}` : ""}{i.run.status === "completed" ? ` · ${t("p2pPlans.status.completed", { defaultValue: "Completed" })}` : ""}{reminders.some((r) => r.planId === i.plan.id && !r.paused) ? " · 🔔" : ""}</Text>
         {i.current ? <Text style={s.body}>{t("p2pPlans.current", { title: i.current.title })}{due ? ` · ${t(`p2pPlans.${due.key}`, { date: due.date ? fmt(due.date) : "" })}` : ""}</Text> : null}
         {i.next ? <Text style={s.small}>{t("p2pPlans.next", { title: i.next.title })}</Text> : null}
       </TouchableOpacity>
@@ -89,11 +99,12 @@ function PlansHome() {
         <View style={[s.card, { gap: 8 }]}>
           <Text style={s.cardTitle}>{t("p2pPlans.studyTitle", { defaultValue: "Study anything in the Bible" })}</Text>
           <Text style={s.small}>{t("p2pPlans.studyHint", { defaultValue: "A word, a subject or a question: grace, forgiveness, how to grow my relationship with God." })}</Text>
-          <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-            <TextInput value={studyQ} onChangeText={setStudyQ} returnKeyType="search" onSubmitEditing={() => studyQ.trim().length >= 2 && router.push({ pathname: "/study", params: { q: studyQ.trim() } } as any)}
-              placeholder={t("p2pPlans.studyPlaceholder", { defaultValue: "Search any word, subject or question" })} placeholderTextColor={c.textMuted} style={[s.input, { flex: 1 }]}
-              accessibilityLabel={t("p2pPlans.studyPlaceholder", { defaultValue: "Search any word, subject or question" })} />
-            <AppButton label={t("p2pPlans.studyGo", { defaultValue: "Study" })} icon="search" disabled={studyQ.trim().length < 2} onPress={() => router.push({ pathname: "/study", params: { q: studyQ.trim() } } as any)} />
+          <TextInput value={studyQ} onChangeText={setStudyQ} returnKeyType="search" onSubmitEditing={() => studyQ.trim().length >= 2 && router.push({ pathname: "/plans/builder", params: { q: studyQ.trim() } } as any)}
+            placeholder={t("p2pPlans.studyPlaceholder", { defaultValue: "Search any word, subject or question" })} placeholderTextColor={c.textMuted} style={s.input}
+            accessibilityLabel={t("p2pPlans.studyPlaceholder", { defaultValue: "Search any word, subject or question" })} />
+          <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+            <AppButton label={t("plansOrganiser.preparePlan", { defaultValue: "Prepare a learning plan" })} icon="map-outline" disabled={studyQ.trim().length < 2} onPress={() => router.push({ pathname: "/plans/builder", params: { q: studyQ.trim() } } as any)} />
+            <AppButton label={t("p2pPlans.studyGo", { defaultValue: "Study" })} variant="secondary" icon="search" disabled={studyQ.trim().length < 2} onPress={() => router.push({ pathname: "/study", params: { q: studyQ.trim() } } as any)} />
           </View>
           <AppButton label={t("study.historyOpen", { defaultValue: "My saved studies" })} icon="time-outline" variant="tertiary" size="sm" onPress={() => router.push("/study/history" as any)} />
         </View>
@@ -116,10 +127,12 @@ function PlansHome() {
               <Text style={s.small}>{t("p2pPlans.home.journeyHint")}</Text>
             </TouchableOpacity>
             <Text style={s.section} accessibilityRole="header">{t("p2pPlans.toFollow", { defaultValue: "Plans to follow" })}</Text>
+            {/* UI refinement 2026-11-19: two per shelf, the rest on request. */}
             {shelves(plans).map((sh) => (
                 <View key={sh.collection} style={{ gap: 8 }}>
-                  <Text style={s.group}>{t(`p2pPlans.collection.${sh.collection}`)}</Text>
-                  {sh.plans.map((p) => <Card key={p.id} p={p} />)}
+                  <SectionHeader title={t(`p2pPlans.collection.${sh.collection}`)} count={sh.plans.length} actionLabel={openShelf === sh.collection ? t("p2pPlans.showLess", { defaultValue: "Show less" }) : t("p2pPlans.seeAll", { defaultValue: "See all" })}
+                    onAction={sh.plans.length > 2 ? () => setOpenShelf(openShelf === sh.collection ? null : sh.collection) : undefined} />
+                  {(openShelf === sh.collection ? sh.plans : sh.plans.slice(0, 2)).map((p) => <Card key={p.id} p={p} />)}
                 </View>
               ))}
             <TouchableOpacity style={[s.card, s.learning]} onPress={() => router.push("/plans/learning" as any)} accessibilityRole="button" accessibilityLabel={t("p2pPlans.learningPlans")}>
@@ -174,6 +187,8 @@ function makeStyles(c: AppColors) {
     cardTitle: { fontSize: 16, color: c.textDark, fontFamily: "Inter_700Bold" },
     kicker: { fontSize: 11.5, color: c.accentGreen, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.4, flexShrink: 1 },
     progress: { fontSize: 13, color: c.textDark, fontFamily: "Inter_600SemiBold" },
+    bar: { height: 4, borderRadius: 2, backgroundColor: c.borderBeige, overflow: "hidden", marginTop: 4 },
+    barFill: { height: 4, backgroundColor: c.primaryGreen },
     rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 },
     metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 2 },
     pill: { fontSize: 11.5, color: c.textDark, fontFamily: "Inter_600SemiBold", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, backgroundColor: c.cardBeige, overflow: "hidden" },

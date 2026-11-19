@@ -4,6 +4,7 @@ import {
   CANON, bookByCode, getChapter, searchBible, relatedLessons, licensedTranslations, publicTranslation, BibleError, booksFor,
   subtractRange, rangesOverlap, type HlRange,
 } from "../lib/bibleReader";
+import { BibleAudioError, chapterAudio } from "../lib/bibleAudio";
 
 // The Bible reader API (mounted at /bible). Every route needs a signed-in
 // caller. Reading routes serve licensed Scripture through lib/bibleReader.ts.
@@ -14,6 +15,25 @@ import {
 // Bible text.
 
 const router = Router();
+// RECORDED BIBLE AUDIO (owner 2026-11-19): a chapter's own recording from the translation's audio edition in the
+// owner's API.Bible plan — a short-lived streaming link (never stored or cached offline by P2P). 404 = no recording.
+//   GET /reader/audio/:translation/:book/:chapter
+router.get("/reader/audio/:translation/:book/:chapter", async (req, res) => {
+  if (!(await caller(req, res))) return;
+  try {
+    const book = bookByCode(String(req.params.book)), chapter = Number(req.params.chapter);
+    if (!book || !Number.isInteger(chapter) || chapter < 1 || chapter > book.chapters) return err(res, "Unknown chapter", 404);
+    const row = (await licensedTranslations()).find((r) => r.translation_code === String(req.params.translation));
+    if (!row) return err(res, "That translation isn't available", 404);
+    // AO Lab recordings come with the chapter itself; this route serves API.Bible audio editions.
+    const a = await chapterAudio(row, book.code, chapter);
+    res.setHeader("Cache-Control", "private, no-store");
+    return ok(res, a);
+  } catch (e) {
+    if (e instanceof BibleAudioError) return err(res, e.message, e.status);
+    return fail(res, e);
+  }
+});
 const ok = (res: Response, data: unknown) => res.json(data);
 const err = (res: Response, message: string, status = 400) => res.status(status).json({ error: message });
 const isUuid = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);

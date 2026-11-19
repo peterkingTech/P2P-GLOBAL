@@ -128,7 +128,7 @@ ok("holy spirit: the edition's own entry for the phrase (Holy Ghost); holy alone
 ok("no scraps of references as sentences", !M.buildMeaning({ q: "kingdom of God", articles: A, dict: D, termVerses: {}, togetherVerses: null }).together.sentences.some((x) => x.text.startsWith("(Matt")));
 ok("together queries: as typed, 'Jesus is lord', the words, their roots", JSON.stringify(M.togetherQueries("the lordship of Jesus")) === '["the lordship of Jesus","jesus is lord","lordship jesus","lord jesus"]');
 const route = readFileSync(path.join(root, "src/routes/studyWorkspace.ts"), "utf8");
-ok("route: meaning returned with the search, never for a typed reference, no AI", route.includes("const terms = reference ? [] : meaningTerms(q)") && route.includes("termVerses: perWord }), meaning, names });") && !/anthropic/i.test(readFileSync(path.join(root, "src/lib/studyMeaning.ts"), "utf8")));
+ok("route: meaning returned with the search, never for a typed reference, no AI", route.includes("const terms = reference ? [] : meaningTerms(q)") && route.includes("termVerses: perWord }), meaning, names };") && !/anthropic/i.test(readFileSync(path.join(root, "src/lib/studyMeaning.ts"), "utf8")));
 ok("route: each word's verses feed every group (termVerses)", route.includes("termVerses: perWord"));
 
 console.log(`studyWorkspace (api): ${pass} passed, ${fail} failed`);

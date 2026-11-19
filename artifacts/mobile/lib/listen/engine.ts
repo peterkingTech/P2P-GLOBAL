@@ -1,9 +1,9 @@
 // Listen: the ONE shared player behind every "Listen" button (Bible,
 // Kingdom Stories, Kingdom School / Core Curriculum, Learning Plans) and the
-// P2P Global Read & Listen screen. The phone's own speech voice reads the text
-// the screen already shows. The one exception: content with a studio recording
-// (`narration`, Kingdom Stories — lib/listen/narration) plays each sentence from
-// that recording instead; everything else is still the phone's voice.
+// P2P Global Read & Listen screen. A P2P Voice reads the text the screen already
+// shows (owner 2026-11-19: never the phone's own voice). Content with a studio
+// recording (`narration`, Kingdom Stories — lib/listen/narration) plays each
+// sentence from that recording instead.
 //
 // Guarantees:
 //  • one speech session at a time — every utterance carries a generation
@@ -38,8 +38,14 @@ import { baseLanguage, chooseVoice, narrationVoices, voicesFor, type DeviceVoice
 
 export type ListenStatus = "idle" | "loading" | "playing" | "paused" | "completed" | "error";
 
+/** The driver can't read this (no P2P Voice for the language, no internet, a translation that isn't public domain):
+ *  its message is shown to the listener exactly as written. */
+export class VoiceUnavailable extends Error { readonly plain = true; }
+
 export interface SpeakOptions {
   language: string; voice?: string; rate: number;
+  /** Bible / playlist passages: the translation being read (P2P Voice reads public-domain translations only). */
+  translation?: string;
   /** Keep speaking when the app goes to the background (the driver sets up the platform audio session). */
   background?: boolean;
   onStart?: () => void; onDone?: () => void; onStopped?: () => void;
@@ -182,9 +188,11 @@ export const PREVIOUS_RESTART_AFTER = 2;
 
 export function createListenEngine(driver: SpeechDriver, store: ListenStore, now: () => number = Date.now, opts: {
   replayDelaySeconds?: number;
-  /** P2P Voices: a verified voice for this language exists OUTSIDE the phone (e.g. Igbo through a specialist
-   *  provider) — then a phone with no voice for the language can still listen. Never consulted for "bible". */
-  externalVoice?: (language: string, kind?: ListenKind) => boolean;
+  /** P2P Voices: something OUTSIDE the phone can read this content (a P2P Voice for its language, or its studio
+   *  narration) — then a phone with no voice for the language can still listen. */
+  externalVoice?: (language: string, kind?: ListenKind, content?: ListenContent) => boolean;
+  /** What to say when nothing can read this language (default: the phone has no voice for it). */
+  noVoiceMessage?: (language: string) => string;
 } = {}) {
   const replayDelay = opts.replayDelaySeconds ?? 3;
   let state: ListenState = {
@@ -268,10 +276,11 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
         source: content.sections[c.section]?.parts[c.part]?.text.slice(c.start, c.end),
         narration: content.narration,
         kind: content.kind, contentKey: content.key,
+        translation: content.sections[c.section]?.translation ?? (typeof content.meta?.t === "string" ? content.meta.t : undefined),
         chunkIndex: index, chunkSources: chunkSources(), resuming,
         onBoundary: (e) => { if (g === gen && typeof e?.charIndex === "number") boundary = spokenFrom + e.charIndex; },
         onDone: () => { if (g === gen) advance(); },
-        onError: (e) => { if (g === gen) fail("speech", `Listening stopped: ${e?.message || "the speech engine reported a problem"}.`); },
+        onError: (e) => { if (g === gen) fail("speech", (e as VoiceUnavailable | undefined)?.plain ? e.message : `Listening stopped: ${e?.message || "the speech engine reported a problem"}.`); },
       });
     } catch (e: any) {
       fail("speech", `Listening couldn't start: ${e?.message || "the speech engine isn't available"}.`);
@@ -366,10 +375,10 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
     const voices = await loadVoices();
     if (my !== request) return; // replaced while loading
     let choice = chooseVoice(c.language, voices, prefs.voices[baseLanguage(c.language)] ?? null, override);
-    if (choice.kind === "unavailable" && c.kind !== "bible" && opts.externalVoice?.(c.language, c.kind)) choice = { kind: "match", language: choice.language, voice: null };
+    if (choice.kind === "unavailable" && opts.externalVoice?.(c.language, c.kind, c)) choice = { kind: "match", language: choice.language, voice: null };
     set({ voice: choice, voices: voicesFor(c.language, voices), allVoices: narrationVoices(voices), rate: prefs.rate, autoAgain: prefs.autoAgain });
     if (choice.kind === "unavailable") {
-      return set({ status: "error", error: { kind: "unavailable_language", message: "This phone has no voice for this language. Choose another voice to listen anyway, or keep reading." } });
+      return set({ status: "error", error: { kind: "unavailable_language", message: opts.noVoiceMessage?.(c.language) ?? "This phone has no voice for this language. Choose another voice to listen anyway, or keep reading." } });
     }
     let index = 0;
     if (at === "saved") {
@@ -522,7 +531,9 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
     async speakSnippet(text: string, o: { language: string; rate?: number }): Promise<{ result: "spoken" | "no_voice" | "error"; voice?: { name: string; language: string } }> {
       const sample = text.trim();
       if (!sample) return { result: "error" };
-      const v = voicesFor(o.language, await loadVoices())[0];
+      const device = voicesFor(o.language, await loadVoices())[0];
+      // No phone voice (P2P Voice only, 2026-11-19): a P2P Voice for this language reads the word instead.
+      const v = device ?? (opts.externalVoice?.(o.language, "study") ? { identifier: undefined, name: "P2P Voice", language: o.language } : null);
       if (!v) return { result: "no_voice" };
       const wasPlaying = state.status === "playing";
       if (wasPlaying) pause();
@@ -539,6 +550,7 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
         };
         try {
           driver.speak(sample.slice(0, 400), { language: v.language, voice: v.identifier, rate: o.rate ?? state.rate, background: prefs.background,
+            kind: "study", contentKey: `snippet:${baseLanguage(o.language)}`, source: sample.slice(0, 400),
             onDone: () => end("spoken"), onStopped: () => end("spoken"), onError: () => end("error") });
         } catch { end("error"); }
       });

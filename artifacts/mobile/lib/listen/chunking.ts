@@ -9,7 +9,7 @@
 // displayed text — `speakable` only tidies whitespace and marks for speech.
 
 export interface ListenPart { key: string; text: string }
-export interface ListenSection { id: string; title: string; parts: ListenPart[] }
+export interface ListenSection { id: string; title: string; parts: ListenPart[]; /** Bible passages: the translation (P2P Voice reads public-domain ones only). */ translation?: string }
 export interface Chunk {
   section: number; part: number; partKey: string;
   /** Character range in the part's ORIGINAL text. */

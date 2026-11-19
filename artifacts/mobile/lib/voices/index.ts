@@ -3,7 +3,7 @@
 //   • the participant's choices: a P2P Voice per CONTENT language, favourites, "official narration first",
 //     kept on the phone (works offline) and synced to their account when the server has the table (migration 254);
 //   • a tiny runtime store the player reads to say what is reading right now: official narration, a synthetic
-//     P2P Voice (which one, from whom) or the phone's own voice — never mixed up, never silently swapped.
+//     P2P Voice (which one, from whom) — never mixed up, never silently swapped (no phone voice since 2026-11-19).
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSyncExternalStore } from "react";
 import { apiRequest } from "@/lib/apiClient";
@@ -31,12 +31,14 @@ export const getCatalogue = (f: CatalogueFilter) => {
 };
 export const getCapabilities = () => apiRequest<{ languages: { language: string; languageName: string; providers: string[]; presentations: string[]; canListen: boolean }[]; eligibleKinds: string[] }>(
   "/voices/capabilities", {}, { fallbackError: "" });
-export const speakChunk = (b: { voiceId: string; contentKind: string; contentKey: string; contentVersion?: string; language: string; text: string }) =>
+export const speakChunk = (b: { voiceId: string; contentKind: string; contentKey: string; contentVersion?: string; language: string; text: string; translation?: string }) =>
   apiRequest<{ url: string; expiresAt: string; cached: boolean; voice: { id: string; name: string; provider: string; synthetic: true }; offlineAllowed: boolean }>("/voices/speak", json(b), { fallbackError: "This voice isn't available at the moment." });
 export const previewVoiceAudio = (voiceId: string) => apiRequest<{ url: string; kind: "provider" | "sample" }>("/voices/preview", json({ voiceId }), { fallbackError: "There's no preview for this voice right now." });
 
-/** Content kinds a P2P Voice may read (mirrors the server's ELIGIBLE_KINDS — the server decides; this only avoids a wasted call). */
-export const ELIGIBLE_KINDS = new Set(["story", "story-intro", "lesson", "plan", "daily_word"]);
+/** Content kinds a P2P Voice may read (mirrors the server's ELIGIBLE_KINDS — the server decides; this only avoids a wasted call).
+ *  Owner 2026-11-19: P2P Voice is the ONLY reading voice — the Bible and playlists too, in public-domain translations
+ *  (the server checks the translation; any other translation gets a plain message, never the phone's voice). */
+export const ELIGIBLE_KINDS = new Set(["story", "story-intro", "lesson", "plan", "daily_word", "learning", "general", "bible", "playlist", "study"]);
 export const isEligibleKind = (k: string | undefined | null) => !!k && ELIGIBLE_KINDS.has(k);
 
 // ── Preferences ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -44,7 +46,7 @@ export interface ChosenVoice { voiceId: string; name: string; provider: VoicePro
 export interface VoicePrefs {
   version: 1;
   preferOfficial: boolean;
-  /** Per content language: the chosen P2P Voice, or null = the phone's own voice (the default). */
+  /** Per content language: the chosen P2P Voice, null = an old "phone voice" choice, now ignored (P2P default). */
   byLanguage: Record<string, ChosenVoice | null>;
   favourites: string[];
 }
@@ -86,9 +88,7 @@ function save(next: VoicePrefs) {
 export const getVoicePrefs = () => prefs;
 export const subscribeVoicePrefs = (l: () => void) => { listeners.add(l); return () => { listeners.delete(l); }; };
 export const useVoicePrefs = () => useSyncExternalStore(subscribeVoicePrefs, getVoicePrefs, getVoicePrefs);
-/** The P2P Voice chosen for this content language (null = the phone's voice). Other languages' choices are kept. */
-// Owner 2026-11-18: P2P Voice is the MAIN voice; the phone's voice is the backup. A language the listener never chose
-// for uses P2P's default voice for it; `null` (they chose "My phone's voice") is respected.
+/** P2P default voices per language (the listener's own choice in byLanguage wins). Other languages' choices are kept. */
 let defaults: Record<string, ChosenVoice> = {};
 let defaultsLoaded = false;
 let defaultsLoading: Promise<Record<string, ChosenVoice>> | null = null;
@@ -103,27 +103,33 @@ async function fetchDefaults() {
     defaults = r.defaults ?? {}; defaultsLoaded = true;
     void AsyncStorage.setItem("p2p.voices.defaults", JSON.stringify(defaults)).catch(() => {});
     emit();
-  } catch { /* offline: last known defaults; the phone's voice reads if none */ }
+  } catch { /* offline: last known defaults (none → the player asks to connect to the internet) */ }
   return defaults;
 }
+/** True once P2P's default voices are known on this phone (fetched now, or kept from an earlier session). */
+export const voiceDefaultsKnown = () => defaultsLoaded || Object.keys(defaults).length > 0;
 export const defaultVoiceFor = (language: string) => defaults[base(language)] ?? null;
+/** The P2P Voice for this content language: the listener's own choice, else P2P's default; null = no P2P Voice for
+ *  this language. Owner 2026-11-19: P2P Voice only — an earlier "My phone's voice" choice (null) is no longer honoured. */
 export const chosenVoiceFor = (language: string): ChosenVoice | null => {
   const k = base(language);
-  return k in prefs.byLanguage ? prefs.byLanguage[k] ?? null : defaults[k] ?? null;
+  return prefs.byLanguage[k] ?? defaults[k] ?? null;
 };
 export function chooseVoice(language: string, v: P2PVoice | null) {
-  const next = { ...prefs.byLanguage, [base(language)]: v ? { voiceId: v.id, name: v.name, provider: v.provider, accent: v.accent, language: v.language, presentation: v.presentation } : null };
+  const next = { ...prefs.byLanguage };
+  if (v) next[base(language)] = { voiceId: v.id, name: v.name, provider: v.provider, accent: v.accent, language: v.language, presentation: v.presentation };
+  else delete next[base(language)]; // back to P2P's default voice for this language
   save({ ...prefs, byLanguage: next });
 }
 export function toggleFavourite(id: string) {
   save({ ...prefs, favourites: prefs.favourites.includes(id) ? prefs.favourites.filter((x) => x !== id) : [...prefs.favourites, id].slice(-60) });
 }
 export const setPreferOfficial = (on: boolean) => save({ ...prefs, preferOfficial: on });
-/** Back to the defaults: official narration first, the phone's voice for everything else. Favourites are kept. */
+/** Back to the defaults: official narration first, P2P's default voice for everything else. Favourites are kept. */
 export const restoreVoiceDefaults = () => save({ ...DEFAULTS, favourites: prefs.favourites });
 
 // ── What is reading right now (set by the Listen driver) ─────────────────────────────────────────────────────
-export type ReadingSource = { mode: "official"; voice: string } | { mode: "p2p"; voice: string; provider: string } | { mode: "device" } | null;
+export type ReadingSource = { mode: "official"; voice: string } | { mode: "p2p"; voice: string; provider: string } | { mode: "device" } | null; // device = offline only
 let source: ReadingSource = null;
 let notice: string | null = null;
 const rtListeners = new Set<() => void>();

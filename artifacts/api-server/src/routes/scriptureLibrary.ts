@@ -216,7 +216,11 @@ router.get("/history", async (req, res) => {
   const userId = await caller(req, res); if (!userId) return;
   try {
     const limit = Math.max(1, Math.min(100, Number(req.query.limit ?? 30) | 0));
-    const rows = (must(await db.from("p2p_scripture_listening_history").select(HIST_COLS).eq("user_id", userId).order("started_at", { ascending: false }).limit(limit)) ?? []) as HistRow[];
+    // Paging (UI refinement 2026-11-19): `before` = the started_at of the last row already shown.
+    const before = typeof req.query.before === "string" && !Number.isNaN(Date.parse(req.query.before)) ? new Date(req.query.before).toISOString() : null;
+    let q = db.from("p2p_scripture_listening_history").select(HIST_COLS).eq("user_id", userId);
+    if (before) q = q.lt("started_at", before);
+    const rows = (must(await q.order("started_at", { ascending: false }).limit(limit)) ?? []) as HistRow[];
     const titles = new Map<string, string>();
     for (const id of Array.from(new Set(rows.map((r) => r.collection_id).filter((x): x is string => !!x)))) {
       const v = await visible(userId, id);

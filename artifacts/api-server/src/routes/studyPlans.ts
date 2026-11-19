@@ -3,6 +3,7 @@ import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
 import { canLeadDestination, destinationMemberIds, destinationName, displayName, groupsUserLeads, isDestinationMember, loadContent, notify, profilesById, type Destination, GROUP_DESTINATIONS } from "../lib/sharedStudy";
 import { getArticles } from "../lib/referenceArticles";
 import { invalidateDiscovery } from "./planDiscovery";
+import { readElectives } from "../lib/planOrganiser";
 import {
   COLLECTIONS, DURATIONS, EDITORIAL_FLOW, FOCUS_TYPES, PACES, addDays, durationDays, feasibility, isIsoDate, isUuid, passageDisplay,
   progressOf, resourceKinds, schedule, validateSession, type DurationKey, type Pace, type Passage, type Resource, type SessionInput,
@@ -150,17 +151,19 @@ async function derivedSessions(plan: Plan, userId: string): Promise<Session[]> {
 async function labels(resources: Resource[]): Promise<Map<string, string>> {
   const ids = (k: string) => [...new Set(resources.filter((r) => r.kind === k).map((r) => (r as { id: string }).id))];
   const slugs = [...new Set(resources.filter((r) => r.kind === "scripture_topic").map((r) => (r as { slug: string }).slug))];
-  const [l, s, c, t] = await Promise.all([
+  const [l, s, c, t, sc] = await Promise.all([
     ids("lesson").length ? db.from("p2p_lessons").select("id,title").in("id", ids("lesson")) : Promise.resolve({ data: [] }),
     ids("kingdom_story").length ? db.from("p2p_kingdom_stories").select("id,title,status").in("id", ids("kingdom_story")) : Promise.resolve({ data: [] }),
     ids("curriculum").length ? db.from("p2p_curriculums").select("id,title").in("id", ids("curriculum")) : Promise.resolve({ data: [] }),
     slugs.length ? db.from("p2p_prayer_topics").select("slug,title,status").in("slug", slugs) : Promise.resolve({ data: [] }),
+    ids("scripture_collection").length ? db.from("p2p_scripture_collections").select("id,title,deleted_at").in("id", ids("scripture_collection")) : Promise.resolve({ data: [] }),
   ]);
   const m = new Map<string, string>();
   for (const r of (l.data ?? []) as { id: string; title: string }[]) m.set(`lesson:${r.id}`, r.title);
   for (const r of (s.data ?? []) as { id: string; title: string; status: string }[]) if (r.status === "published") m.set(`kingdom_story:${r.id}`, r.title);
   for (const r of (c.data ?? []) as { id: string; title: string }[]) m.set(`curriculum:${r.id}`, r.title);
   for (const r of (t.data ?? []) as { slug: string; title: string; status: string }[]) if (r.status === "published") m.set(`scripture_topic:${r.slug}`, r.title);
+  for (const r of (sc.data ?? []) as { id: string; title: string; deleted_at: string | null }[]) if (!r.deleted_at) m.set(`scripture_collection:${r.id}`, r.title);
   const arts = resources.filter((r) => r.kind === "reference_article");
   if (arts.length) { try { const a = getArticles(); for (const r of arts) { const x = a.byId.get((r as { id: string }).id); if (x) m.set(`reference_article:${x.id}`, x.title); } } catch { /* dictionary not loaded: shown as unavailable */ } }
   return m;
@@ -294,6 +297,25 @@ async function currentRun(planId: string, userId: string): Promise<Run | null> {
   return (data as Run) ?? null;
 }
 
+// Plan-scoped elective access (owner brief 2026-11-19 §5): may THIS person open THIS lesson out of its curriculum's
+// order? Only when it's an elective of an organised plan they follow (active, paused or completed). Kingdom School's
+// own sequence, prerequisites and curriculum-wide rules are untouched — this answers for one lesson, one plan.
+router.get("/electives/:lessonId", async (req, res) => {
+  const userId = await caller(req, res);
+  if (!userId) return;
+  try {
+    const lessonId = String(req.params.lessonId);
+    if (!isUuid(lessonId)) return res.json({ allowed: false });
+    const { data: runs } = await db.from("p2p_study_plan_enrollments").select("plan_id,status").eq("user_id", userId).in("status", ["active", "paused", "completed"]);
+    const planIds = [...new Set(((runs ?? []) as { plan_id: string }[]).map((r) => r.plan_id))];
+    if (!planIds.length) return res.json({ allowed: false });
+    const { data: plans } = await db.from("p2p_study_plans").select("id,title,focus_ref").in("id", planIds);
+    const hit = ((plans ?? []) as { id: string; title: string; focus_ref: Record<string, unknown> | null }[])
+      .find((pl) => pl.focus_ref?.organised === true && Array.isArray(pl.focus_ref.electives) && (pl.focus_ref.electives as unknown[]).includes(lessonId));
+    return res.json(hit ? { allowed: true, planId: hit.id, planTitle: hit.title } : { allowed: false });
+  } catch (e) { return fail(res, e); }
+});
+
 router.get("/:id", async (req, res) => {
   const userId = await caller(req, res);
   if (!userId) return;
@@ -362,6 +384,36 @@ function readPlanBody(b: Record<string, unknown>, opts: { allowEmpty?: boolean }
   const objectives = Array.isArray(b.objectives) ? b.objectives.filter((o): o is string => typeof o === "string" && !!o.trim()).map((o) => o.trim().slice(0, 300)).slice(0, 8) : [];
   const collection = (COLLECTIONS as readonly string[]).includes(String(b.collection)) ? String(b.collection) : null;
   return { title, focusType, focusLabel, focusRef, description, pace, days, sessions, kind: derivedFrom ? "structured" : scripture ? "scripture" : structured ? "structured" : "mixed", objectives, collection, derivedFrom };
+}
+// ── Organised plans (owner brief 2026-11-19) ──
+// A plan prepared by the Learning Plan organiser carries, in focus_ref: organised, question, electives (lessons this
+// plan may open out of their curriculum's order — ONLY lessons the signed proposal offered AND still in the plan),
+// and its Study Deeper lineage (deeperOf, root, depth). A participant can't write any of these themselves.
+const ORGANISER_KEYS = ["organised", "question", "electives", "deeperOf", "root", "depth"] as const;
+const lessonIdsOf = (sessions: SessionInput[]) => [...new Set(sessions.flatMap((x) => [x.primaryResource, ...x.supporting]).filter((r): r is Resource => !!r && r.kind === "lesson").map((r) => (r as { id: string }).id))];
+async function organiserRef(b: Record<string, unknown>, userId: string, sessions: SessionInput[], focusRef: Record<string, unknown>, previous?: Record<string, unknown> | null): Promise<Record<string, unknown>> {
+  const ref: Record<string, unknown> = { ...focusRef };
+  for (const k of ORGANISER_KEYS) delete ref[k];
+  const inPlan = new Set(lessonIdsOf(sessions));
+  const prevElectives = Array.isArray(previous?.electives) ? (previous!.electives as unknown[]).filter((x): x is string => typeof x === "string") : [];
+  if (previous?.organised === true) for (const k of ORGANISER_KEYS) if (previous[k] !== undefined) ref[k] = previous[k];
+  const org = b.organiser as { token?: unknown; question?: unknown; deeperOf?: unknown } | undefined;
+  if (org && typeof org === "object") {
+    ref.organised = true;
+    if (typeof org.question === "string" && org.question.trim()) ref.question = org.question.trim().slice(0, 200);
+    const offered = new Set(readElectives(org.token, userId));
+    ref.electives = [...new Set([...prevElectives, ...offered])].filter((id) => inPlan.has(id));
+    if (org.deeperOf != null && org.deeperOf !== "" && ref.deeperOf === undefined) {
+      if (!isUuid(org.deeperOf)) throw new PlanError(400, "That plan isn't available.");
+      const { data: parent } = await db.from("p2p_study_plans").select("id,owner_id,focus_ref").eq("id", org.deeperOf).maybeSingle();
+      const par = parent as { id: string; owner_id: string | null; focus_ref: Record<string, unknown> | null } | null;
+      const { data: done } = await db.from("p2p_study_plan_enrollments").select("id").eq("plan_id", org.deeperOf).eq("user_id", userId).eq("status", "completed").limit(1);
+      if (!par || !((done ?? []) as unknown[]).length) throw new PlanError(409, "Study Deeper opens when you've completed the whole plan.");
+      const pr = par.focus_ref ?? {};
+      ref.deeperOf = par.id; ref.root = typeof pr.root === "string" && isUuid(pr.root) ? pr.root : par.id; ref.depth = (Number(pr.depth) || 0) + 1;
+    }
+  } else if (previous?.organised === true) ref.electives = prevElectives.filter((id) => inPlan.has(id));
+  return ref;
 }
 /** Referenced lessons, stories, curriculums and topics must exist and be published. */
 async function checkReferences(sessions: SessionInput[]) {
@@ -448,6 +500,7 @@ router.post("/", async (req, res) => {
     }
     const p = readPlanBody(b, { allowEmpty: isDraft });
     await checkReferences(p.sessions);
+    p.focusRef = await organiserRef(b, userId, p.sessions, p.focusRef, null);
     if (p.derivedFrom?.type === "curriculum") {
       const { data: cur } = await db.from("p2p_curriculums").select("id,status,type").eq("id", p.derivedFrom.id).maybeSingle();
       const c = cur as { status: string; type: string } | null;
@@ -492,6 +545,7 @@ router.put("/:id", async (req, res) => {
     const p = readPlanBody(body, { allowEmpty: isDraft });
     if (p.derivedFrom) throw new PlanError(409, "This plan's sessions can't be replaced by a curriculum. Create a new plan instead.");
     await checkReferences(p.sessions);
+    p.focusRef = await organiserRef(body, userId, p.sessions, p.focusRef, plan.focus_ref);
     // A new VERSION only once someone follows the plan (a draft being written isn't history yet).
     const { data: anyRun } = await db.from("p2p_study_plan_enrollments").select("id").eq("plan_id", plan.id).limit(1);
     const followed = ((anyRun ?? []) as unknown[]).length > 0;

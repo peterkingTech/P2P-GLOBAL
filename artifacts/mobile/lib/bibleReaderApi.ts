@@ -90,6 +90,8 @@ export interface BibleChapter {
   footnotes?: { verse: number | null; caller: string | null; text: string }[];
   /** True when this is the copy kept on the phone (no connection). */
   offline?: boolean;
+  /** AO Lab: the chapter's own licensed recording(s), when the licence permits audio. */
+  audio?: { reader: string; url: string; timings: number[] | null }[];
 }
 // The licensed-translations list changes rarely: one request every 10 minutes at most
 // (a failed request isn’t remembered, so the next visit tries again).
@@ -202,4 +204,11 @@ export function highlightPalette(mode: "light" | "dark"): Record<HighlightColor,
     // No fill: an underline in the reading colour (see the reader's run style).
     underline: { wash: "transparent", swatch: dark ? "#E5E7EB" : "#374151", ink: dark ? "#E5E7EB" : "#374151", label: "Underline" },
   };
+}
+
+/** A chapter's recorded audio from the translation's licensed audio edition (API.Bible, streamed — never stored).
+ *  null = this chapter has no recording. */
+export async function getChapterAudio(t: string, book: string, chapter: number): Promise<{ url: string; expiresAt: string; reader: string } | null> {
+  try { return await call<{ url: string; expiresAt: string; reader: string }>(`/bible/reader/audio/${encodeURIComponent(t)}/${encodeURIComponent(book)}/${chapter}`); }
+  catch { return null; }
 }

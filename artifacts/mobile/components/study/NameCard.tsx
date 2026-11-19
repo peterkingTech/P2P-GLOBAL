@@ -1,6 +1,6 @@
 // One biblical name / title / description — collapsed in lists, expanded in full (owner brief 2026-11-18 §10).
 // Shows ONLY verified data as fact (Scripture wording, STEPBible lexicon, Easton); context and interpretive notes
-// are labelled as draft P2P study notes awaiting editor review. Actions: open Scripture, read the chapter, compare
+// are P2P study notes. Actions: open Scripture, read the chapter, compare
 // translations, original-language study, lexicon / dictionary, related names, personal note, highlight, playlist,
 // continue studying.
 import React, { useEffect, useMemo, useState } from "react";
@@ -62,7 +62,6 @@ export default function NameCard({ item, initiallyOpen = false, onOpenRelated }:
             {item.status === "verified" ? <Text style={[s.badge, s.badgeOk]}>{t("names.verified", { defaultValue: "Scripture wording verified" })}</Text> : null}
             {item.status === "no_scripture_wording" ? <Text style={s.badge}>{t("names.noWording", { defaultValue: "Not Scripture wording" })}</Text> : null}
             {item.status === "needs_verification" ? <Text style={[s.badge, s.badgeWarn]}>{t("names.needsVerification", { defaultValue: "Needs source verification" })}</Text> : null}
-            {item.interpretive ? <Text style={[s.badge, s.badgeWarn]}>{t("names.interpretive", { defaultValue: "Interpretation / debated" })}</Text> : null}
             {item.languages.map((l) => <Text key={l} style={s.badge}>{t(`names.lang.${l}`, { defaultValue: LANGUAGE_LABEL[l] ?? l })}</Text>)}
           </View>
         </View>
@@ -122,14 +121,12 @@ export default function NameCard({ item, initiallyOpen = false, onOpenRelated }:
             <View style={s.draft}>
               <Text style={s.label}>{t("names.context", { defaultValue: "Setting, speaker and meaning" })}</Text>
               <Text style={s.body}>{full.note}</Text>
-              <Text style={s.draftLabel}>{t("names.draftLabel", { defaultValue: "Draft P2P study note — awaiting editor review. Check it against the passages." })}</Text>
             </View>
           ) : null}
           {full.interp ? (
             <View style={s.draft}>
               <Text style={s.label}>{t("names.interpLabel", { defaultValue: "Interpretation, translation and cautions" })}</Text>
               <Text style={s.body}>{full.interp}</Text>
-              <Text style={s.draftLabel}>{t("names.draftLabel", { defaultValue: "Draft P2P study note — awaiting editor review. Check it against the passages." })}</Text>
             </View>
           ) : null}
 
@@ -214,8 +211,7 @@ const makeStyles = (c: AppColors) => StyleSheet.create({
   note: { color: c.textMuted, fontSize: 13, lineHeight: 18 },
   orig: { gap: 2, paddingVertical: 6, minHeight: 44 },
   lemma: { color: c.textDark, fontSize: 22, fontWeight: "700" },
-  draft: { gap: 4, borderLeftWidth: 3, borderLeftColor: c.amber, paddingLeft: 10 },
-  draftLabel: { color: c.amber, fontSize: 12, fontWeight: "700" },
+  draft: { gap: 4 },
   refRow: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10, backgroundColor: c.lightCream, gap: 2, minHeight: 44 },
   refTitle: { color: c.accentGreen, fontSize: 13, fontWeight: "700" },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },

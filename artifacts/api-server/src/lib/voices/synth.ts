@@ -1,4 +1,5 @@
-// P2P VOICES — on-demand speech for ELIGIBLE content (never pre-generated, never Bible text, never ElevenLabs).
+// P2P VOICES — on-demand speech for ELIGIBLE content (never pre-generated, never ElevenLabs; Bible text only from
+// PUBLIC-DOMAIN translations — owner 2026-11-19: P2P Voice is the only reading voice, no phone voice).
 //
 // The app's player is sentence-by-sentence (lib/listen/engine): each request here is ONE chunk exactly as the
 // listener will hear it, so highlighting stays on the sentence being spoken, pause/resume and a voice change
@@ -19,11 +20,20 @@ import { supabaseServiceRole as db } from "../supabase";
 import { logger } from "../logger";
 import { voiceById, providers } from "./catalogue";
 import { ProviderError, type Voice } from "./types";
+import { syntheticSpeechAllowed, type TranslationRow } from "../bibleLicence";
+import { licensedTranslations } from "../bibleReader";
 
-/** Content the participant may hear in a P2P Voice. NOT "bible" (licensed Bible text and audio are never synthesised)
- *  and NOT "playlist" (Scripture playlists are Bible text). "study" stays off: it carries Bible quotations in
- *  translations with different licences. */
-export const ELIGIBLE_KINDS = ["story", "story-intro", "lesson", "plan", "daily_word", "learning", "general"] as const;
+/** Content the participant may hear in a P2P Voice. Since 2026-11-19 (owner: P2P Voice only) this includes the Bible
+ *  and Scripture playlists — but ONLY in a public-domain translation (SCRIPTURE_KINDS: the request must name the
+ *  translation and syntheticSpeechAllowed must pass). "study" = commentaries, dictionary and lexicon articles
+ *  (public-domain / open study sources, in English); when it names a translation, the same rule applies. */
+export const ELIGIBLE_KINDS = ["story", "story-intro", "lesson", "plan", "daily_word", "learning", "general", "bible", "playlist", "study"] as const;
+export const SCRIPTURE_KINDS: readonly string[] = ["bible", "playlist"];
+type Lookup = (code: string) => Promise<TranslationRow | null>;
+// Static import (a dynamic import here would move database-client code ahead of the start-up env guard).
+let lookupTranslation: Lookup = async (code) => (await licensedTranslations()).find((r) => r.translation_code === code) ?? null;
+export const setTranslationLookupForTests = (f: Lookup) => { lookupTranslation = f; };
+export const NOT_PUBLIC_DOMAIN = "P2P Voice reads only public-domain Bible translations. Switch to one such as KJV, WEB or ASV to listen.";
 export type EligibleKind = (typeof ELIGIBLE_KINDS)[number];
 export const isEligible = (k: string): k is EligibleKind => (ELIGIBLE_KINDS as readonly string[]).includes(k);
 export const MAX_CHARS = 1500;
@@ -41,7 +51,7 @@ export const PREVIEW_SAMPLES: Record<string, string> = {
 export class VoicesError extends Error { constructor(public status: number, message: string, public code?: string) { super(message); } }
 
 // ── rate limits (per participant, per hour, this instance) ──
-const LIMITS = { speak: 400, preview: 40 };
+const LIMITS = { speak: 1500, preview: 40 }; // a Bible chapter is ~30–80 sentences; listening all hour stays under this
 const hits = new Map<string, number[]>();
 export function underLimit(userId: string, what: keyof typeof LIMITS, nowMs = Date.now()): boolean {
   const k = `${what}:${userId}`;
@@ -113,10 +123,18 @@ const inflight = new Map<string, Promise<void>>();
 let generations = 0;
 export const generationCount = () => generations;
 
-export interface SpeakRequest { userId: string; voiceId: string; contentKind: string; contentKey: string; contentVersion?: string; language: string; text: string; baseUrl: string }
+export interface SpeakRequest { userId: string; voiceId: string; contentKind: string; contentKey: string; contentVersion?: string; language: string; text: string; baseUrl: string; translation?: string }
 /** One chunk of eligible content in a P2P Voice: the cached recording, or a new one (once). */
 export async function speak(r: SpeakRequest): Promise<{ url: string; expiresAt: string; cached: boolean; voice: { id: string; name: string; provider: string; synthetic: true }; offlineAllowed: boolean }> {
-  if (!isEligible(r.contentKind)) throw new VoicesError(400, "This content is read by your phone's voice only.", "not_eligible");
+  if (!isEligible(r.contentKind)) throw new VoicesError(400, "P2P Voice can't read this yet.", "not_eligible");
+  const translation = String(r.translation ?? "").trim();
+  if (SCRIPTURE_KINDS.includes(r.contentKind) && !translation) throw new VoicesError(400, NOT_PUBLIC_DOMAIN, "translation_required");
+  if (translation) {
+    if (!/^[\w-]{1,64}$/.test(translation)) throw new VoicesError(400, NOT_PUBLIC_DOMAIN, "translation_not_permitted");
+    let row: TranslationRow | null = null;
+    try { row = await lookupTranslation(translation); } catch { throw new VoicesError(503, "Listening isn't available at the moment. Please try again shortly.", "provider_failed"); }
+    if (!row || !syntheticSpeechAllowed(row)) throw new VoicesError(403, NOT_PUBLIC_DOMAIN, "translation_not_permitted");
+  }
   const text = String(r.text ?? "").replace(/\s+/g, " ").trim();
   if (!text) throw new VoicesError(400, "There is nothing to read.", "empty");
   if (text.length > MAX_CHARS) throw new VoicesError(400, "That passage is too long to read at once.", "too_long");
@@ -150,7 +168,7 @@ export async function speak(r: SpeakRequest): Promise<{ url: string; expiresAt: 
       })();
       inflight.set(key, job);
     } else cached = false;
-    try { await job; } catch { throw new VoicesError(503, "This voice isn't available at the moment. Your phone's voice can keep reading.", "provider_failed"); }
+    try { await job; } catch { throw new VoicesError(503, "P2P Voice isn't available at the moment. Please try again shortly.", "provider_failed"); }
   }
   const link = await urlFor(key, r.baseUrl);
   return { ...link, cached, voice: { id: voice.id, name: voice.name, provider: voice.provider, synthetic: true }, offlineAllowed: policy.offlineAllowed };

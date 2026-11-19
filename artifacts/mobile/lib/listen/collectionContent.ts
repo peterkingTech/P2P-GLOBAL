@@ -39,7 +39,7 @@ export async function playlistContent(meta: PlaylistMeta, entries: QueueEntry[],
       ...(heading ? heading.parts.map((p) => ({ ...p, key: `${e.key}:heading` })) : []),
       ...verses.map((v) => ({ key: `${e.key}:${v.verse}`, text: v.text })),
     ];
-    sections.push({ id: e.key, title: e.reference, parts });
+    sections.push({ id: e.key, title: e.reference, parts, translation: e.ref.translationCode });
   }
   if (!sections.length) throw new Error("These passages couldn't be loaded. Please check your connection and try again.");
   return {

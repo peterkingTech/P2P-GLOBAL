@@ -33,7 +33,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { AppButton, IconButton } from "@/components/ui";
 import ListenPlayer, { ListenButton } from "@/components/listen/ListenPlayer";
 import { listen, useListenOwner, useListenState, type ListenContent, type StartAt } from "@/lib/listen";
-import { bibleListenContent, bibleListenKey } from "@/lib/listen/bibleContent";
+import { bibleListenContent, bibleListenKey, withChapterAudio } from "@/lib/listen/bibleContent";
 import { usePerfVisit } from "@/lib/perf";
 import { loadLocale } from "@/lib/i18n";
 import { useTranslation } from "react-i18next";
@@ -284,7 +284,8 @@ export default function BibleReaderScreen() {
     await loadLocale(translations?.find((t) => t.code === d.translation.code)?.language);
     const content = listenContent(d, part);
     if (!content) return flash("Listening isn't available for this translation yet.");
-    void listen.play(content, at);
+    // The translation's own recording first, when it has one (lib/listen/bibleContent withChapterAudio).
+    void listen.play(await withChapterAudio(content, d), at);
   };
   // "Continue listening" chose another chapter: once it has loaded, listen from the saved place.
   useEffect(() => {

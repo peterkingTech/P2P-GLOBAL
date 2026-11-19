@@ -97,7 +97,7 @@ export default function BibleVersions() {
               <Text style={s.emptyTitle}>{audioOnly ? "No recorded audio yet" : "No versions found"}</Text>
               <Text style={s.muted}>
                 {audioOnly
-                  ? anyAudio ? "None of the versions shown has licensed recorded audio available." : "No Bible version available to P2P Global has licensed recorded audio yet. Listen still reads any version aloud with your phone's voice."
+                  ? anyAudio ? "None of the versions shown has licensed recorded audio available." : "No Bible version available to P2P Global has licensed recorded audio yet. Listen reads public-domain versions aloud with P2P Voice."
                   : query ? `Nothing matches “${query}”.` : "No version is available in this language yet."}
               </Text>
             </View>

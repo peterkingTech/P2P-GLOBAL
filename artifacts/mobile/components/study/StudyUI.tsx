@@ -131,8 +131,8 @@ export function PronounceButton({ text, language, transliteration }: { text: str
       {plan.soundsLike ? <Text style={s.soundsLike}>{t("deepStudy.soundsLike", { defaultValue: "Sounds like: {{spelling}}", spelling: plan.soundsLike })}</Text> : null}
       <Text style={s.pronounceNote}>
         {approx ? approxNote : language === "hebrew"
-          ? t("deepStudy.conventionHebrew", { defaultValue: "Modern Israeli Hebrew (device voice) — not verified for Biblical Hebrew" })
-          : t("deepStudy.conventionGreek", { defaultValue: "Modern Greek (device voice) — not a reconstructed Koine pronunciation" })}
+          ? t("deepStudy.conventionHebrew", { defaultValue: "Modern Israeli Hebrew (P2P Voice) — not verified for Biblical Hebrew" })
+          : t("deepStudy.conventionGreek", { defaultValue: "Modern Greek (P2P Voice) — not a reconstructed Koine pronunciation" })}
         {state.voice ? ` · ${state.voice}` : ""}
       </Text>
       {state.status === "no_voice" ? <Text style={s.pronounceWarn} accessibilityLiveRegion="polite">{t("deepStudy.noDeviceVoice", { defaultValue: "This device has no voice for this language. Use the transliteration, or add the language's voice in your device's speech settings." })}</Text> : null}

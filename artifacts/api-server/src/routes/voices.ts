@@ -1,7 +1,7 @@
 // P2P VOICES — participant API (owner brief 2026-11-18). Mounted at /api/voices.
 //   GET  /catalogue?language=&accent=&provider=&presentation=&characteristic=&q=&purpose=&page=   voices + facets
 //   GET  /capabilities                       languages P2P can actually speak, and through whom
-//   POST /speak   { voiceId, contentKind, contentKey, contentVersion?, language, text }   one chunk (eligible content only)
+//   POST /speak   { voiceId, contentKind, contentKey, contentVersion?, language, text, translation? }   one chunk (eligible content; Bible = public domain only)
 //   POST /preview { voiceId }                a short fixed sample, or the provider's own preview link
 //   GET  /audio/:key?exp=&sig=               locally stored audio (development / no bucket) — signed, expiring
 //   GET  /preferences · PUT /preferences     the participant's voices per language, favourites, speed (own row only)
@@ -55,7 +55,8 @@ router.post("/speak", async (req, res) => {
   try {
     const b = req.body ?? {};
     const out = await speak({ userId, voiceId: String(b.voiceId ?? "").slice(0, 200), contentKind: String(b.contentKind ?? ""), contentKey: String(b.contentKey ?? ""),
-      contentVersion: b.contentVersion ? String(b.contentVersion).slice(0, 80) : "", language: String(b.language ?? "").slice(0, 16), text: String(b.text ?? ""), baseUrl: baseUrl(req) });
+      contentVersion: b.contentVersion ? String(b.contentVersion).slice(0, 80) : "", language: String(b.language ?? "").slice(0, 16), text: String(b.text ?? ""), baseUrl: baseUrl(req),
+      translation: b.translation ? String(b.translation).slice(0, 64) : undefined });
     return res.json(out);
   } catch (e) { return fail(res, e); }
 });

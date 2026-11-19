@@ -1,5 +1,5 @@
 // BIBLICAL NAMES, TITLES AND DESCRIPTIONS — the collection browser (owner brief 2026-11-18 §2, §12).
-// Sections A–H, filters (person, language, Testament, kind, interpretive) showing only what has entries, sorting
+// Sections A–H, filters (person, language, Testament, kind) showing only what has entries, sorting
 // (Bible order, original language, category, A–Z), search inside the collection, and expandable entries (NameCard).
 // Opened from the Bible Study page, from a search ("Names of God"), or at one entry (?id=).
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
-import { ChipRow, FilterChip } from "@/components/ui";
+import { ActiveFilters, ChipRow, FilterChip, FilterSheet, type FilterGroup, type FilterValue } from "@/components/ui";
 import { StudyState as StateView } from "@/components/study/StudyUI";
 import NameCard from "@/components/study/NameCard";
 import { getNameEntry, getNamesCollection, KIND_LABEL, LANGUAGE_LABEL, PERSON_LABEL, type NameKind, type NamePerson, type NameSection, type NameSummary, type NamesCollection, type NamesFilter } from "@/lib/biblicalNamesApi";
@@ -40,7 +40,6 @@ export default function BiblicalNames() {
     getNameEntry(String(p.id)).then((r) => setFocus({ ...r.entry, original: r.entry.original.map((o) => ({ lemma: o.lemma, transliteration: o.transliteration, language: o.language, strongs: o.strongs })), interpretive: !!r.entry.interp } as NameSummary)).catch(() => {});
   }, [p.id]);
   const set = (patch: Partial<NamesFilter>) => setF((cur) => ({ ...cur, ...patch }));
-  const toggle = <K extends keyof NamesFilter>(k: K, v: NamesFilter[K]) => setF((cur) => ({ ...cur, [k]: cur[k] === v ? null : v }));
 
   return (
     <>
@@ -58,27 +57,29 @@ export default function BiblicalNames() {
         <TextInput value={q} onChangeText={setQ} placeholder={t("names.filterPlaceholder", { defaultValue: "Find a name, title, Hebrew or Greek word" })} placeholderTextColor={c.textMuted}
           style={s.search} accessibilityLabel={t("names.filterPlaceholder", { defaultValue: "Find a name, title, Hebrew or Greek word" })} />
 
-        {data ? (
-          <View style={{ gap: 8 }}>
-            {data.facets.person.length > 1 ? (
-              <ChipRow accessibilityLabel={t("names.byPerson", { defaultValue: "Person" })}>
-                {data.facets.person.map((x) => <FilterChip key={x.key} label={`${t(`names.person.${x.key}`, { defaultValue: PERSON_LABEL[x.key as NamePerson] })} ${x.count}`} selected={f.person === x.key} onPress={() => toggle("person", x.key)} />)}
-              </ChipRow>
-            ) : null}
-            <ChipRow accessibilityLabel={t("names.byLanguage", { defaultValue: "Language and Testament" })}>
-              {data.facets.language.map((x) => <FilterChip key={x.key} label={`${t(`names.lang.${x.key}`, { defaultValue: LANGUAGE_LABEL[x.key] ?? x.key })} ${x.count}`} selected={f.language === x.key} onPress={() => toggle("language", x.key)} />)}
-              {data.facets.testament.map((x) => <FilterChip key={x.key} label={`${x.key === "OT" ? t("study.testament.OT", { defaultValue: "Old Testament" }) : t("study.testament.NT", { defaultValue: "New Testament" })} ${x.count}`} selected={f.testament === x.key} onPress={() => toggle("testament", x.key)} />)}
-            </ChipRow>
-            <ChipRow accessibilityLabel={t("names.byKind", { defaultValue: "Kind" })}>
-              {data.facets.kind.map((x) => <FilterChip key={x.key} label={`${t(`names.kind.${x.key}`, { defaultValue: KIND_LABEL[x.key as NameKind] })} ${x.count}`} selected={f.kind === x.key} onPress={() => toggle("kind", x.key)} />)}
-              {data.facets.interpretive ? <FilterChip label={`${t("names.interpretive", { defaultValue: "Interpretation / debated" })} ${data.facets.interpretive}`} selected={!!f.interpretive} onPress={() => set({ interpretive: !f.interpretive })} /> : null}
-            </ChipRow>
-            <ChipRow accessibilityLabel={t("names.sort", { defaultValue: "Sort" })} single>
-              {SORTS.map(([k, l]) => <FilterChip key={k} label={t(`names.sortBy.${k}`, { defaultValue: l })} icon="swap-vertical" selected={f.sort === k} selection="single" onPress={() => set({ sort: k })} />)}
-            </ChipRow>
-            <Text style={s.note}>{t("names.showing", { defaultValue: "{{count}} of {{total}} in {{title}}", count: data.total, total: data.sectionTotal, title: data.title })}</Text>
-          </View>
-        ) : null}
+        {data ? (() => {
+          // One Filters control (UI refinement 2026-11-19): person, language, Testament, kind and sorting live in a
+          // sheet; what's chosen shows as small removable chips. Same filters, same combinations as before.
+          const groups: FilterGroup[] = [
+            ...(data.facets.person.length > 1 ? [{ key: "person", title: t("names.byPerson", { defaultValue: "Person" }), options: [{ value: "", label: t("names.any", { defaultValue: "Any" }) }, ...data.facets.person.map((x) => ({ value: x.key, label: `${t(`names.person.${x.key}`, { defaultValue: PERSON_LABEL[x.key as NamePerson] })} ${x.count}` }))] }] : []),
+            { key: "language", title: t("names.byLanguageOnly", { defaultValue: "Language" }), options: [{ value: "", label: t("names.any", { defaultValue: "Any" }) }, ...data.facets.language.map((x) => ({ value: x.key, label: `${t(`names.lang.${x.key}`, { defaultValue: LANGUAGE_LABEL[x.key] ?? x.key })} ${x.count}` }))] },
+            { key: "testament", title: t("names.byTestament", { defaultValue: "Testament" }), options: [{ value: "", label: t("names.any", { defaultValue: "Any" }) }, ...data.facets.testament.map((x) => ({ value: x.key, label: `${x.key === "OT" ? t("study.testament.OT", { defaultValue: "Old Testament" }) : t("study.testament.NT", { defaultValue: "New Testament" })} ${x.count}` }))] },
+            { key: "kind", title: t("names.byKind", { defaultValue: "Kind" }), options: [{ value: "", label: t("names.any", { defaultValue: "Any" }) }, ...data.facets.kind.map((x) => ({ value: x.key, label: `${t(`names.kind.${x.key}`, { defaultValue: KIND_LABEL[x.key as NameKind] })} ${x.count}` }))] },
+            { key: "sort", title: t("names.sort", { defaultValue: "Sort" }), options: SORTS.map(([k, l]) => ({ value: k, label: t(`names.sortBy.${k}`, { defaultValue: l }) })) },
+          ];
+          const value: FilterValue = { person: [f.person ?? ""], language: [f.language ?? ""], testament: [f.testament ?? ""], kind: [f.kind ?? ""], sort: [f.sort ?? "canon"] };
+          const defaults: FilterValue = { person: [""], language: [""], testament: [""], kind: [""], sort: ["canon"] };
+          const apply = (v: FilterValue) => set({ person: (v.person?.[0] || null) as NamesFilter["person"], language: v.language?.[0] || null, testament: (v.testament?.[0] || null) as NamesFilter["testament"], kind: (v.kind?.[0] || null) as NamesFilter["kind"], sort: (v.sort?.[0] || "canon") as NamesFilter["sort"] });
+          return (
+            <View style={{ gap: 8 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <FilterSheet groups={groups} value={value} defaults={defaults} onChange={apply} />
+                <Text style={[s.note, { flex: 1 }]}>{t("names.showing", { defaultValue: "{{count}} of {{total}} in {{title}}", count: data.total, total: data.sectionTotal, title: data.title })}</Text>
+              </View>
+              <ActiveFilters groups={groups} value={value} defaults={defaults} onChange={apply} />
+            </View>
+          );
+        })() : null}
 
         <StateView loading={loading && !data} error={error} onRetry={load} empty={data && !data.entries.length ? t("names.none", { defaultValue: "No entries match these filters." }) : null} />
         {(data?.entries ?? []).filter((e) => e.id !== focus?.id).map((e) => <NameCard key={e.id} item={e} />)}
@@ -87,7 +88,6 @@ export default function BiblicalNames() {
           <View style={s.about}>
             <Text style={s.label}>{t("names.aboutTitle", { defaultValue: "Sources and coverage" })}</Text>
             <Text style={s.note}>{data.about.coverage}</Text>
-            <Text style={s.note}>{data.about.notesStatus}</Text>
             <Text style={s.note}>{t("names.aboutSources", { defaultValue: "Scripture: {{bibles}}. Original languages: STEPBible lexicons (CC BY 4.0) with BSB interlinear tagging. Dictionary: {{easton}}.",
               bibles: data.about.sources.bible.map((b) => `${b.name} (${b.licence})`).join(", "), easton: `${data.about.sources.easton.name} (${data.about.sources.easton.licence})` })}</Text>
           </View>

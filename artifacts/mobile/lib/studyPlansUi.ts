@@ -28,6 +28,7 @@ export function resourceRoute(r: Resource): Route | null {
     case "dictionary_term": return r.key ? { pathname: "/dictionary/term/[key]", params: { key: r.key } } : null;
     case "curriculum": return r.id ? { pathname: "/plan/[id]", params: { id: r.id } } : null;
     case "reference_article": return r.id ? { pathname: "/dictionary/article/[id]", params: { id: r.id } } : null;
+    case "scripture_collection": return r.id ? { pathname: "/scripture-collections/[id]", params: { id: r.id } } : null;
   }
   return null;
 }

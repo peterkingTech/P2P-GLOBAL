@@ -1,4 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { governedSystemPrompt } from "./aiGovernance";
+import { azureTranslate } from "./azureTranslator";
 import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL =
@@ -21,6 +23,34 @@ const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY || ANON_KEY);
 const supabaseRead  = createClient(SUPABASE_URL, SERVICE_ROLE_KEY || ANON_KEY);
 
 const TRANSLATION_MODEL = "claude-haiku-4-5-20251001";
+// Which service translates (owner 2026-11-19): "azure" = Azure AI Translator free tier (no credit needed), "anthropic"
+// = Claude (needs Anthropic credit). Results are DRAFTS for review either way.
+const translationProvider = () => ((process.env.TRANSLATION_PROVIDER ?? "anthropic").toLowerCase() === "azure" ? "azure" : "anthropic");
+const providerLabel = () => (translationProvider() === "azure" ? "azure-translator-f0" : TRANSLATION_MODEL);
+
+// COPYRIGHT (owner rule 2026-11-19: "everything we do must follow the copyright license"). A translation is a new
+// version of someone's work: content P2P credits to ANOTHER author or ministry (a module's attribution_text) is not
+// translated unless the owner has confirmed the right to translate it — listed by module id in
+// TRANSLATION_LICENSED_MODULES (comma-separated). P2P's own content is translated as before.
+export class TranslationLicenceError extends Error { readonly code = "licence_unconfirmed"; }
+async function moduleIdFor(contentType: ContentType, contentId: string): Promise<string | null> {
+  if (contentType === "module") return contentId;
+  if (contentType === "lesson") {
+    const { data } = await supabaseRead.from("p2p_lessons").select("module_id").eq("id", contentId).maybeSingle();
+    return (data as { module_id: string | null } | null)?.module_id ?? null;
+  }
+  return null;
+}
+export async function assertTranslationLicensed(contentType: ContentType, contentId: string): Promise<void> {
+  const moduleId = await moduleIdFor(contentType, contentId);
+  if (!moduleId) return;
+  const { data } = await supabaseRead.from("p2p_modules").select("attribution_text").eq("id", moduleId).maybeSingle();
+  const credit = String((data as { attribution_text: string | null } | null)?.attribution_text ?? "").trim();
+  if (!credit) return;
+  const allowed = String(process.env.TRANSLATION_LICENSED_MODULES ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  if (allowed.includes(moduleId)) return;
+  throw new TranslationLicenceError(`Not translated: this content is credited to another author ("${credit.split("\n")[0].slice(0, 80)}"). Confirm the right to translate it first (TRANSLATION_LICENSED_MODULES).`);
+}
 
 function getAnthropic(): Anthropic {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -397,10 +427,16 @@ async function callAI(
   source: SourceFields,
   targetLang: string
 ): Promise<{ result: TranslationResult; cost_usd: number }> {
+  // Free provider: Azure AI Translator (machine translation of the same fields; references protected).
+  if (translationProvider() === "azure") {
+    const { result } = await azureTranslate(source as Record<string, unknown>, targetLang);
+    return { result: result as TranslationResult, cost_usd: 0 };
+  }
   const langName = LANGUAGE_NAMES[targetLang] ?? targetLang;
   const anthropic = getAnthropic();
 
-  const systemPrompt = `You are translating content for a peer-to-peer Bible discipleship platform. All theological terms must be translated accurately and with cultural sensitivity. Preserve the meaning, tone, and spiritual weight of the original text. Do not paraphrase — translate faithfully.
+  // P2P AI governance (lib/aiGovernance): the shared framework comes first, then this task's own rules.
+  const systemPrompt = governedSystemPrompt("content_translation", `You are translating content for a peer-to-peer Bible discipleship platform. All theological terms must be translated accurately and with cultural sensitivity. Preserve the meaning, tone, and spiritual weight of the original text. Do not paraphrase — translate faithfully.
 
 Translate the following Christian discipleship content from English to ${langName}.
 
@@ -410,7 +446,7 @@ Rules:
 - Translate study questions, section headings, and descriptive content faithfully
 - Keep the same tone: warm, encouraging, and biblically grounded
 - Return ONLY a valid JSON object with the same keys as the input — no markdown, no explanation, no code fences
-- Every string value must itself be valid JSON: escape newlines as \\n and backslashes as \\\\`;
+- Every string value must itself be valid JSON: escape newlines as \\n and backslashes as \\\\`);
 
   const userPrompt = `Translate this ${contentType} content to ${langName}:\n\n${JSON.stringify(source, null, 2)}`;
 
@@ -455,7 +491,7 @@ async function createJob(
       status: "processing",
       attempts: 1,
       triggered_by: triggeredBy,
-      ai_provider: TRANSLATION_MODEL,
+      ai_provider: providerLabel(),
       started_at: new Date().toISOString(),
     })
     .select("id")
@@ -575,6 +611,9 @@ export async function translateAndStore(
     const existing = await getExistingTranslation(contentType, contentId, languageCode);
     if (existing) return existing;
   }
+
+  // Copyright first: content credited to another author is never translated without confirmed rights.
+  await assertTranslationLicensed(contentType, contentId);
 
   const source = await fetchEnglishSource(contentType, contentId);
   if (!source) throw new Error(`Content not found: ${contentType}/${contentId}`);

@@ -11,6 +11,7 @@ import { withScreenBoundary } from "@/components/ScreenErrorBoundary";
 import { archivePlan, getPlan, savePlan, startPlan, updateRun, type DurationKey, type Pace, type PlanDetail } from "@/lib/studyPlansApi";
 import { DURATIONS, PACES, dueKey, estimate, passageText, todayIso } from "@/lib/studyPlansUi";
 import { getStudyDestinations, startSharedStudy, type LedGroup, type StudyPerson } from "@/lib/studyTogetherApi";
+import PlanReminders from "@/components/plans/PlanReminders";
 
 // P2P PLANS — PLAN DETAILS (owner brief §11, §8, §9). What the plan is about, what you'll study, how long it
 // takes and how to follow it — individually or together (Study Together: discussion there, each person's own
@@ -159,7 +160,25 @@ function PlanDetailsScreen() {
               <AppButton size="sm" variant="tertiary" label={t("p2pPlans.me.leave")} onPress={() => updateRun(me.run.id, { action: "leave" }).then(load)} />
             </View>
             {panel === "reschedule" ? <View style={s.panel}>{SchedulePicker}<View style={s.buttons}><AppButton label={t("p2pPlans.me.changeSchedule")} disabled={busy} onPress={() => submit()} /><AppButton variant="tertiary" label={t("p2pPlans.start.cancel")} onPress={() => setPanel(null)} /></View></View> : null}
+            {/* Reminders (owner brief 2026-11-19 §7): only while the plan isn't completed; a completed plan has none. */}
+            {me.run.status !== "completed" ? <PlanReminders planId={p.id} planTitle={p.title} /> : null}
           </View>
+        ) : null}
+
+        {/* STUDY DEEPER (owner brief 2026-11-19 §8–§10): ONLY once this whole confirmed plan is completed. A new
+            journey that goes beyond what was studied — prepared for review, never saved or started automatically. */}
+        {me && me.run.status === "completed" ? (
+          <View style={[s.card, s.deeper]}>
+            <Text style={s.label}>{t("plansOrganiser.deeperKicker", { defaultValue: "Journey complete" })}</Text>
+            <Text style={s.big}>{t("plansOrganiser.deeperTitle", { defaultValue: "Study Deeper" })}</Text>
+            <Text style={s.body}>{t("plansOrganiser.deeperBody", { defaultValue: "Go further into “{{focus}}”: original languages, history and context, cross-references and new passages — without repeating what you've already studied.", focus: String((p as { focusRef?: Record<string, unknown> }).focusRef?.question ?? p.focusLabel) })}</Text>
+            <AppButton icon="layers-outline" label={t("plansOrganiser.deeperAction", { defaultValue: "Study Deeper" })}
+              onPress={() => router.push({ pathname: "/plans/builder", params: { deeperOf: p.id, q: String((p as { focusRef?: Record<string, unknown> }).focusRef?.question ?? p.focusLabel) } } as any)} />
+          </View>
+        ) : null}
+        {typeof (p as { focusRef?: Record<string, unknown> }).focusRef?.deeperOf === "string" ? (
+          <AppButton size="sm" variant="tertiary" icon="git-branch-outline" label={t("plansOrganiser.previousJourney", { defaultValue: "Earlier journey on this subject" })}
+            onPress={() => router.push({ pathname: "/study-plan/[id]", params: { id: String((p as { focusRef?: Record<string, unknown> }).focusRef!.deeperOf) } } as any)} />
         ) : null}
 
         {/* ── About the plan ── */}
@@ -305,6 +324,7 @@ function makeStyles(c: AppColors) {
     label: { fontSize: 11.5, color: c.accentGreen, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.4, marginTop: 4 },
     section: { fontSize: 18, color: c.textDark, fontFamily: "Inter_700Bold", marginTop: 8 },
     card: { padding: 14, gap: 6, borderRadius: 14, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige },
+    deeper: { borderColor: c.primaryGreen, borderWidth: 1.5, gap: 8 },
     panel: { padding: 14, gap: 8, borderRadius: 14, backgroundColor: c.card, borderWidth: 2, borderColor: c.accentGreen },
     cardTitle: { fontSize: 16, color: c.textDark, fontFamily: "Inter_700Bold" },
     buttons: { flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center" },

@@ -3,6 +3,7 @@ import { BOOK_CODES } from "./bibleService";
 import { attributionOf, canCache, canPlayRecordedAudio, isServable, offlineAllowed, providerOf, textCopyAllowed as licenceTextCopyAllowed, type TranslationRow } from "./bibleLicence";
 import { getHelloAoBooks, getHelloAoCatalogue, getHelloAoChapter, HelloAoError, type HelloAoTranslation } from "./bibleProviders/helloao";
 import { CURATED_TRANSLATIONS } from "./bibleProviders/helloaoRegistry";
+import { audioEditionFor } from "./bibleAudio";
 
 // The Bible reader (full chapters, translations, search, related lessons).
 // Scripture text comes ONLY from API.Bible for translations marked
@@ -122,7 +123,10 @@ export const publicTranslation = (r: TRow) => ({
   coverage: r.coverage ?? null,
   coverageLabel: r.coverage ? r.description ?? null : null,
   // Recorded audio: only when the provider supplies it AND the reviewed licence permits it (never assumed).
-  recordedAudio: canPlayRecordedAudio(r),
+  recordedAudio: canPlayRecordedAudio(r) || !!audioEditionFor(r),
+  // API.Bible audio edition (lib/bibleAudio): streamed per chapter through GET /bible/audio.
+  audioEdition: audioEditionFor(r)?.label ?? null,
+  audioNtOnly: audioEditionFor(r)?.nt === true,
 });
 
 export class BibleError extends Error { status: number; constructor(message: string, status: number) { super(message); this.status = status; } }

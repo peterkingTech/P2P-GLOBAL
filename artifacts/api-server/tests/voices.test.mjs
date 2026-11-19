@@ -3,7 +3,7 @@
 //   A catalogue: dynamic, normalised (accent from locale, presentation only when supplied, characteristics only
 //     from metadata), child voices excluded, filters + facets, caching, provider failure → last verified list
 //   B ElevenLabs: no synthesize anywhere, preview = provider link (no generation), no TTS endpoint in the server
-//   C/D eligibility: Bible / playlists never synthesised; language must match (never translated)
+//   C/D eligibility: Bible / playlists only in public-domain translations (owner 2026-11-19); language must match
 //   G cache: same content+voice reused, edited text regenerates, concurrent requests generate ONCE
 //   I security: no provider secret in the app; narration routes owner-only; uploads validated
 // Run: node tests/voices.test.mjs
@@ -76,7 +76,23 @@ ok("the server source never calls an ElevenLabs text-to-speech endpoint", !/api\
 ok("the narration admin routes contain no TTS call", !/elevenlabs\.io|synthesize\(/.test(readFileSync(path.join(root, "src/routes/narrationsAdmin.ts"), "utf8")));
 
 // ── C/D. eligibility ──
-for (const kind of ["bible", "playlist", "study"]) { let e = null; try { await req({ contentKind: kind }); } catch (x) { e = x; } ok(`never synthesised: ${kind}`, e?.code === "not_eligible"); }
+// Owner 2026-11-19: P2P Voice only — the Bible and playlists too, but ONLY in a public-domain translation.
+V.setTranslationLookupForTests(async (code) => ({
+  KJV: { translation_code: "KJV", provider: null, license_notes: "Public domain — no restrictions" },
+  "AO-eng_asv": { translation_code: "AO-eng_asv", provider: "helloao", licence_status: "approved", licence_name: "Public domain" },
+  NIV: { translation_code: "NIV", provider: null, license_notes: "Copyright © Biblica" },
+  ONEN: { translation_code: "ONEN", provider: null, license_notes: "Biblica® Open License — available in API.Bible" },
+  "AO-eng_lsv": { translation_code: "AO-eng_lsv", provider: "helloao", licence_status: "approved", licence_name: "CC BY-SA 4.0" },
+}[code] ?? null));
+const tryReq = async (o) => { try { return { r: await req(o) }; } catch (e) { return { e }; } };
+for (const kind of ["bible", "playlist"]) {
+  ok(`${kind}: no translation named → refused`, (await tryReq({ contentKind: kind })).e?.code === "translation_required");
+  ok(`${kind}: public-domain API.Bible translation (KJV) → read`, !!(await tryReq({ contentKind: kind, contentKey: "bible:KJV:JHN.3", translation: "KJV" })).r?.url);
+  ok(`${kind}: public-domain AO Lab translation (ASV) → read`, !!(await tryReq({ contentKind: kind, contentKey: "bible:AO-eng_asv:JHN.3", translation: "AO-eng_asv" })).r?.url);
+  for (const t of ["NIV", "ONEN", "AO-eng_lsv", "UNKNOWN"]) ok(`${kind}: ${t} (not public domain) → refused`, (await tryReq({ contentKind: kind, translation: t })).e?.code === "translation_not_permitted");
+}
+ok("study (commentary, dictionary, lexicon) → read", !!(await tryReq({ contentKind: "study", contentKey: "dictionary:grace" })).r?.url);
+ok("unknown content kinds are still refused", (await tryReq({ contentKind: "messages" })).e?.code === "not_eligible");
 err = null; try { await req({ language: "de" }); } catch (e) { err = e; }
 ok("the voice must speak the TEXT's language (no silent translation)", err?.code === "language_mismatch");
 err = null; try { await req({ text: "x".repeat(2000) }); } catch (e) { err = e; }
@@ -97,7 +113,7 @@ const prevA = await V.preview("u1", "azure:en-GB-SoniaNeural", "http://x"); cons
 ok("Azure/Google preview: one short fixed sample, generated once then cached", prevA.kind === "sample" && synthCalls === before);
 ok("local audio links are signed and expire", V.verifyLocal("a".repeat(64), Math.floor(Date.now() / 1000) + 60, V.signLocal("a".repeat(64), Math.floor(Date.now() / 1000) + 60)) && !V.verifyLocal("a".repeat(64), Math.floor(Date.now() / 1000) - 5, V.signLocal("a".repeat(64), Math.floor(Date.now() / 1000) - 5)));
 V.resetLimitsForTests();
-let limited = false; for (let i = 0; i < 401; i++) if (!V.underLimit("u2", "speak")) limited = true;
+let limited = false; for (let i = 0; i < 1501; i++) if (!V.underLimit("u2", "speak")) limited = true;
 ok("rate limit per participant", limited);
 
 // ── F. preferences (server validation) ──
@@ -119,8 +135,9 @@ const appSrc = srcFiles(path.join(mobile, "lib")).concat(srcFiles(path.join(mobi
 ok("no provider secret or key name in the app", !/AZURE_SPEECH_KEY|GOOGLE_TTS_API_KEY|ELEVENLABS_API_KEY|SPITCH_API_KEY|xi-api-key|Ocp-Apim-Subscription-Key/.test(appSrc));
 ok("no provider key in public (EXPO_PUBLIC_) variables", !/EXPO_PUBLIC_[A-Z_]*(AZURE|GOOGLE_TTS|ELEVEN|SPITCH)/.test(appSrc));
 const listenSrc = readFileSync(path.join(mobile, "lib/listen/index.ts"), "utf8");
-ok("the app's player never uses a P2P Voice for Bible content", listenSrc.includes('o.kind !== "bible" && isEligibleKind(o.kind)'));
-ok("official narration comes first unless the listener chose otherwise", listenSrc.includes("(!official || !getVoicePrefs().preferOfficial)"));
+ok("the app's player uses the phone's voice only offline (owner 2026-11-19)", (listenSrc.match(/phoneSpeech\.speak\(/g) ?? []).length === 1 && listenSrc.includes("isNetworkFailure(e) ? noInternet() : refused("));
+ok("the app's player sends the Bible translation so the server can check it", readFileSync(path.join(mobile, "lib/listen/engine.ts"), "utf8").includes("translation: content.sections[c.section]?.translation"));
+ok("official narration comes first unless the listener chose otherwise", listenSrc.includes("(!official || (chosen && !getVoicePrefs().preferOfficial && !authorised))"));
 const mig = readFileSync(path.join(root, "../../migrations/254_p2p_voices.sql"), "utf8");
 ok("migration 254: additive, RLS on, API-only, one published recording per chapter", !/drop table|alter table [^;]* drop|delete from/i.test(mig.replace(/-- .*$/gm, "")) && (mig.match(/enable row level security/g) ?? []).length === 5 && mig.includes("where status = 'published'"));
 

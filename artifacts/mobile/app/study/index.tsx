@@ -56,6 +56,7 @@ export default function StudyWorkspace() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [group, setGroup] = useState<StudyGroup | "all">("all");
+  const [moreFor, setMoreFor] = useState<string | null>(null);
   const [match, setMatch] = useState<Match>("all");
   const [saved, setSaved] = useState<SavedFinding[]>([]);
   const [hls, setHls] = useState<StudyHl[]>([]);
@@ -304,7 +305,12 @@ export default function StudyWorkspace() {
             <Text style={s.source}>{t("study.sourceLabel", { defaultValue: "Source:" })} {f.source}</Text>
             <View style={s.actions}>
               <AppButton label={f.kind === "bible_passage" ? t("study.readChapter", { defaultValue: "Read in the Bible" }) : t("study.open", { defaultValue: "Open" })} size="sm" variant="secondary" onPress={() => open(f)} />
+              {/* UI refinement 2026-11-19: one primary action; the rest on request (same actions as before). */}
               {f.kind === "bible_passage" ? (
+                <AppButton label={moreFor === f.key ? t("study.less", { defaultValue: "Less" }) : t("study.moreActions", { defaultValue: "More" })} size="sm" variant="tertiary" icon={moreFor === f.key ? "chevron-up" : "ellipsis-horizontal"}
+                  accessibilityLabel={`${t("study.moreActions", { defaultValue: "More" })}: ${f.title}`} onPress={() => setMoreFor(moreFor === f.key ? null : f.key)} />
+              ) : null}
+              {f.kind === "bible_passage" && moreFor === f.key ? (
                 <>
                   <AppButton label={t("study.compareTr", { defaultValue: "Compare" })} size="sm" variant="outline" icon="git-compare-outline" onPress={() => {
                     const ps = passageOf(f)!; router.push(bibleRoute({ book: ps.book, chapter: ps.chapter, v: ps.startVerse, ve: ps.endVerse, translation, compare: true }) as any);

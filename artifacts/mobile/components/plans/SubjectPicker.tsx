@@ -17,7 +17,7 @@ export default function SubjectPicker({ value, onChange, types, initialType }: {
   const { colors: c } = useTheme();
   const s = useMemo(() => makeStyles(c), [c]);
   const [available, setAvailable] = useState<SubjectType[] | null>(null);
-  const [type, setType] = useState<SubjectType>(value?.type ?? initialType ?? "bible_topic");
+  const [type, setType] = useState<SubjectType>(value?.type ?? initialType ?? "bible_book");
   const [q, setQ] = useState("");
   const [items, setItems] = useState<SubjectItem[] | null>(null);
   const [total, setTotal] = useState(0);
@@ -27,10 +27,11 @@ export default function SubjectPicker({ value, onChange, types, initialType }: {
 
   useEffect(() => {
     getSubjectTypes().then((r) => {
-      const has = r.types.filter((x) => x.count > 0).map((x) => x.type).filter((x) => !types || types.includes(x));
+      // "Bible Topic" is not a focus choice (owner 2026-11-19): topics are found by searching the subject itself.
+      const has = r.types.filter((x) => x.count > 0).map((x) => x.type).filter((x) => x !== "bible_topic" && (!types || types.includes(x)));
       setAvailable(has);
-      if (!has.includes(type) && has.length) setType(has.includes("bible_topic") ? "bible_topic" : has[0]);
-    }, () => setAvailable(SUBJECT_TYPES.filter((x) => x === "bible_book" || x === "bible_topic")));
+      if (!has.includes(type) && has.length) setType(has.includes("bible_book") ? "bible_book" : has[0]);
+    }, () => setAvailable(SUBJECT_TYPES.filter((x) => x === "bible_book")));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const run = (ty: SubjectType, query: string, offset = 0) => {

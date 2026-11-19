@@ -4,7 +4,7 @@
 //   • Hebrew / Aramaic / Greek from the STEPBible lexicons (lemma, transliteration, gloss, use count) with the BSB
 //     interlinear tagging that shows the word in the primary verse;
 //   • Easton's Bible Dictionary links (and excerpts, unchanged).
-// "note" and "interp" texts are DRAFT P2P study notes awaiting editor review — the API labels them so.
+// "note" and "interp" texts are P2P study notes (owner 2026-11-19: no draft label; fields kept empty for older app builds).
 // One canonical record per expression: it can sit in several collections (sections) without being duplicated.
 import namesText from "../../data/biblical-names.txt";
 import { getArticles } from "./referenceArticles";
@@ -44,7 +44,7 @@ export function summary(e: NameEntry) {
   return { id: e.id, name: e.name, kind: e.kind, persons: e.persons, sections: SECTIONS.filter((s) => inSection(e, s.key)).map((s) => s.key),
     original: e.original.slice(0, 3).map((o) => ({ lemma: o.lemma, transliteration: o.transliteration, language: o.language, strongs: o.strongs })),
     primary: e.primary ? { display: e.primary.display, book: e.primary.book, chapter: e.primary.chapter, start: e.primary.start, end: e.primary.end, testament: e.primary.testament } : null,
-    testaments: e.testaments, languages: e.languages, status: e.status, interpretive: !!e.interp };
+    testaments: e.testaments, languages: e.languages, status: e.status, interpretive: false }; // badge removed (owner 2026-11-19)
 }
 
 export interface CollectionQuery { section?: Section | null; person?: Person | null; language?: string | null; testament?: "OT" | "NT" | null; kind?: Kind | null; interpretive?: boolean; q?: string | null; sort?: "canon" | "language" | "category" | "alpha" }
@@ -69,7 +69,7 @@ export function collection(cq: CollectionQuery) {
     language: ["hebrew", "aramaic", "greek"].map((l) => ({ key: l, count: count((e) => e.languages.includes(l)) })).filter((x) => x.count),
     testament: (["OT", "NT"] as const).map((t) => ({ key: t, count: count((e) => e.testaments.includes(t)) })).filter((x) => x.count),
     kind: KIND_ORDER.map((k) => ({ key: k, count: count((e) => e.kind === k) })).filter((x) => x.count),
-    interpretive: count((e) => !!e.interp),
+    interpretive: 0, // filter removed (owner 2026-11-19)
   };
   return { section: cq.section ?? null, title: SECTIONS.find((s) => s.key === cq.section)?.title ?? "All biblical names, titles and descriptions", total: list.length,
     sectionTotal: base.length, entries: list.map(summary), facets, sections: SECTIONS.map((s) => ({ ...s, count: all.filter((e) => inSection(e, s.key)).length })), about: about() };
@@ -80,7 +80,7 @@ export function about() {
   const d = getNames();
   return { builtAt: d.builtAt, sources: d.sources, counts: d.counts,
     coverage: "Every entry is checked against the Bible text and the lexicon; the collection grows as P2P editors add verified entries. It is not claimed to be exhaustive.",
-    notesStatus: "Context notes and interpretive notes are draft P2P study notes awaiting editor review." };
+    notesStatus: "" };
 }
 
 /** One entry in full: Easton excerpt, related names (same original word, same Easton article, same verse, or
@@ -102,7 +102,7 @@ export function entry(id: string) {
   let eastonExcerpt: string | null = null;
   try { const a = e.easton ? getArticles().byId.get(e.easton.id) : null; eastonExcerpt = a ? excerptOf(a, 900) : null; } catch { eastonExcerpt = null; }
   return { ...e, sections: SECTIONS.filter((s) => inSection(e, s.key)).map((s) => s.key), eastonExcerpt, related,
-    noteLabel: "Draft P2P study note — awaiting editor review", sources: getNames().sources };
+    noteLabel: "", sources: getNames().sources };
 }
 
 // ── Search (My Plan / Bible Study) ───────────────────────────────────────────────────────────────────────────────

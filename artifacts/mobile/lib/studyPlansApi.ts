@@ -7,7 +7,7 @@ export type Collection = "bible_books" | "topical" | "life_of_jesus" | "biblical
 export type Pace = "daily" | "five_weekly" | "three_weekly" | "weekly" | "flexible";
 export type DurationKey = "daily" | "weekly" | "monthly" | "quarterly" | "half_year" | "yearly" | "custom";
 export type QuestionKind = "observe" | "context" | "interpret" | "consider" | "apply";
-export type ResourceKind = "bible_passage" | "lesson" | "kingdom_story" | "scripture_topic" | "deep_study" | "word_study" | "commentary" | "dictionary_term" | "curriculum" | "reference_article";
+export type ResourceKind = "bible_passage" | "lesson" | "kingdom_story" | "scripture_topic" | "deep_study" | "word_study" | "commentary" | "dictionary_term" | "curriculum" | "reference_article" | "scripture_collection";
 export interface Passage { book: string; chapter: number; startVerse?: number; endVerse?: number }
 export type Resource = { kind: ResourceKind; id?: string; chapterId?: string; slug?: string; strongs?: string; key?: string; note?: string; title?: string; label?: string | null; display?: string } & Partial<Passage>;
 
@@ -41,6 +41,9 @@ export interface MyPlans { active: RunItem[]; paused: RunItem[]; completed: RunI
 export interface ScheduleProblem { error: string; perDay?: number; suggestion?: { durationKey: DurationKey; days: number } | null }
 export interface PlanInput { title: string; description?: string | null; focusType: FocusType; focusLabel?: string; focusRef?: Record<string, unknown>; suggestedPace?: Pace; suggestedDays?: number | null;
   /** A builder draft (may be incomplete; can't be started). `clientKey` makes a retried create return the same plan. */
+  /** A journey prepared by the Learning Plan organiser: its signed proposal token (electives), the question, and —
+   *  for Study Deeper — the completed plan it goes deeper from. The server decides what this grants. */
+  organiser?: { token: string; question: string; deeperOf?: string | null };
   draft?: boolean; clientKey?: string; derivedFrom?: { type: "foundations" } | { type: "curriculum"; id: string } | null;
   objectives?: string[]; sessions: { id?: string; title: string; intro?: string | null; passages: Passage[]; primaryResource?: Resource | null; supporting?: Resource[]; questions?: { kind: QuestionKind; text: string }[]; reflection?: string | null; prayer?: string | null }[] }
 

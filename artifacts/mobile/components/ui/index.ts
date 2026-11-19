@@ -11,3 +11,5 @@ export { default as CallControl } from "./CallControl";
 export type { CallControlProps } from "./CallControl";
 export { ButtonThemeProvider, FixedLightButtons, useButtonTokens } from "./ButtonTheme";
 export type { ButtonPalette } from "./ButtonTheme";
+export { SectionHeader, Collapsible, EmptyNote, FilterSheet, ActiveFilters } from "./Disclosure";
+export type { FilterGroup, FilterValue } from "./Disclosure";

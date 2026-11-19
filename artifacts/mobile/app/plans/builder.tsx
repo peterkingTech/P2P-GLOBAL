@@ -18,6 +18,8 @@ import {
 } from "@/lib/studyPlansApi";
 import { DURATIONS, PACES, estimate, focusFor, journeySessions, move, newClientKey, parseReference, passageText, todayIso } from "@/lib/studyPlansUi";
 import { onPick, pickRoute, takePick } from "@/lib/passagePick";
+import JourneyReview from "@/components/plans/JourneyReview";
+import { organise, toPlanSession, type Organised, type ProposedSession } from "@/lib/planOrganiserApi";
 
 // P2P PLANS — THE PLAN BUILDER (brief §8): five calm steps, one thing at a time.
 //   1 Focus      — what to study (searchable, from the real records) and how: "Let P2P organise my study" or
@@ -40,13 +42,21 @@ function BuilderScreen() {
   const { t } = useTranslation();
   const { colors: c } = useTheme();
   const s = useMemo(() => makeStyles(c), [c]);
-  const params = useLocalSearchParams<{ id?: string; type?: string; key?: string; label?: string; approach?: string; group?: string }>();
+  const params = useLocalSearchParams<{ id?: string; type?: string; key?: string; label?: string; approach?: string; group?: string; q?: string; deeperOf?: string }>();
   const editId = params.id ? String(params.id) : null;
-  const preset = params.type && params.key && (SUBJECT_TYPES as string[]).includes(params.type) ? { type: params.type as SubjectType, key: String(params.key), label: String(params.label ?? "") } : null;
-  const [step, setStep] = useState<Step>(preset ? 2 : 1);
+  const preset = params.type && params.key && (SUBJECT_TYPES as string[]).includes(params.type) && params.type !== "bible_topic" ? { type: params.type as SubjectType, key: String(params.key), label: String(params.label ?? "") } : null;
+  // Study Deeper (only reachable from a COMPLETED plan): the same question, a new journey that goes further.
+  const deeperOf = params.deeperOf ? String(params.deeperOf) : null;
+  const [step, setStep] = useState<Step>(preset || deeperOf ? 2 : 1);
   const [subject, setSubject] = useState<ChosenSubject | null>(preset);
   const [approach, setApproach] = useState<"p2p" | "own">(params.approach === "own" ? "own" : "p2p");
-  const [customFocus, setCustomFocus] = useState("");
+  // The subject or question, in the participant's own words (owner brief 2026-11-19 §1) — also the "own" focus.
+  const [customFocus, setCustomFocus] = useState(params.q ? String(params.q).slice(0, 200) : "");
+  // Optional starting point: widens the search, never restricts it.
+  const [startKind, setStartKind] = useState<"any" | "bible_book" | "core_foundations" | "kingdom_school">(preset?.type === "bible_book" || preset?.type === "kingdom_school" || preset?.type === "core_foundations" ? preset.type : "any");
+  const [organised, setOrganised] = useState<Organised | null>(null);
+  const [proposal, setProposal] = useState<ProposedSession[]>([]);
+  const [organisedFor, setOrganisedFor] = useState<string | null>(null);
   const [discovery, setDiscovery] = useState<Discovery | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [derivedFrom, setDerivedFrom] = useState<PlanInput["derivedFrom"]>(null);
@@ -101,23 +111,23 @@ function BuilderScreen() {
     setDiscovery(null);
     if (subject) discover(subject.type, subject.key).then(setDiscovery, () => setDiscovery(null));
   }, [subject?.type, subject?.key]); // eslint-disable-line react-hooks/exhaustive-deps
-  // "Let P2P organise my study": prepare the suggested journey ONCE per subject; the person reviews it.
+  // "Let P2P organise my study" (owner brief 2026-11-19): the subject or question is searched across ALL authorised
+  // P2P resources and organised into a PROPOSED journey — prepared once per question + starting point, then
+  // reviewed and edited here. Nothing is saved until the participant confirms in the last step.
+  const question = customFocus.trim() || subject?.label || "";
+  const startPoint = startKind === "core_foundations" ? { type: "core_foundations" as const, key: "foundations", label: "Core Foundations" }
+    : subject && (startKind === "bible_book" || startKind === "kingdom_school") && subject.type === startKind ? { type: startKind, key: subject.key, label: subject.label } : null;
   useEffect(() => {
-    if (step !== 2 || !subject || approach !== "p2p") return;
-    const id = `${subject.type}:${subject.key}`;
-    if (journeyFor === id || journeyFor === "edit") return;
+    if (step !== 2 || approach !== "p2p" || journeyFor === "edit") return;
+    if (!deeperOf && question.length < 2) return;
+    const id = `${question}|${startPoint?.type ?? ""}:${startPoint?.key ?? ""}|${deeperOf ?? ""}`;
+    if (organisedFor === id) return;
     setLoadingJourney(true); setError(null);
-    getJourney(subject.type, subject.key).then((r) => {
-      setJourneyFor(id);
-      setDerivedFrom(r.journey.derivedFrom);
-      const js = journeySessions(r.journey, t, subject.label || r.subject.label);
-      setSessions(js);
-      // What the journey already includes shows as added (so "Add more" never offers it twice).
-      setAdded(new Set(js.flatMap((x) => [...x.passages.map((p) => `bible_passage:${passageText(p)}`), ...[x.primaryResource, ...(x.supporting ?? [])].filter(Boolean).map((res) => recKey(res as Resource))])));
-      setJourneyNote(r.journey.note);
-      if (!subject.label) setSubject({ ...subject, label: r.subject.label });
+    organise({ q: question, start: startPoint, deeperOf }).then((r) => {
+      setOrganisedFor(id); setOrganised(r); setProposal(r.sessions); setDerivedFrom(null);
+      if (!customFocus.trim() && r.journey.question) setCustomFocus(r.journey.question);
     }, (e) => setError(e?.message ?? t("p2pPlans.discover.loadError"))).finally(() => setLoadingJourney(false));
-  }, [step, subject, approach, journeyFor, t]);
+  }, [step, approach, question, startPoint?.type, startPoint?.key, deeperOf, organisedFor, journeyFor, t]); // eslint-disable-line react-hooks/exhaustive-deps
   // Scripture chosen in the Bible reader comes back here.
   const applyPick = useCallback((p: NonNullable<ReturnType<typeof takePick>>) => {
     const at = pickAt.current; pickAt.current = null;
@@ -126,14 +136,22 @@ function BuilderScreen() {
   useFocusEffect(useCallback(() => { const p = takePick(); if (p) applyPick(p); return onPick(() => { const q = takePick(); if (q) applyPick(q); }); }, [applyPick]));
 
   const focusLabel = subject?.label || customFocus.trim();
-  const sessionCount = derivedFrom ? lessonsInCurriculum(discovery) : sessions.length;
+  const organisedFlow = approach === "p2p" && journeyFor !== "edit";
+  // While reviewing an organised journey, the plan is the proposal (it becomes the sessions on Next).
+  const sessionCount = derivedFrom ? lessonsInCurriculum(discovery) : organisedFlow && step === 2 ? proposal.length : sessions.length;
   const est = estimate(sessionCount || 1, duration, pace, Number(customDays) || null);
   const suggestion = est.tooMuch ? (["monthly", "quarterly", "half_year", "yearly"] as DurationKey[]).find((d) => !estimate(sessionCount, d, pace).tooMuch) ?? null : null;
   const supportingCount = sessions.reduce((n, x) => n + (x.supporting?.length ?? 0), 0);
   const withQuestions = sessions.filter((x) => (x.questions ?? []).length).length;
   const canNext: Record<Step, boolean> = {
-    1: approach === "p2p" ? !!subject : !!subject || !!customFocus.trim(),
-    2: !!derivedFrom || sessions.length > 0, 3: true, 4: mode === "individual" || (!!group && (group.kind === "existing" || !!group.name.trim())), 5: true,
+    1: organisedFlow ? question.length >= 2 || !!startPoint : !!subject || !!customFocus.trim(),
+    2: organisedFlow ? proposal.length > 0 : !!derivedFrom || sessions.length > 0, 3: true, 4: mode === "individual" || (!!group && (group.kind === "existing" || !!group.name.trim())), 5: true,
+  };
+  /** Leaving the review: the reviewed journey becomes the plan's sessions (still nothing saved). */
+  const goNext = () => {
+    setNotice(null);
+    if (step === 2 && organisedFlow) setSessions(proposal.map(toPlanSession));
+    setStep((step + 1) as Step);
   };
 
   const addRec = (r: Recommendation, toSession: boolean) => {
@@ -167,9 +185,13 @@ function BuilderScreen() {
   const addSupport = (r: Resource) => setSessions((xs) => xs.map((x, i) => (i === target ? { ...x, supporting: [...(x.supporting ?? []).filter((y) => JSON.stringify(y) !== JSON.stringify(r)), r].slice(0, 12) } : x)));
 
   function input(draft: boolean): PlanInput {
-    const f = subject ? focusFor(subject.type, subject.key) : { focusType: "theme" as const, focusRef: {} };
-    return { title: (title.trim() || focusLabel || t("p2pPlans.builder.untitled")).slice(0, 200), description: description.trim() || null, focusType: f.focusType, focusLabel: focusLabel || title.trim() || t("p2pPlans.builder.untitled"),
-      focusRef: f.focusRef, suggestedPace: pace, suggestedDays: est.days, sessions: derivedFrom ? [] : sessions, derivedFrom, draft };
+    // An organised journey's focus is the participant's own question (the starting point only widened the search).
+    const f = organisedFlow ? { focusType: "theme" as const, focusRef: {} } : subject ? focusFor(subject.type, subject.key) : { focusType: "theme" as const, focusRef: {} };
+    const label = organisedFlow ? question : focusLabel;
+    const live = organisedFlow && step === 2 ? proposal.map(toPlanSession) : sessions;
+    return { title: (title.trim() || label || t("p2pPlans.builder.untitled")).slice(0, 200), description: description.trim() || null, focusType: f.focusType, focusLabel: label || title.trim() || t("p2pPlans.builder.untitled"),
+      focusRef: f.focusRef, suggestedPace: pace, suggestedDays: est.days, sessions: derivedFrom ? [] : live, derivedFrom, draft,
+      ...(organisedFlow && organised ? { organiser: { token: organised.token, question: question || organised.journey.question, deeperOf } } : {}) };
   }
   const schedule = (): GroupSchedule => ({ durationKey: duration, pace, startDate, ...(duration === "custom" ? { customDays: Number(customDays) || 1 } : {}) });
 
@@ -216,7 +238,7 @@ function BuilderScreen() {
     <View style={s.summary} accessibilityLabel={t("p2pPlans.builder.summaryLabel")}>
       <Ionicons name="reader-outline" size={16} color={c.accentGreen} />
       <Text style={s.summaryText} numberOfLines={2}>
-        {[focusLabel || t("p2pPlans.builder.noFocus"), derivedFrom ? t("p2pPlans.builder.followsCurriculum") : t("p2pPlans.sessions", { count: sessions.length }),
+        {[focusLabel || t("p2pPlans.builder.noFocus"), derivedFrom ? t("p2pPlans.builder.followsCurriculum") : t("p2pPlans.sessions", { count: sessionCount }),
           supportingCount ? t("p2pPlans.builder.supportingCount", { count: supportingCount }) : null, t(`p2pPlans.duration.${duration}`), t(`p2pPlans.mode.${mode}`)].filter(Boolean).join(" · ")}
       </Text>
     </View>
@@ -248,13 +270,21 @@ function BuilderScreen() {
 
         {step === 1 ? (
           <>
-            <SubjectPicker value={subject} onChange={(x) => { setSubject(x); setJourneyFor(null); setSessions([]); setDerivedFrom(null); setAdded(new Set()); }} />
-            {!subject ? (
-              <>
-                <Text style={s.label}>{t("p2pPlans.builder.orOwnFocus")}</Text>
-                <TextInput value={customFocus} onChangeText={setCustomFocus} placeholder={t("p2pPlans.builder.focusLabelPlaceholder")} placeholderTextColor={c.textMuted} style={s.input} accessibilityLabel={t("p2pPlans.builder.orOwnFocus")} />
-              </>
+            {/* Owner brief 2026-11-19: any legitimate subject or question, in the participant's own words. */}
+            <Text style={s.label}>{t("plansOrganiser.focusLabel", { defaultValue: "What would you like to learn?" })}</Text>
+            <TextInput value={customFocus} onChangeText={(v) => { setCustomFocus(v.slice(0, 200)); setOrganisedFor(null); }} placeholder={t("plansOrganiser.focusPlaceholder", { defaultValue: "A subject, a question, a person, a passage… e.g. “Who is the Holy Spirit?”" })}
+              placeholderTextColor={c.textMuted} style={[s.input, s.bigInput]} multiline accessibilityLabel={t("plansOrganiser.focusLabel", { defaultValue: "What would you like to learn?" })} />
+            <Text style={s.label}>{t("plansOrganiser.startFrom", { defaultValue: "Starting point (optional)" })}</Text>
+            <ChipRow accessibilityLabel={t("plansOrganiser.startFrom", { defaultValue: "Starting point (optional)" })} single>
+              {(["any", "bible_book", "core_foundations", "kingdom_school"] as const).map((k) => (
+                <FilterChip key={k} selection="single" selected={startKind === k} onPress={() => { setStartKind(k); setOrganisedFor(null); if (k === "any" || k === "core_foundations" || (subject && subject.type !== k)) setSubject(null); }}
+                  label={k === "any" ? t("plansOrganiser.startAny", { defaultValue: "Any subject" }) : k === "bible_book" ? t("plansOrganiser.startBook", { defaultValue: "A Bible book" }) : k === "core_foundations" ? t("plansOrganiser.startFoundations", { defaultValue: "Core Foundations" }) : t("plansOrganiser.startSchool", { defaultValue: "Kingdom School" })} />
+              ))}
+            </ChipRow>
+            {startKind === "bible_book" || startKind === "kingdom_school" ? (
+              <SubjectPicker key={startKind} types={[startKind]} initialType={startKind} value={subject && subject.type === startKind ? subject : null} onChange={(x) => { setSubject(x); setOrganisedFor(null); setJourneyFor(null); setSessions([]); setDerivedFrom(null); setAdded(new Set()); }} />
             ) : null}
+            {startKind !== "any" ? <Text style={s.small}>{t("plansOrganiser.startNote", { defaultValue: "P2P still searches everything; this is just where your journey begins." })}</Text> : null}
             <Text style={s.label}>{t("p2pPlans.builder.how")}</Text>
             {(["p2p", "own"] as const).map((a) => (
               <TouchableOpacity key={a} style={[s.choice, approach === a && s.choiceOn]} onPress={() => setApproach(a)} accessibilityRole="radio" accessibilityState={{ selected: approach === a }}
@@ -267,11 +297,29 @@ function BuilderScreen() {
                 {approach === a ? <Ionicons name="checkmark-circle" size={20} color={c.primaryGreen} /> : null}
               </TouchableOpacity>
             ))}
-            {approach === "p2p" && !subject ? <Text style={s.small}>{t("p2pPlans.builder.p2pNeedsSubject")}</Text> : null}
           </>
         ) : null}
 
-        {step === 2 ? (
+        {step === 2 && organisedFlow ? (
+          <>
+            {loadingJourney ? <View style={s.card}><ActivityIndicator color={c.primaryGreen} /><Text style={s.meta}>{t("plansOrganiser.preparing", { defaultValue: "Searching all of P2P for “{{focus}}” and preparing your journey…", focus: question })}</Text></View> : null}
+            {organised && !loadingJourney ? (
+              organised.journey.note === "empty" || organised.journey.note === "nothing_new" ? (
+                <View style={s.card}>
+                  <Text style={s.body}>{organised.journey.note === "nothing_new" ? t("plansOrganiser.nothingNew", { defaultValue: "You've already studied everything P2P has found on this subject. Try a related question to keep going." }) : t("plansOrganiser.empty", { defaultValue: "P2P didn't find resources for this yet. Try other words, a key word, or a Bible passage." })}</Text>
+                  <AppButton size="sm" variant="secondary" icon="create-outline" label={t("plansOrganiser.changeQuestion", { defaultValue: "Change the question" })} onPress={() => setStep(1)} />
+                </View>
+              ) : (
+                <>
+                  <Text style={s.small}>{deeperOf ? t("plansOrganiser.deeperReview", { defaultValue: "This journey goes beyond what you've already studied. Review it, change anything, then continue — nothing is saved until you confirm." }) : t("plansOrganiser.review", { defaultValue: "Here's a journey from P2P's resources. Review it, change anything, then continue — nothing is saved until you confirm." })}</Text>
+                  <JourneyReview data={organised} proposal={proposal} onChange={setProposal} />
+                </>
+              )
+            ) : null}
+          </>
+        ) : null}
+
+        {step === 2 && !organisedFlow ? (
           <>
             {loadingJourney ? <View style={s.card}><ActivityIndicator color={c.primaryGreen} /><Text style={s.meta}>{t("p2pPlans.builder.preparing", { focus: focusLabel })}</Text></View> : null}
             {derivedFrom ? (
@@ -426,7 +474,7 @@ function BuilderScreen() {
 
         <View style={s.rowBetween}>
           {step > 1 ? <AppButton variant="secondary" icon="arrow-back" label={t("p2pPlans.builder.back")} onPress={() => setStep((step - 1) as Step)} /> : <View />}
-          {step < 5 ? <AppButton icon="arrow-forward" iconPosition="trailing" label={t("p2pPlans.builder.next")} disabled={!canNext[step] || loadingJourney} onPress={() => { setNotice(null); setStep((step + 1) as Step); }} /> : null}
+          {step < 5 ? <AppButton icon="arrow-forward" iconPosition="trailing" label={t("p2pPlans.builder.next")} disabled={!canNext[step] || loadingJourney} onPress={goNext} /> : null}
         </View>
       </ScrollView>
     </View>
@@ -495,6 +543,7 @@ function makeStyles(c: AppColors) {
     choiceOn: { borderColor: c.primaryGreen, borderWidth: 1.5 },
     choiceTitle: { fontSize: 15.5, color: c.textDark, fontFamily: "Inter_700Bold" },
     input: { minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: c.borderBeige, backgroundColor: c.card, paddingHorizontal: 12, color: c.textDark, fontFamily: "Inter_400Regular", fontSize: 14 },
+    bigInput: { minHeight: 72, paddingTop: 12, fontSize: 16, textAlignVertical: "top" },
     row: { flexDirection: "row", gap: 8, alignItems: "center" },
     rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" },
     buttons: { flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center" },

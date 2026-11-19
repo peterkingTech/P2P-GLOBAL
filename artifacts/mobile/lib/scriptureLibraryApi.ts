@@ -70,7 +70,7 @@ export const favouriteCollection = (collectionId: string) => call<{ id: string }
 export const removeFavourite = (id: string) => call<{ removed: true }>(`/favourites/${id}`, { method: "DELETE" });
 
 // Listening history (one entry per passage listened)
-export const listHistory = (limit = 30) => call<{ items: HistoryItem[] }>(`/history${qs({ limit })}`);
+export const listHistory = (limit = 30, before?: string) => call<{ items: HistoryItem[] }>(`/history${qs(before ? { limit, before } : { limit })}`);
 export const historyStarted = (ref: NewRef, o: { collectionId?: string; itemId?: string; source?: ListenSource } = {}) =>
   call<{ id: string; reused: boolean }>("/history", json("POST", { ref, ...o }));
 export const historyCompleted = (id: string, listenedSeconds?: number) => call<{ completed: true }>(`/history/${id}/complete`, json("POST", { listenedSeconds }));

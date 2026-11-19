@@ -6,12 +6,14 @@ import { getActiveGathering } from "@/lib/activeGathering";
 import { useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Speech from "expo-speech";
+import { cachedVoiceUri, keepVoice, voiceCacheName } from "./voiceCache";
 import i18n from "@/lib/i18n";
-import { createListenEngine, type ListenState, type SpeechDriver } from "./engine";
+import { createListenEngine, VoiceUnavailable, type ListenState, type SpeechDriver } from "./engine";
 import { labelsFrom, type SpokenLabels } from "./labels";
 import { baseLanguage } from "./voices";
 import { createUiPrefs, type ListenUiPrefs } from "./uiPrefs";
-import { chosenVoiceFor, getVoicePrefs, isEligibleKind, loadVoiceDefaults, loadVoicePrefs, setReadingSource, setVoiceNotice, speakChunk, type ChosenVoice } from "@/lib/voices";
+import { chosenVoiceFor, getVoicePrefs, isEligibleKind, loadVoiceDefaults, loadVoicePrefs, setReadingSource, setVoiceNotice, speakChunk, voiceDefaultsKnown, type ChosenVoice } from "@/lib/voices";
+import { getLanguageName } from "@/lib/languageNames";
 
 /** Spoken signposts in the TEXT's language (no fallback to another language). */
 export function spokenLabels(language: string): SpokenLabels {
@@ -25,51 +27,83 @@ export type { ListenContent, ListenState, ListenStatus, StartAt, ChunkPosition, 
 export type { ListenSection, ListenPart } from "./chunking";
 export { RATES } from "./engine";
 
-// The device's own speech engine (expo-speech: iOS AVSpeechSynthesizer,
-// Android TextToSpeech, the browser's speechSynthesis on web).
-//
-// Background (iOS): speech keeps going with the screen locked only on the
-// app's own audio session in "playback" mode (Info.plist already declares the
-// "audio" background mode). That session is set up — the same way the
-// ringtone does it, through expo-audio — only when Background playback is on
-// and NO call is live; during a call the system-managed session is kept, so
-// call audio (Agora, CallKit, Bluetooth routing) is never touched.
-// Android has no session switch here; see docs/listen.md for its limits.
+// OWNER 2026-11-19: "only P2P voice … no internet: voices should fall back to the phone voice or cached voices; when
+// there is internet, phone voices hide immediately". So, for every sentence:
+//   1. official narration (a studio recording), when the content has it and the listener keeps it first;
+//   2. the listener's P2P Voice — the copy KEPT ON THIS PHONE when that sentence was heard before (lib/listen/
+//      voiceCache: works offline, starts instantly), otherwise fresh from the server (and then kept);
+//   3. ONLY when there is no internet: the phone's own voice (expo-speech), with a plain "you're offline" note.
+//      The moment the server answers again, P2P Voice takes over and the phone's voice is gone (never offered online).
+// Online refusals (a translation that isn't public domain, no P2P Voice for the language, the provider down) are
+// said in plain words — the phone's voice is never used to get round them while there is internet.
+
+// The app's own playback session (needed for background listening) — but NEVER during a live call or Gathering:
+// then the system-managed session is kept, so call audio (Agora, CallKit, Bluetooth routing) is never touched.
+function playbackSession(background: boolean) {
+  if (getActiveGathering()) return;
+  setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: background, interruptionMode: "doNotMix" }).catch(() => {});
+}
+
+// ── The phone's own voice: OFFLINE ONLY ─────────────────────────────────────────────────────────────────────────
+// Background (iOS): speech keeps going with the screen locked only on the app's own audio session in "playback"
+// mode — set up only when Background playback is on and NO call is live (calls untouched).
 let speakToken = 0;
 let sessionAt = 0;
-const deviceSpeech: SpeechDriver = {
-  speak(text, o) {
+const phoneSpeech = {
+  speak(text: string, o: Parameters<SpeechDriver["speak"]>[1]) {
     const token = ++speakToken;
     const appSession = Platform.OS === "ios" && !!o.background && !getActiveGathering();
     const go = () => {
       if (token !== speakToken) return; // stopped or replaced while the session was set up
       Speech.speak(text, {
-        language: o.language || undefined, voice: o.voice, rate: o.rate,
-        // Off: the system manages a separate session, so calls and other audio
-        // interrupt or duck speech normally. On: the app's playback session (background).
+        language: o.language || undefined, rate: o.rate,
         useApplicationAudioSession: appSession,
         onDone: o.onDone, onStopped: o.onStopped, onError: o.onError,
         onBoundary: o.onBoundary as any,
       });
     };
-    // Re-assert the playback session now and then (a ringtone or call may have changed it).
     if (appSession && Date.now() - sessionAt > 60_000) {
       sessionAt = Date.now();
       setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true, interruptionMode: "doNotMix" }).catch(() => { sessionAt = 0; }).finally(go);
     } else go();
   },
   stop: () => { speakToken++; return Speech.stop(); },
-  // Honest about what device speech can do: no length, elapsed time or seeking by seconds;
-  // the finest reliable position is one utterance (one sentence).
-  capabilities: { seekSeconds: false, duration: false, timing: "sentence" },
-  getVoices: async () => (await Speech.getAvailableVoicesAsync()).map((v) => ({ identifier: v.identifier, name: v.name, language: v.language, quality: String(v.quality) })),
 };
+// "Offline" = the server couldn't be reached (a network failure, not a refusal). Re-tried every 15 s while offline
+// (and on every sentence that has no kept copy after that), so P2P Voice returns as soon as the internet does.
+let offlineSince = 0;
+const RETRY_MS = 15_000;
+const isOffline = () => offlineSince > 0;
+const markOffline = () => { if (!offlineSince) offlineSince = Date.now(); };
+const markOnline = () => { offlineSince = 0; };
+const OFFLINE_NOTE = "You're offline, so your phone's voice is reading. P2P Voice comes back when you're online.";
+function phoneVoice(text: string, o: Parameters<SpeechDriver["speak"]>[1]) {
+  cloudStop(false);
+  setReadingSource({ mode: "device" });
+  setVoiceNotice(OFFLINE_NOTE);
+  phoneSpeech.speak(text, o);
+}
+/** Online, P2P Voice can't read this: stop with a plain message (the phone's voice is never used online). */
+function cannotRead(o: Parameters<SpeechDriver["speak"]>[1], message: string) {
+  setReadingSource(null);
+  o.onError?.(new VoiceUnavailable(message));
+}
+const noVoiceMessage = (language: string) => {
+  const code = baseLanguage(language);
+  return `There's no P2P Voice for ${code === "en" ? "English" : getLanguageName(code)} yet.`;
+};
+/** The server accepts letters, digits and : . - / _ in a content key (a listening queue's key has commas). */
+const safeKey = (k: string | undefined) => (String(k ?? "p2p").replace(/[^\w:.\-/]/g, "_").slice(0, 160) || "p2p");
+// Sentence-level positions only (one recording per sentence): no total length or seeking by seconds.
+const SENTENCE_CAPABILITIES = { seekSeconds: false, duration: false, timing: "sentence" } as const;
+/** A network failure has no HTTP status; the server's own refusals do (and carry a plain message). */
+const isNetworkFailure = (e: unknown) => !(typeof (e as { status?: number } | null)?.status === "number" && (e as { status: number }).status > 0);
 
 // A studio recording (lib/listen/narration): each sentence plays its own stretch of the one file
 // (expo-audio), so the engine's sentence-by-sentence behaviour is unchanged. Consecutive sentences
 // play straight on without re-seeking (the engine stops and starts between sentences; the pause is
 // deferred one tick so the next sentence can simply continue). A sentence the recording doesn't
-// contain — or any failure — falls back to the phone's voice.
+// contain — or any failure — is read by the listener's P2P Voice (offline: kept copy, then the phone).
 let recPlayer: AudioPlayer | null = null;
 let recUrl = "";
 let recToken = 0;
@@ -81,12 +115,11 @@ const recBroken = new Set<string>();
 let recPausedAt: { url: string; chunk: number; time: number } | null = null;
 let recWatch: ReturnType<typeof setInterval> | null = null;
 let recCurrent: { url: string; chunk: number } | null = null;
-// ── P2P Voices (owner brief 2026-11-18): a synthetic voice from P2P's voice library, for ELIGIBLE content only ──
-// Same engine, same sentences: each sentence is one short recording made on demand by the server (cached there),
-// played with expo-audio. Highlighting stays on the sentence being heard, pause resumes at the exact moment, and
-// changing voice carries on from the same sentence. The next two sentences are fetched ahead so playback flows.
-// Never for Bible content (the server refuses too); any failure → the phone's voice reads that sentence and the
-// player says so in plain words. Official narration always comes first when the listener keeps that setting.
+// ── P2P Voices (owner brief 2026-11-18): a synthetic voice from P2P's voice library ──
+// Same engine, same sentences: each sentence is one short recording made on demand by the SERVER (cached there, and
+// kept on this phone once heard), played with expo-audio. Highlighting stays on the sentence being heard, pause
+// resumes at the exact moment, and changing voice carries on from the same sentence. The next two sentences are
+// fetched (and kept) ahead so playback flows. Bible and playlists: public-domain translations only (server check).
 let cloudPlayer: AudioPlayer | null = null;
 let cloudToken = 0;
 let cloudSub: { remove: () => void } | null = null;
@@ -94,11 +127,14 @@ let cloudWatch: ReturnType<typeof setInterval> | null = null;
 let cloudPausedAt: { key: string; time: number } | null = null;
 let cloudCurrentKey = "";
 const cloudUrls = new Map<string, Promise<string>>();
-function cloudUrl(voiceId: string, o: { kind?: string; contentKey?: string; language: string }, text: string): Promise<string> {
-  const k = `${voiceId}|${o.contentKey}|${text}`;
+type VoiceOpts = { kind?: string; contentKey?: string; language: string; translation?: string };
+const keptName = (voiceId: string, o: VoiceOpts, text: string) => voiceCacheName({ voiceId, contentKey: safeKey(o.contentKey), translation: o.translation, text });
+function cloudUrl(voiceId: string, o: VoiceOpts, text: string): Promise<string> {
+  const k = `${voiceId}|${o.contentKey}|${o.translation ?? ""}|${text}`;
   let p = cloudUrls.get(k);
   if (!p) {
-    p = speakChunk({ voiceId, contentKind: o.kind ?? "", contentKey: o.contentKey ?? "p2p", language: o.language, text }).then((r) => r.url);
+    p = speakChunk({ voiceId, contentKind: o.kind ?? "general", contentKey: safeKey(o.contentKey), language: o.language, text, ...(o.translation ? { translation: o.translation } : {}) })
+      .then((r) => { markOnline(); keepVoice(keptName(voiceId, o, text), r.url); return r.url; });
     p.catch(() => cloudUrls.delete(k));
     cloudUrls.set(k, p);
     if (cloudUrls.size > 120) { const oldest = cloudUrls.keys().next().value; if (oldest !== undefined) cloudUrls.delete(oldest); }
@@ -114,26 +150,22 @@ function cloudStop(rememberPause: boolean) {
     try { cloudPlayer.pause(); } catch {}
   }
 }
-function cloudSpeak(text: string, o: Parameters<SpeechDriver["speak"]>[1], voice: ChosenVoice): boolean {
+function cloudSpeak(text: string, o: Parameters<SpeechDriver["speak"]>[1], voice: ChosenVoice): void {
   const source = (o.source ?? text).trim();
-  if (!source) return false;
   const token = ++cloudToken;
+  if (!source) { setTimeout(() => { if (token === cloudToken) o.onDone?.(); }, 0); return; } // nothing to say: next sentence
   const key = `${voice.voiceId}|${o.contentKey}|${o.chunkIndex ?? -1}`;
-  const fallback = (why: string) => {
-    if (token !== cloudToken) return;
-    setVoiceNotice(why);
-    setReadingSource({ mode: "device" });
-    deviceSpeech.speak(text, o);
-  };
-  // Ahead: the next two sentences (same voice), so the next one starts without a wait.
-  if (o.chunkSources && typeof o.chunkIndex === "number")
+  const refused = (message: string) => { if (token !== cloudToken) return; setVoiceNotice(null); cannotRead(o, message); };
+  const noInternet = () => { if (token !== cloudToken) return; markOffline(); phoneVoice(text, o); };
+  // Ahead: the next two sentences (same voice), so the next one starts without a wait — and is kept for offline.
+  if (!isOffline() && o.chunkSources && typeof o.chunkIndex === "number")
     for (const n of [1, 2]) { const t = o.chunkSources[o.chunkIndex + n]?.trim(); if (t) void cloudUrl(voice.voiceId, o, t).catch(() => {}); }
-  cloudUrl(voice.voiceId, o, source).then((url) => {
+  const play = (uri: string, kept: boolean) => {
     if (token !== cloudToken) return;
-    if (!cloudPlayer) cloudPlayer = createAudioPlayer({ uri: url }, { updateInterval: 100 });
-    else cloudPlayer.replace({ uri: url });
+    if (!cloudPlayer) cloudPlayer = createAudioPlayer({ uri }, { updateInterval: 100 });
+    else cloudPlayer.replace({ uri });
     const p = cloudPlayer;
-    setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: !!o.background, interruptionMode: "doNotMix" }).catch(() => {});
+    playbackSession(!!o.background);
     setReadingSource({ mode: "p2p", voice: voice.name, provider: voice.provider });
     setVoiceNotice(null);
     cloudCurrentKey = key;
@@ -144,39 +176,66 @@ function cloudSpeak(text: string, o: Parameters<SpeechDriver["speak"]>[1], voice
     cloudSub = p.addListener("playbackStatusUpdate", (s) => {
       if (token !== cloudToken || done) return;
       if (s.didJustFinish) { done = true; cloudSub?.remove(); cloudSub = null; if (cloudWatch) { clearInterval(cloudWatch); cloudWatch = null; } o.onDone?.(); }
+      // Paused from OUTSIDE the app (lock screen, headset, Bluetooth, a call): P2P Listen pauses at the same place.
+      else if (heard && !s.playing && !s.isBuffering) systemPause();
+      else if (s.playing && s.currentTime > resumeAt + 0.05) heard = true;
     });
+    let heard = false;
     p.setPlaybackRate(o.rate);
-    (resumeAt > 0 ? p.seekTo(resumeAt) : Promise.resolve()).then(() => { if (token === cloudToken) p.play(); }, () => { if (token === cloudToken) p.play(); });
-    // A recording that never starts within 8 s (no connection, expired link): the phone's voice reads this sentence.
+    (resumeAt > 0 ? p.seekTo(resumeAt) : Promise.resolve()).then(() => { if (token === cloudToken) { p.play(); lockScreenFor(p, o); } }, () => { if (token === cloudToken) { p.play(); lockScreenFor(p, o); } });
+    // A recording that never starts within 8 s: a fresh one → the connection is gone (the phone's voice reads this
+    // sentence); a kept one that won't play → fetch it fresh instead.
     let started = false, waited = 0;
     if (cloudWatch) clearInterval(cloudWatch);
     cloudWatch = setInterval(() => {
       if (token !== cloudToken || done) { if (cloudWatch) { clearInterval(cloudWatch); cloudWatch = null; } return; }
       if (p.currentTime > resumeAt + 0.05) started = true;
-      if (!started && ++waited >= 8) { if (cloudWatch) { clearInterval(cloudWatch); cloudWatch = null; } cloudStop(false); fallback("Your chosen voice couldn't load, so your phone's voice is reading for now."); }
+      if (!started && ++waited >= 8) {
+        if (cloudWatch) { clearInterval(cloudWatch); cloudWatch = null; }
+        try { p.pause(); } catch {}
+        if (kept) fresh(); else noInternet();
+      }
     }, 1000);
-  }, () => fallback("Your chosen voice isn't available at the moment, so your phone's voice is reading."));
-  return true;
+  };
+  const fresh = () => {
+    if (token !== cloudToken) return;
+    // Known offline and not yet time to try again: straight to the phone's voice (no waiting on every sentence).
+    if (isOffline() && Date.now() - offlineSince < RETRY_MS) return noInternet();
+    cloudUrl(voice.voiceId, o, source).then((url) => play(url, false), (e) => (isNetworkFailure(e) ? noInternet() : refused((e as Error).message)));
+  };
+  // A copy kept on this phone plays first (offline too); otherwise the server.
+  cachedVoiceUri(keptName(voice.voiceId, o, source)).then((uri) => (uri ? play(uri, true) : fresh()), fresh);
+}
+/** The listener's P2P Voice reads this sentence. No P2P Voice for this language: a plain message online, the
+ *  phone's voice offline (or before P2P's voice list has ever reached this phone). */
+function p2pSpeak(text: string, o: Parameters<SpeechDriver["speak"]>[1]) {
+  const chosen = isEligibleKind(o.kind ?? "general") ? chosenVoiceFor(o.language) : null;
+  if (chosen) return cloudSpeak(text, o, chosen);
+  if (isOffline() || !voiceDefaultsKnown()) { markOffline(); return phoneVoice(text, o); }
+  cannotRead(o, noVoiceMessage(o.language));
 }
 
 const recordedNarration: SpeechDriver = {
   speak(text, o) {
     const official = o.narration as RecordedNarration | undefined;
     void loadVoicePrefs(); void loadVoiceDefaults(); // after sign-in (cheap when already loaded)
-    // Official narration first (unless the listener chose a P2P Voice over it); otherwise their P2P Voice for this
-    // language when the content is eligible; otherwise the phone's voice. Bible is never read by a P2P Voice.
-    const chosen = o.kind !== "bible" && isEligibleKind(o.kind) ? chosenVoiceFor(o.language) : null;
-    if (chosen && (!official || !getVoicePrefs().preferOfficial)) { recStop(true); if (cloudSpeak(text, o, chosen)) return; }
+    // Official narration first (unless the listener chose their P2P Voice over it); otherwise their P2P Voice
+    // (offline: a kept copy, else the phone's voice — owner 2026-11-19).
+    const chosen = isEligibleKind(o.kind ?? "general") ? chosenVoiceFor(o.language) : null;
+    // Bible recordings are the translation's own licensed audio: always first (never swapped for a generated voice).
+    const authorised = o.kind === "bible" || o.kind === "playlist";
+    if (!official || (chosen && !getVoicePrefs().preferOfficial && !authorised)) { recStop(true); return p2pSpeak(text, o); }
     cloudStop(false);
     const n = official;
-    setReadingSource(n ? { mode: "official", voice: n.voice } : { mode: "device" });
+    const viaP2P = () => { recStop(true); p2pSpeak(text, o); };
     // 2026-11-18: the sentence's stretch comes from ONE in-order alignment of the whole content (contiguous,
     // tolerant of small wording differences); the old per-sentence exact search is kept only for callers
     // that don't pass the sentence list.
     const seg = n && o.source && !recBroken.has(n.url)
       ? (o.chunkSources && typeof o.chunkIndex === "number" ? alignedSegments(n, o.chunkSources)[o.chunkIndex] ?? null : segmentFor(n, o.source, recCursor))
       : null;
-    if (!n || !seg) { recStop(true); return deviceSpeech.speak(text, o); }
+    if (!seg) return viaP2P();
+    setReadingSource({ mode: "official", voice: n.voice });
     const token = ++recToken;
     if (recPause) { clearTimeout(recPause); recPause = null; }
     if (recWatch) { clearInterval(recWatch); recWatch = null; }
@@ -187,7 +246,7 @@ const recordedNarration: SpeechDriver = {
         recPlayer = createAudioPlayer({ uri: n.url }, { updateInterval: 100 });
         recUrl = n.url;
         recCursor = 0;
-        setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: !!o.background, interruptionMode: "doNotMix" }).catch(() => {});
+        playbackSession(!!o.background);
       }
       const p = recPlayer;
       recCursor = seg.lastWord + 1;
@@ -202,9 +261,13 @@ const recordedNarration: SpeechDriver = {
       };
       recSub?.remove();
       // The sentence ends when the AUDIO reaches its end (or the file ends) — never on a timer.
+      let heard = false;
       recSub = p.addListener("playbackStatusUpdate", (s) => {
         if (token !== recToken) return;
         if (s.didJustFinish || s.currentTime >= seg.end - 0.02) finish();
+        // Paused from OUTSIDE the app (lock screen, headset, Bluetooth, a call): P2P Listen pauses at the same place.
+        else if (heard && !done && !s.playing && !s.isBuffering) systemPause();
+        else if (s.playing) heard = true;
       });
       // Resume after a pause: from the exact moment it was paused (within this sentence's stretch).
       const pausedHere = o.resuming && recPausedAt && recPausedAt.url === n.url && recPausedAt.chunk === chunk
@@ -217,6 +280,7 @@ const recordedNarration: SpeechDriver = {
       p.setPlaybackRate(o.rate);
       if (contiguous) p.play();
       else p.seekTo(from).then(() => { if (token === recToken) p.play(); }, () => { if (token === recToken) p.play(); });
+      lockScreenFor(p, o);
       // Watchdog — progress, not time. A recording that never starts (no connection, an expired link) goes to
       // the phone's voice; one that stops moving mid-sentence (buffering) is WAITED for, and only after a long
       // stall is it reported as an error (the listener resumes from the same place). It never skips ahead.
@@ -229,7 +293,7 @@ const recordedNarration: SpeechDriver = {
         still++;
         if (!started && still >= 6) { // 6 s and not a moment played: the recording isn't reachable
           done = true; if (recWatch) { clearInterval(recWatch); recWatch = null; }
-          recBroken.add(n.url); recStop(true); deviceSpeech.speak(text, o);
+          recBroken.add(n.url); viaP2P();
         } else if (started && still >= 25) { // stuck mid-sentence for 25 s: stop and say so (no skipping)
           done = true; if (recWatch) { clearInterval(recWatch); recWatch = null; }
           recPausedAt = { url: n.url, chunk, time: t };
@@ -237,13 +301,14 @@ const recordedNarration: SpeechDriver = {
         }
       }, 1000);
     } catch {
-      recStop(true);
-      deviceSpeech.speak(text, o);
+      viaP2P();
     }
   },
-  stop: () => { recStop(false); cloudStop(true); return deviceSpeech.stop(); },
-  capabilities: deviceSpeech.capabilities,
-  getVoices: deviceSpeech.getVoices,
+  stop: () => { recStop(false); cloudStop(true); return phoneSpeech.stop(); },
+  capabilities: SENTENCE_CAPABILITIES,
+  // No phone voices are offered (the phone's voice reads only offline, chosen automatically). Waiting here (≤2.5 s, raced by the engine) makes sure the listener's
+  // P2P Voice choices and P2P's default voices are known before the engine decides whether anything can read.
+  getVoices: async () => { await Promise.all([loadVoicePrefs(), loadVoiceDefaults()]).catch(() => {}); return []; },
 };
 function recStop(now: boolean) {
   recToken++;
@@ -258,16 +323,78 @@ function recStop(now: boolean) {
   recPause = setTimeout(() => { recPause = null; try { recPlayer?.pause(); } catch {} }, 0);
 }
 
-/** The one shared player: the device's own voice, or a chapter's studio recording when it has one. */
+/** The one shared player: a P2P Voice, or a chapter's studio recording when it has one (the phone's voice only offline). */
 export const listen = createListenEngine(recordedNarration, {
   get: (k) => AsyncStorage.getItem(k),
   set: (k, v) => AsyncStorage.setItem(k, v),
   remove: (k) => AsyncStorage.removeItem(k),
 }, Date.now, {
-  // A verified P2P Voice for a language the phone can't speak (e.g. Igbo, once a specialist provider is verified).
-  externalVoice: (language, kind) => isEligibleKind(kind) && !!chosenVoiceFor(language),
+  // Something can read this content: the listener's P2P Voice for its language, its official narration, or —
+  // offline only — the phone's voice.
+  externalVoice: (language, kind, content) => (isEligibleKind(kind ?? "general") && !!chosenVoiceFor(language)) || !!content?.narration || isOffline() || !voiceDefaultsKnown(),
+  noVoiceMessage,
 });
 void loadVoicePrefs(); void loadVoiceDefaults();
+
+// ── LOCK SCREEN, NOTIFICATION AND HEADSET CONTROLS (owner brief 2026-11-19 "Lock screen audio controls") ──────
+// ONE implementation for every kind of content, on the SAME two players P2P Listen already uses (studio / Bible
+// recordings and P2P Voice). expo-audio shows the iOS Now Playing / lock screen and the Android media notification
+// (its config plugin declares the foreground media-playback service; iOS declares UIBackgroundModes: audio).
+//   • metadata = the content's own title and subtitle (a Scripture reference, a story chapter, a lesson) and P2P
+//     Global — never private text; artwork only when the content has a web image;
+//   • play / pause from the lock screen, notification, headset or Bluetooth act on the player itself; P2P Listen
+//     follows (pauses at the same place, and continues from there) — the controls never disagree with the app;
+//   • Previous / Next are NOT shown: this audio library offers no track commands for one player, and seek buttons
+//     would jump inside a single sentence — no misleading controls;
+//   • only with Background playback on, and never during a live call or Gathering (call audio is untouched);
+//   • cleared when listening stops or finishes (no lingering notification, no idle service).
+// The phone's own voice (offline only) speaks through the system speech engine and has no lock-screen controls.
+let lockPlayer: AudioPlayer | null = null;
+let lockKey = "";
+let systemPaused = false;
+const watched = new WeakSet<AudioPlayer>();
+function lockScreenFor(p: AudioPlayer, o: Parameters<SpeechDriver["speak"]>[1]) {
+  if (Platform.OS === "web" || !o.background || getActiveGathering()) return;
+  const c = listen.getState().content;
+  const art = c?.artwork && typeof c.artwork === "object" && /^https:\/\//.test(c.artwork.uri) ? c.artwork.uri : undefined;
+  const meta = { title: c?.title ?? "P2P Listen", artist: c?.subtitle ?? "P2P Global", albumTitle: "P2P Global", ...(art ? { artworkUrl: art } : {}) };
+  const key = JSON.stringify(meta);
+  try {
+    if (lockPlayer !== p) {
+      try { lockPlayer?.setActiveForLockScreen(false); } catch { /* already inactive */ }
+      p.setActiveForLockScreen(true, meta, { showSeekForward: false, showSeekBackward: false });
+      lockPlayer = p; lockKey = key;
+      if (!watched.has(p)) {
+        watched.add(p);
+        // Resumed from outside the app after a system pause: P2P Listen continues from the same place.
+        p.addListener("playbackStatusUpdate", (s) => {
+          if (s.playing && systemPaused && listen.getState().status === "paused") { systemPaused = false; listen.resume(); }
+        });
+      }
+    } else if (key !== lockKey) { p.updateLockScreenMetadata(meta); lockKey = key; }
+  } catch { /* lock-screen controls unavailable here: playback itself is unaffected */ }
+}
+/** The player was paused from the lock screen, notification, headset or an interruption. */
+function systemPause() {
+  if (listen.getState().status !== "playing") return;
+  systemPaused = true;
+  listen.pause();
+}
+function clearLockScreen() {
+  const p = lockPlayer;
+  lockPlayer = null; lockKey = ""; systemPaused = false;
+  if (!p) return;
+  try { p.clearLockScreenControls(); } catch { try { p.setActiveForLockScreen(false); } catch { /* gone */ } }
+}
+// Listening stopped, finished or failed: the lock screen and media notification go away. A pause keeps them, so
+// the listener can continue from the lock screen. Content changes update the shown title.
+let lastContentKey = "";
+listen.subscribe(() => {
+  const st = listen.getState();
+  if (st.status === "idle" || st.status === "completed" || st.status === "error" || !st.content) { if (lockPlayer) clearLockScreen(); lastContentKey = ""; return; }
+  if (st.content.key !== lastContentKey) { lastContentKey = st.content.key; lockKey = ""; }
+  if (st.status === "playing") systemPaused = false;
+});
 
 export function useListenState(): ListenState {
   return useSyncExternalStore(listen.subscribe, listen.getState, listen.getState);

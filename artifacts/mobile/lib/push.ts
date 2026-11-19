@@ -210,6 +210,11 @@ export function pathForNotification(
     const route = typeof data?.route === "string" ? data.route : "";
     return /^\/(library|library\/memorise|scripture-collections\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.test(route) ? route : "/library";
   }
+  // Learning Plan reminder (lib/planReminders) — only to that plan's own screen; opening it never marks anything.
+  if (notificationType === "plan_reminder") {
+    const route = typeof data?.route === "string" ? data.route : "";
+    return /^\/study-plan\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(route) ? route : "/plans";
+  }
   // Peer Evaluation Engine (migration 229): straight to the evaluation (ids checked).
   const evaluationId = typeof data?.evaluationId === "string" && /^[0-9a-f-]{36}$/i.test(data.evaluationId) ? data.evaluationId : null;
   const evalAssignmentId = typeof data?.assignmentId === "string" && /^[0-9a-f-]{36}$/i.test(data.assignmentId) ? data.assignmentId : null;

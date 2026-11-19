@@ -67,7 +67,7 @@ ok("versions screen: honest empty state when no recorded audio exists", versions
 ok("languages screen: header, search, Suggested / All, A–Z index, selected indicator, native + English", languages.includes(">Bible Languages<") && languages.includes('{ value: "suggested", label: "Suggested" }')
   && languages.includes("scrollToLocation(") && languages.includes('name="checkmark-circle"') && languages.includes("{l.native}") && languages.includes("l.english"));
 ok("data: only the server's licensed translations (no hard-coded lists or counts)", versions.includes("getTranslations()") && languages.includes("getTranslations()") && !/\b(KJV|ASV|BSB|CEV|AMP)\b/.test(versions + languages));
-ok("API: recorded audio flag is the licence rule (never assumed)", readFileSync(path.join(root, "../api-server/src/lib/bibleReader.ts"), "utf8").includes("recordedAudio: canPlayRecordedAudio(r),"));
+ok("API: recorded audio flag is the licence rule (AO Lab licence, or the translation's own API.Bible audio edition — never assumed)", readFileSync(path.join(root, "../api-server/src/lib/bibleReader.ts"), "utf8").includes("recordedAudio: canPlayRecordedAudio(r) || !!audioEditionFor(r),"));
 
 // Reader: the scroll fix
 ok("reader: the version screen replaces the pop-up picker", reader.includes('pathname: "/bible/versions"') && !reader.includes("<TranslationPicker"));
