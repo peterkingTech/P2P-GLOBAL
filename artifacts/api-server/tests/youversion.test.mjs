@@ -9,11 +9,11 @@ const { build } = createRequire(path.join(root, "package.json"))("esbuild");
 let pass = 0, fail = 0;
 const ok = (n, c, d = "") => { if (c) pass++; else { fail++; console.log(`FAIL ${n} ${d}`); } };
 const tmp = mkdtempSync(path.join(root, ".tmp-yv-"));
-let Y, Y2, L, G, B;
+let Y, Y2, L, G, B, DA, S;
 try {
-  await build({ stdin: { contents: `export * as Y from "./src/lib/bibleProviders/youversion"; export * as Y2 from "./src/lib/bibleProviders/youversionSync"; export * as L from "./src/lib/bibleLicence"; export * as G from "./src/lib/aiGovernance"; export { withJesusRanges } from "./src/lib/bibleReader";`, resolveDir: root, loader: "ts" },
+  await build({ stdin: { contents: `export * as Y from "./src/lib/bibleProviders/youversion"; export * as Y2 from "./src/lib/bibleProviders/youversionSync"; export * as L from "./src/lib/bibleLicence"; export * as G from "./src/lib/aiGovernance"; export { withJesusRanges, displayAbbreviation } from "./src/lib/bibleReader"; export * as S from "./src/lib/bibleProviders/youversionState";`, resolveDir: root, loader: "ts" },
     bundle: true, platform: "node", format: "esm", outfile: path.join(tmp, "m.mjs"), logLevel: "silent", packages: "external", loader: { ".txt": "text" } });
-  ({ Y, Y2, L, G, withJesusRanges: B } = await import(pathToFileURL(path.join(tmp, "m.mjs")).href));
+  ({ Y, Y2, L, G, withJesusRanges: B, displayAbbreviation: DA, S } = await import(pathToFileURL(path.join(tmp, "m.mjs")).href));
 } finally { rmSync(tmp, { recursive: true, force: true }); }
 
 const html = `<div><div class="d">A song for testing.</div><div class="q1"><span class="yv-v" v="1"></span><span class="yv-vlbl">1</span>First line &amp; more</div><div class="q2">second line.</div>`
@@ -94,7 +94,7 @@ Y2.setYouVersionStateForTests(null);
 ok("sync: before the first successful sync nothing is hidden", Y2.yvLicensedNow("999"));
 ok("reader filters YouVersion rows by the live licence list", reader.includes("yvLicensedNow(r.provider_translation_id)"));
 const syncSrc = readFileSync(path.join(root, "src/lib/bibleProviders/youversionSync.ts"), "utf8");
-ok("sync is additive (inserts only, never updates or deletes rows)", !/\.update\(|\)\s*\.delete\(/.test(syncSrc) && (syncSrc.match(/db\.from\(/g) ?? []).length === 3 && syncSrc.includes("ignoreDuplicates: true"));
+ok("sync is additive (inserts only, never updates or deletes rows)", !/\.update\(|\)\s*\.delete\(/.test(syncSrc) && (syncSrc.match(/db\.from\(/g) ?? []).length === 4 && (syncSrc.match(/\.upsert\(/g) ?? []).length === 1 && syncSrc.includes("ignoreDuplicates: true"));
 ok("sync never hides everything on an empty answer", syncSrc.includes("if (!list.length) throw"));
 // Gentle on the key's request allowance (2026-11-19: a full sweep hit YouVersion's 429 and briefly blocked readers).
 const plan2 = Y2.planSync(list, existing, (id) => (id === "916" ? "© ok" : undefined));
@@ -105,5 +105,19 @@ ok("sync: at most 50 new Bibles per run, one call every 2 s", Y2.BATCH === 50 &&
 ok("sync: a 429 stops the run at once — no retrying into the limit", syncSrc.includes("e.upstream === 429) throw new RateLimited") && /if \(res\.status === 429\) throw new YouVersionError\([^)]*503, 429\)/.test(readFileSync(path.join(root, "src/lib/bibleProviders/youversion.ts"), "utf8")));
 ok("sync: only Bibles in P2P's language list are added (translations.language → p2p_languages FK, 23503 on 2026-11-19)", syncSrc.includes("rows: full.rows.filter((r) => inApp(r.language))") && syncSrc.includes("first.waiting.filter((w) => inApp(w.language))"));
 ok("sync: runs hourly", readFileSync(path.join(root, "src/index.ts"), "utf8").includes('cron.schedule("17 * * * *", () => { void syncYouVersion(); });'));
+// Familiar abbreviations (owner 2026-11-19: "show how it normally is on YouVersion").
+const row2 = (code, name, abbreviation, provider = "api.bible", id = null) => ({ translation_code: code, translation_name: name, abbreviation, provider, provider_translation_id: id });
+ok("before any sync: the source's own abbreviation (never empty)", DA(row2("YV-NIV11", "New International Version", "NIV11", "youversion", "111")) === "NIV11" && DA(row2("X1", "Name", null)) === "X1");
+S.setYvAbbreviation("111", "NIV"); S.setSameEditionAbbreviation("BIUO", "ICB");
+ok("YouVersion Bibles: YouVersion's display abbreviation (NIV11 → NIV)", DA(row2("YV-NIV11", "New International Version", "NIV11", "youversion", "111")) === "NIV");
+ok("same edition from API.Bible: YouVersion's name for it (BIUO → ICB)", DA(row2("BIUO", "Igbo Contemporary Bible (2020)", "BIUO")) === "ICB");
+ok("familiar ones unchanged (KJV)", DA(row2("KJV", "King James Version", "KJV")) === "KJV");
+ok("AO Lab's generic BIB → the Bible's own short name, never an invented code", DA(row2("AO-kik_bib", "Kikuyu Bible", "BIB", "helloao")) === "Kikuyu" && DA(row2("AO-gaz_bib", "New Oromo Contemporary Version", "BIB", "helloao")) === "NOCV" && DA(row2("AO-x", "Hausa Contemporary Bible", "BIB", "helloao")) === "HCB");
+const NA = (abbreviation, localized_abbreviation) => Y2.niceAbbreviation({ abbreviation, localized_abbreviation });
+ok("YouVersion internal codes → its display form (NIV11→NIV, ptNVI→NVI, polUBG→UBG, turytc→YTC, engWEBUS→WEBUS)", NA("NIV11", "NIV") === "NIV" && NA("ptNVI", "NVI") === "NVI" && NA("polUBG", "UBG") === "UBG" && NA("turytc", "YTC") === "YTC" && NA("engWEBUS", "WEBUS") === "WEBUS");
+ok("familiar abbreviations stay (ICB, KJV, NASB2020); another script's form is never used on its own", NA("ICB", "BIU") === "ICB" && NA("KJV", "KJV") === "KJV" && NA("NASB2020", "NASB2020") === "NASB2020" && NA("SAT", "ت ع م") === "SAT" && NA("NRT", "НРП") === "NRT");
+const sync2 = readFileSync(path.join(root, "src/lib/bibleProviders/youversionSync.ts"), "utf8");
+ok("sync records YouVersion's abbreviation for its Bibles and for the same editions P2P has elsewhere", sync2.includes("setYvAbbreviation(String(b.id), niceAbbreviation(b))") && sync2.includes("if (d.code) setSameEditionAbbreviation(d.code,"));
+ok("app: the reader's translation button shows the abbreviation, not the internal code", readFileSync(path.join(root, "../mobile/app/bible/index.tsx"), "utf8").includes("label={`${translation?.abbreviation ?? loc?.t ?? \"—\"}`}"));
 console.log(`youversion (api): ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

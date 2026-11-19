@@ -12,7 +12,7 @@
 import { supabaseServiceRole as db } from "../supabase";
 import { logger } from "../logger";
 import { yvGet as yvGetOnce, yvKey, YouVersionError } from "./youversion";
-import { currentLicensedCount, hasYvLanguageName, recordYouVersionSync, setYvLanguageName } from "./youversionState";
+import { currentLicensedCount, hasYvLanguageName, notifyYouVersionChanged, recordYouVersionSync, setSameEditionAbbreviation, setYvAbbreviation, setYvLanguageName } from "./youversionState";
 
 export interface YvListItem { id: number | string; abbreviation?: string; localized_abbreviation?: string; title?: string; localized_title?: string; language_tag?: string; copyright?: string; promotional_content?: string; books?: string[] }
 export interface ExistingRow { translation_code: string; translation_name: string; language: string; abbreviation: string | null; provider: string | null; provider_translation_id: string | null }
@@ -20,7 +20,7 @@ export interface NewRow { language: string; translation_code: string; translatio
 export interface SyncReport {
   at: string; ok: boolean; error?: string; licensed: number; inP2P: number;
   added: { code: string; name: string; language: string }[];
-  duplicates: { id: string; abbr: string; language: string; sameAs: string }[];
+  duplicates: { id: string; abbr: string; language: string; sameAs: string; code?: string }[];
   noAttribution: { id: string; abbr: string; language: string }[];
   withdrawn: { code: string; name: string }[];
   /** Licensed Bibles not checked yet — added by the next runs (a few per run, so readers keep YouVersion's allowance). */
@@ -47,6 +47,16 @@ const nameNorm = (s: unknown) => String(s ?? "").toLowerCase().replace(/biblica�
 const RTL = new Set(["ar", "he", "fa", "ur", "ps", "sd", "ug", "yi", "dv", "ckb"]);
 const clean = (s: string) => s.replace(/\s*\(In Review\)\s*/i, " (in review)").replace(/\s+/g, " ").trim();
 
+/** The abbreviation to show (owner 2026-11-19: "how it normally is on YouVersion"): YouVersion's main abbreviation
+ *  (ICB, NAV, YCB…), except where that is an internal code (NIV11, ptNVI, polUBG, turytc, urdgvr) — then YouVersion's
+ *  display form (NIV, NVI, UBG, YTC, GVR), but only in plain Latin letters (not "ت ع م" or "НРП" on an English screen). */
+export function niceAbbreviation(b: Pick<YvListItem, "abbreviation" | "localized_abbreviation"> & { id?: unknown }): string {
+  const raw = String(b.abbreviation ?? "").trim(), local = String(b.localized_abbreviation ?? "").trim();
+  const looksLikeCode = /^[a-z]{2,3}[A-Z]/.test(raw) || /^[a-z0-9]+$/.test(raw) || /[A-Za-z]\d{2}$/.test(raw);
+  if (raw && looksLikeCode && /^[A-Za-z][A-Za-z0-9-]{1,11}$/.test(local)) return local;
+  return raw || local;
+}
+
 /** Pure planning step (tested): which licensed Bibles become new rows, which are skipped and why, which were withdrawn.
  *  attributionOf: the copyright text; null = checked and has none; undefined = not checked yet (waits). */
 export function planSync(list: YvListItem[], existing: ExistingRow[], attributionOf: (id: string) => string | null | undefined, rtlOf: (tag: string) => boolean = () => false) {
@@ -68,7 +78,7 @@ export function planSync(list: YvListItem[], existing: ExistingRow[], attributio
     if (EXCLUDED[id]) { duplicates.push({ id, abbr, language: lang, sameAs: EXCLUDED[id] }); continue; }
     const dup = others.find((r) => (r.language === lang || r.language.split("-")[0] === lang)
       && (norm(r.abbreviation ?? r.translation_code) === norm(abbr) || norm(r.translation_code) === norm(abbr) || (!!nameNorm(r.translation_name) && nameNorm(r.translation_name) === nameNorm(b.title))));
-    if (dup) { duplicates.push({ id, abbr, language: lang, sameAs: `${dup.translation_code} (${dup.provider ?? "api.bible"})` }); continue; }
+    if (dup) { duplicates.push({ id, abbr, language: lang, sameAs: `${dup.translation_code} (${dup.provider ?? "api.bible"})`, code: dup.translation_code }); continue; }
     const attribution = attributionOf(id);
     if (attribution === undefined) { waiting.push({ id, language: lang }); continue; }
     if (!attribution) { noAttribution.push({ id, abbr, language: lang }); continue; }
@@ -127,6 +137,21 @@ async function listKeyBibles(): Promise<YvListItem[]> {
   throw new Error("YouVersion's list didn't finish");
 }
 
+/** Names only (YOUVERSION_AUTO_SYNC=off, e.g. localhost): YouVersion's display abbreviations from the list (a few
+ *  calls), nothing added to or hidden from the database. */
+export async function refreshYouVersionNames(): Promise<number> {
+  if (!yvKey()) return 0;
+  try {
+    const list = await listKeyBibles();
+    for (const b of list) setYvAbbreviation(String(b.id), niceAbbreviation(b));
+    const { data } = await db.from("p2p_bible_translations").select("translation_code,translation_name,language,abbreviation,provider,provider_translation_id");
+    const plan = planSync(list, (data ?? []) as ExistingRow[], () => undefined);
+    for (const d of plan.duplicates) if (d.code) setSameEditionAbbreviation(d.code, niceAbbreviation(list.find((b) => String(b.id) === d.id) ?? { id: d.id, abbreviation: d.abbr }));
+    notifyYouVersionChanged();
+    return list.length;
+  } catch { return 0; }
+}
+
 export function syncYouVersion(): Promise<SyncReport> {
   if (!running) running = run().finally(() => { running = null; });
   return running;
@@ -147,7 +172,10 @@ async function run(): Promise<SyncReport> {
     // Which Bibles still need their copyright record (no-notice ones only once a day).
     const now = Date.now();
     const known = (id: string): null | undefined => { const t = noNotice.get(id); return t && now - t < NO_NOTICE_RECHECK_MS ? null : undefined; };
+    // The abbreviation YouVersion shows for each Bible (and for the same edition P2P gets elsewhere).
+    for (const b of list) setYvAbbreviation(String(b.id), niceAbbreviation(b));
     const first = planSync(list, existing, known);
+    for (const d of first.duplicates) if (d.code) setSameEditionAbbreviation(d.code, niceAbbreviation(list.find((b) => String(b.id) === d.id) ?? { id: d.id, abbreviation: d.abbr }));
     const inApp = (lang: string) => appLangs.has(lang);
     const batch = pickBatch(first.waiting.filter((w) => inApp(w.language)), appLangs, BATCH);
     const attribution = new Map<string, string | null>();

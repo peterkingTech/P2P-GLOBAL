@@ -573,7 +573,7 @@ export default function BibleReaderScreen() {
         {book ? <Text style={styles.refText} numberOfLines={1}>{` ${loc?.chapter}`}</Text> : null}
         <Ionicons name="chevron-down" size={16} color={c.accentGreen} style={{ marginLeft: 4 }} />
       </TouchableOpacity>
-      <AppButton label={`${loc?.t ?? "—"}`} onPress={() => router.push({ pathname: "/bible/versions", params: { current: loc?.t ?? "" } } as any)} variant="secondary" size="sm" accessibilityLabel={`Translation ${translation?.name ?? loc?.t ?? ""}. Change translation`} style={{ minWidth: 44, marginHorizontal: 2 }} />
+      <AppButton label={`${translation?.abbreviation ?? loc?.t ?? "—"}`} onPress={() => router.push({ pathname: "/bible/versions", params: { current: loc?.t ?? "" } } as any)} variant="secondary" size="sm" accessibilityLabel={`Translation ${translation?.name ?? loc?.t ?? ""}. Change translation`} style={{ minWidth: 44, marginHorizontal: 2 }} />
       <TouchableOpacity hitSlop={10} style={styles.iconBtn} onPress={() => setSheet("compare")} disabled={!loc || !translations?.length} accessibilityRole="button"
         accessibilityLabel={compare.length ? `Comparing ${compare.length + 1} translations. Change` : "Compare translations"} accessibilityState={{ selected: compare.length > 0 }}>
         <Ionicons name={compare.length ? "git-compare" : "git-compare-outline"} size={21} color={compare.length ? c.accentGreen : c.textDark} />

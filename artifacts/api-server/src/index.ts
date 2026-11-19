@@ -16,7 +16,7 @@ import { sweepUnansweredCalls } from "./lib/callSweep";
 import { sweep as sweepAdminNotifications } from "./lib/adminNotifications";
 import { processScheduledDeletions } from "./lib/accountDeletion";
 import { runStudioScheduler } from "./lib/studio/runtime";
-import { syncYouVersion } from "./lib/bibleProviders/youversionSync";
+import { refreshYouVersionNames, syncYouVersion } from "./lib/bibleProviders/youversionSync";
 import { sweepLiveAudio } from "./lib/voices/synth";
 
 // Translation calls fail silently into an English fallback (see
@@ -58,6 +58,9 @@ app.listen(port, (err) => {
 if (process.env.YOUVERSION_AUTO_SYNC !== "off") {
   setTimeout(() => { void syncYouVersion(); }, 90_000).unref();
   cron.schedule("17 * * * *", () => { void syncYouVersion(); });
+} else {
+  // Sync off (localhost): still show YouVersion's familiar abbreviations (a few list calls, nothing written).
+  setTimeout(() => { void refreshYouVersionNames(); }, 20_000).unref();
 }
 
 // Live-only voices (9jaLingo): delete delivered clips older than 20 minutes (timers do it too; this catches restarts).

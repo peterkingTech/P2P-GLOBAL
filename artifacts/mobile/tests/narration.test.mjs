@@ -51,7 +51,8 @@ ok("loaded once per chapter per session", calls === 1);
 
 // App wiring
 const engine = src("lib/listen/engine.ts"), index = src("lib/listen/index.ts"), chapter = src("app/kingdom-stories/chapter.tsx"), client = src("lib/kingdomStoriesApi.ts");
-ok("engine: passes the displayed text and the content's narration to the driver", engine.includes("source: content.sections[c.section]?.parts[c.part]?.text.slice(c.start, c.end),") && engine.includes("narration: content.narration,"));
+ok("engine: passes the displayed text and the content's narration to the driver", engine.includes("source: content.sections[c.section]?.parts[c.part]?.text.slice(c.start, c.end),") && engine.includes("...sectionNarration(index),") && engine.includes("if (!sec?.narration) return { narration: content?.narration, chunkIndex: index, chunkSources: chunkSources() };"));
+ok("engine: a section's own recording (playlist passage) is matched within that section only", engine.includes("return { narration: sec.narration, chunkIndex: index - first, chunkSources: mine };"));
 ok("driver: the listener's P2P Voice (never the phone, owner 2026-11-19) when there's no recording, no match, a broken recording, or any failure", index.includes("if (!official || (chosen && !getVoicePrefs().preferOfficial && !authorised)) { recStop(true); return p2pSpeak(text, o); }") && index.includes("if (!seg) return viaP2P();") && index.includes("recBroken.add(n.url); viaP2P();") && /catch \{\s*viaP2P\(\);/.test(index) && !index.includes("deviceSpeech"));
 ok("driver: consecutive sentences carry on without a seek; never stuck, and never advanced by a timer (2026-11-18)", index.includes("const contiguous = pausedHere === null && p.playing") && index.includes("recPause = setTimeout(") && index.includes("recWatch = setInterval(") && !index.includes("setTimeout(finish,"));
 ok("driver: one player, replaced (and the cursor reset) when the recording changes", index.includes("recPlayer?.remove();") && index.includes("recCursor = 0;"));
@@ -105,7 +106,7 @@ ok("API: narration per language (?lang=), English still served from the first up
   // 2026-11-18 (P2P Voices): the chunk index, every chunk's text, 'resuming', the content kind and key are passed for
   // EVERY reading (a P2P Voice prefetches the next sentences and must know it isn't Bible content); the recording
   // driver still uses them only when the content has a recording.
-  ok("engine: passes the chunk index, every chunk's text, 'resuming', kind and key", engine.includes("kind: content.kind, contentKey: content.key,") && engine.includes("chunkIndex: index, chunkSources: chunkSources(), resuming,") && engine.includes("speakFrom(state.chunk, spokenFrom, true)"));
+  ok("engine: passes the chunk index, every chunk's text, 'resuming', kind and key", engine.includes("kind: content.kind, contentKey: content.key,") && engine.includes("chunkIndex: index, chunkSources: chunkSources() };") && engine.includes("        resuming,") && engine.includes("speakFrom(state.chunk, spokenFrom, true)"));
   ok("driver: resumes from the exact paused moment; otherwise from the sentence's start", index.includes("recPausedAt.time >= seg.start && recPausedAt.time < seg.end ? recPausedAt.time : null") && index.includes("const from = pausedHere ?? seg.start;"));
   ok("driver: a stall is waited for, then reported — never skipped", index.includes("started && still >= 25") && index.includes("o.onError?.(new Error("));
 }

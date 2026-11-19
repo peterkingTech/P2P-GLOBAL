@@ -6,7 +6,8 @@
 import { router } from "expo-router";
 import { BIBLE_COVER } from "@/constants/artwork";
 import { bibleRoute, bookByCode, formatRef, getChapter, getChapterAudio, getTranslations, type BibleChapter } from "@/lib/bibleReaderApi";
-import { estimatedNarration, recordingDuration } from "./chapterAudio";
+import { estimatedNarration, recordingDuration, sliceNarration } from "./chapterAudio";
+import type { RecordedNarration } from "./narration";
 import { loadLocale } from "@/lib/i18n";
 import { listen, spokenLabels, type ListenAction, type ListenContent, type ListenSection } from "@/lib/listen";
 
@@ -37,27 +38,61 @@ export async function playBibleChapter(bookCode: string, chapter: number, transl
  * A chapter (or the verses `part`) as listening content. `actions` are extra
  * buttons for when listening ends (e.g. the reader's "Choose another passage").
  */
+/** The whole chapter's licensed recording with estimated positions (the chapter's parts, in reading order), or null. */
+async function chapterRecording(d: BibleChapter, language: string): Promise<{ narration: RecordedNarration; texts: string[]; verseOf: (number | null)[] } | null> {
+  if (d.offline) return null;
+  let url: string | null = d.audio?.[0]?.url ?? null, reader = d.audio?.[0]?.reader ?? "";
+  if (!url) {
+    const tr = (await getTranslations().catch(() => null))?.translations.find((x) => x.code === d.translation.code);
+    if (!tr?.recordedAudio) return null;
+    const a = await getChapterAudio(d.translation.code, d.book.code, d.chapter);
+    if (!a) return null;
+    url = a.url; reader = a.reader;
+  }
+  const dur = await recordingDuration(url);
+  if (!dur) return null;
+  // Positions are estimated over the WHOLE chapter as it is read (heading + every verse), so a selection's verses
+  // land where they are in the recording.
+  const full = bibleListenContent(d, language);
+  // The reader also reads the section headings ("Jisọs na Nikọdimọs") — counted in the timing (not highlighted), or
+  // every verse after a heading would be highlighted too early (owner 2026-11-19: "the audio is not following the text").
+  const headingsBefore = (v: number) => (d.headings ?? []).filter((h) => h.beforeVerse === v && h.text.trim()).map((h) => ({ text: h.text, verse: null as number | null }));
+  const parts = full.sections.flatMap((s) => {
+    const verse = /^\d+$/.test(s.id) ? Number(s.id) : null;
+    return [...(verse !== null ? headingsBefore(verse) : []), ...s.parts.map((p) => ({ text: p.text, verse }))];
+  });
+  const narration = estimatedNarration(url, reader || d.translation.name, parts.map((p) => p.text), dur);
+  return narration ? { narration, texts: parts.map((p) => p.text), verseOf: parts.map((p) => p.verse) } : null;
+}
+
+/** Just the verses start–end of the chapter's recording; `heading` (spoken words not in the recording) is skipped. */
+export async function passageRecording(d: BibleChapter, language: string, start: number, end: number, heading: string[] = []): Promise<RecordedNarration | null> {
+  try {
+    const rec = await chapterRecording(d, language);
+    if (!rec) return null;
+    return sliceNarration(rec.narration, rec.texts, (i) => rec.verseOf[i] !== null && rec.verseOf[i]! >= start && rec.verseOf[i]! <= end, heading);
+  } catch { return null; }
+}
+
 /**
  * The chapter's own LICENSED RECORDING, when its translation has one (owner 2026-11-19): AO Lab's recording that
  * came with the chapter, or the translation's API.Bible audio edition (streamed). It becomes the content's
- * narration, so P2P Listen plays the real recording first — never replaced by a generated voice. Whole chapters
- * only (a selection of verses is read by P2P Voice). No recording / no connection → the content as it was.
+ * narration, so P2P Listen plays the real recording first — never replaced by a generated voice. A selection of
+ * verses plays just its stretch of the chapter's recording (owner 2026-11-19: Igbo should play everywhere).
+ * No recording / no connection → the content as it was.
  */
 export async function withChapterAudio(content: ListenContent, d: BibleChapter): Promise<ListenContent> {
-  if (content.key !== bibleListenKey(d) || d.offline) return content;
+  const whole = bibleListenKey(d);
+  const sel = content.key.startsWith(`${whole}:`) ? /:(\d+)-(\d+)$/.exec(content.key) : null;
+  if (content.key !== whole && !sel) return content;
   try {
-    let url: string | null = d.audio?.[0]?.url ?? null, reader = d.audio?.[0]?.reader ?? "";
-    if (!url) {
-      const tr = (await getTranslations().catch(() => null))?.translations.find((x) => x.code === d.translation.code);
-      if (!tr?.recordedAudio) return content;
-      const a = await getChapterAudio(d.translation.code, d.book.code, d.chapter);
-      if (!a) return content;
-      url = a.url; reader = a.reader;
+    if (sel) {
+      const heading = content.sections.filter((s) => !/^\d+$/.test(s.id)).flatMap((s) => s.parts.map((p) => p.text));
+      const narration = await passageRecording(d, content.language, Number(sel[1]), Number(sel[2]), heading);
+      return narration ? { ...content, narration, subtitle: `${d.translation.name} · Recorded audio` } : content;
     }
-    const dur = await recordingDuration(url);
-    if (!dur) return content;
-    const narration = estimatedNarration(url, reader || d.translation.name, content.sections.flatMap((s) => s.parts.map((p) => p.text)), dur);
-    return narration ? { ...content, narration, subtitle: `${d.translation.name} · Recorded audio` } : content;
+    const rec = await chapterRecording(d, content.language);
+    return rec ? { ...content, narration: rec.narration, subtitle: `${d.translation.name} · Recorded audio` } : content;
   } catch { return content; }
 }
 

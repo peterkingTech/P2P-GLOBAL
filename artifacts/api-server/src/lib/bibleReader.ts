@@ -5,7 +5,7 @@ import { getHelloAoBooks, getHelloAoCatalogue, getHelloAoChapter, HelloAoError, 
 import { CURATED_TRANSLATIONS } from "./bibleProviders/helloaoRegistry";
 import { audioEditionFor } from "./bibleAudio";
 import { getYvChapter, getYvMeta, YouVersionError } from "./bibleProviders/youversion";
-import { onYouVersionChange, yvLanguageName, yvLicensedNow } from "./bibleProviders/youversionState";
+import { onYouVersionChange, sameEditionAbbreviation, yvAbbreviation, yvLanguageName, yvLicensedNow } from "./bibleProviders/youversionState";
 
 // The Bible reader (full chapters, translations, search, related lessons).
 // Scripture text comes ONLY from API.Bible for translations marked
@@ -112,12 +112,26 @@ const languageForPreview = (iso3: string) => ISO3[iso3] ?? iso3;
 
 /** Copying verse text: API.Bible public-domain translations, or AO Lab ones whose licence permits sharing. */
 export const textCopyAllowed = (r: TRow) => licenceTextCopyAllowed(r);
+/** The abbreviation people know (owner 2026-11-19): as YouVersion shows it — for its own Bibles (NIV, not NIV11) and for
+ *  the same edition from another source (BIUO → ICB) — else the source's own; AO Lab's generic "BIB" becomes the
+ *  Bible's own short name ("Kikuyu Bible" → "Kikuyu"), never an invented code. */
+export function displayAbbreviation(r: Pick<TRow, "translation_code" | "translation_name" | "abbreviation" | "provider" | "provider_translation_id">): string {
+  const yv = providerOf(r as TRow) === "youversion" ? yvAbbreviation(String(r.provider_translation_id ?? "")) : sameEditionAbbreviation(r.translation_code);
+  if (yv) return yv;
+  const own = (r.abbreviation ?? "").trim() || r.translation_code;
+  if (/^bib(le)?$/i.test(own)) {
+    const words = String(r.translation_name ?? "").replace(/\(.*?\)/g, " ").split(/\s+/).filter((w) => w && !/^(bible|the|open|holy)$/i.test(w));
+    if (words.length === 1) return words[0];
+    if (words.length > 1) return words.map((w) => w[0]).join("").toUpperCase() + (/\bbible\b/i.test(String(r.translation_name)) ? "B" : "");
+  }
+  return own;
+}
 export const publicTranslation = (r: TRow) => ({
   code: r.translation_code, name: r.translation_name, language: r.language, isDefault: r.is_default_for_language, textCopyAllowed: textCopyAllowed(r),
   // Additions (older app versions ignore them):
   provider: providerOf(r) === "helloao" ? "helloao" : providerOf(r) === "youversion" ? "youversion" : "api.bible",
   providerName: providerOf(r) === "helloao" ? "Free Use Bible API (AO Lab)" : providerOf(r) === "youversion" ? "YouVersion" : "API.Bible",
-  abbreviation: r.abbreviation ?? r.translation_code,
+  abbreviation: displayAbbreviation(r),
   textDirection: r.text_direction === "rtl" ? "rtl" : "ltr",
   attribution: attributionOf(r),
   licenceUrl: providerOf(r) === "helloao" ? r.licence_url ?? null : null,

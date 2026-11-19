@@ -33,8 +33,13 @@ export function loadNarration(storyId: string, chapterId: string, lang = "en"): 
   return p;
 }
 
-export const normWord = (w: string) => w.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]/g, "");
-const wordsOf = (text: string) => text.split(/[\s—–-]+/).map(normWord).filter(Boolean);
+// Latin words keep exactly the form they always had (Kingdom Stories narrations were aligned with it); a word in
+// another script (Hindi, Bengali, Tamil, Amharic …), which that form would erase, keeps its letters instead.
+export const normWord = (w: string) => {
+  const latin = w.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]/g, "");
+  return latin || w.toLowerCase().normalize("NFKD").replace(/[^\p{L}\p{M}\p{N}]/gu, "");
+};
+export const wordsOf = (text: string) => text.split(/[\s—–-]+/).map(normWord).filter(Boolean);
 
 /**
  * Where `text` (one or more whole sentences, as displayed) is in the recording, in seconds.

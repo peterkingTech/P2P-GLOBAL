@@ -257,6 +257,14 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
   let sources: string[] | null = null;
   /** Every chunk's displayed text, in playing order (worked out once per content). */
   const chunkSources = () => (sources ??= chunks.map((c) => content?.sections[c.section]?.parts[c.part]?.text.slice(c.start, c.end) ?? ""));
+  function sectionNarration(index: number): { narration: unknown; chunkIndex: number; chunkSources: string[] } {
+    const sec = content?.sections[chunks[index].section];
+    if (!sec?.narration) return { narration: content?.narration, chunkIndex: index, chunkSources: chunkSources() };
+    const first = chunks.findIndex((c) => c.section === chunks[index].section);
+    const all = chunkSources();
+    const mine = chunks.map((c, i) => (c.section === chunks[index].section ? all[i] : null)).filter((x): x is string => x !== null);
+    return { narration: sec.narration, chunkIndex: index - first, chunkSources: mine };
+  }
   function speakFrom(index: number, offset = 0, resuming = false) {
     if (!content || index < 0 || index >= chunks.length || !state.voice || state.voice.kind === "unavailable") return;
     halt();
@@ -274,10 +282,11 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
         rate: state.rate,
         background: prefs.background,
         source: content.sections[c.section]?.parts[c.part]?.text.slice(c.start, c.end),
-        narration: content.narration,
+        // A section with its own recording (a playlist passage) is matched within that section; otherwise the content's.
+        ...sectionNarration(index),
         kind: content.kind, contentKey: content.key,
         translation: content.sections[c.section]?.translation ?? (typeof content.meta?.t === "string" ? content.meta.t : undefined),
-        chunkIndex: index, chunkSources: chunkSources(), resuming,
+        resuming,
         onBoundary: (e) => { if (g === gen && typeof e?.charIndex === "number") boundary = spokenFrom + e.charIndex; },
         onDone: () => { if (g === gen) advance(); },
         onError: (e) => { if (g === gen) fail("speech", (e as VoiceUnavailable | undefined)?.plain ? e.message : `Listening stopped: ${e?.message || "the speech engine reported a problem"}.`); },

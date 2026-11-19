@@ -8,7 +8,7 @@
 import { BIBLE_COVER } from "@/constants/artwork";
 import { getChapter, type BibleChapter, type NewRef } from "@/lib/bibleReaderApi";
 import type { ListenContent, ListenSection } from "@/lib/listen";
-import { bibleAnnouncement } from "@/lib/listen/bibleContent";
+import { bibleAnnouncement, passageRecording } from "@/lib/listen/bibleContent";
 import type { CollectionItem } from "@/lib/scriptureCollectionsApi";
 
 /** One passage in a listening queue: `key` is unique in the queue (a playlist item id, or a generated one). */
@@ -41,6 +41,15 @@ export async function playlistContent(meta: PlaylistMeta, entries: QueueEntry[],
     ];
     sections.push({ id: e.key, title: e.reference, parts, translation: e.ref.translationCode });
   }
+  // The translation's own recording first (owner 2026-11-19): each passage gets its stretch of its chapter's recording.
+  const byKey = new Map(loaded.map(({ e, d }) => [e.key, { e, d }]));
+  await Promise.all(sections.map(async (s) => {
+    const x = byKey.get(s.id);
+    if (!x?.d) return;
+    const heading = s.parts.filter((p) => p.key.endsWith(":heading")).map((p) => p.text);
+    const rec = await passageRecording(x.d, language, x.e.ref.startVerse, x.e.ref.endVerse, heading).catch(() => null);
+    if (rec) s.narration = rec;
+  }));
   if (!sections.length) throw new Error("These passages couldn't be loaded. Please check your connection and try again.");
   return {
     unavailable,
