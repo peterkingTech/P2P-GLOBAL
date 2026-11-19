@@ -5,7 +5,8 @@
 //   Google Cloud TTS    GOOGLE_TTS_API_KEY                               everyday content + story fallback
 //   ElevenLabs          ELEVENLABS_API_KEY (+ VOICES_ELEVENLABS_CATALOGUE=true)   catalogue + previews ONLY
 //   Spitch (Igbo…)      SPITCH_API_KEY + VOICES_SPITCH_VERIFIED=true     specialist; off until verified by the owner
-//   9jaLingo            P2P_Global_Igbo_Voice (owner 2026-11-19)          Igbo, Hausa, Pidgin, Yoruba — LIVE ONLY (no copies)
+//   9jaLingo            NAIJALINGO_API_KEY                                Igbo, Hausa, Pidgin, Yoruba — LIVE ONLY (no copies)
+//   Naija Speech        P2P_Global_Igbo_Voice + VOICES_NAIJASPEECH_LICENCE=confirmed   Igbo, Hausa, Yoruba — LIVE ONLY
 import { characteristicsFrom, describeLocale, fetchWithTimeout, isChildVoice, ProviderError, type ProviderPolicy, type Voice, type VoiceProvider } from "./types";
 
 const now = () => new Date().toISOString();
@@ -182,7 +183,7 @@ export const spitch: VoiceProvider = {
 // LIVE ONLY — the server keeps a clip only long enough to deliver it, phones never keep a copy, no offline.
 // VOICES_NAIJALINGO=off switches it off without removing the key.
 const NL_BASE = "https://api.9jalingo.org";
-const nlKey = () => process.env.P2P_Global_Igbo_Voice || process.env.NAIJALINGO_API_KEY || "";
+const nlKey = () => process.env.NAIJALINGO_API_KEY || "";
 export const NAIJALINGO_LANGUAGES = ["ig", "ha", "pcm", "yo"] as const;
 const NL_DOMAIN: Record<string, string> = { "Everyday Conversation": "everyday", "Business Conversation": "business", "Health Conversation": "health", "Agricultural Conversation": "agriculture" };
 export const naijalingo: VoiceProvider = {
@@ -223,7 +224,54 @@ export const naijalingo: VoiceProvider = {
   },
 };
 
-export const PROVIDERS: VoiceProvider[] = [azure, google, elevenlabs, spitch, naijalingo];
+// ── Naija Speech API (asr.naijallm.com) — Igbo, Hausa, Yoruba (owner's key, 2026-11-20) ─────────────────────────
+// API (asr.naijallm.com/llms.txt, read 2026-11-20): base https://asr.naijallm.com/v1, Authorization: Bearer nlb_…,
+// GET /audio/voices, POST /audio/speech { input ≤ 1000 chars, voice, language, response_format: "mp3" } → audio bytes.
+// Limits per key: 10 requests/minute, 1,000/day, 100,000 TTS characters/day.
+// TERMS: "Free for non-commercial use"; commercial products need a licence (ayuba@naijallm.com). The *_clear voices
+// (MMS-TTS, CC BY-NC 4.0) are non-commercial ONLY → never offered. Storing generated audio isn't addressed → LIVE ONLY.
+// Owner's copyright rule (unknown = no): OFF until the owner records Naija Speech's permission for P2P Global
+// (VOICES_NAIJASPEECH_LICENCE=confirmed on Railway).
+const NS_BASE = "https://asr.naijallm.com/v1";
+const nsKey = () => process.env.P2P_Global_Igbo_Voice || process.env.NAIJASPEECH_API_KEY || "";
+export const NAIJASPEECH_LANGUAGES = ["ig", "ha", "yo"] as const;
+const NS_LANGUAGE_WORD: Record<string, string> = { ig: "Igbo", ha: "Hausa", yo: "Yoruba" };
+export const naijaspeech: VoiceProvider = {
+  id: "naijaspeech", name: "Naija Speech (Igbo, Hausa, Yoruba)", role: "Igbo, Hausa and Yoruba",
+  policy: { cacheAllowed: false, offlineAllowed: false, retentionDays: 0,
+    note: "Naija Speech is free for non-commercial use; P2P uses it only once Naija Speech has given permission. Its terms say nothing about storing audio, so P2P plays these voices live only." },
+  status() {
+    if (!nsKey()) return { enabled: false, reason: "Not connected: no Naija Speech key on the server." };
+    if (process.env.VOICES_NAIJASPEECH_LICENCE !== "confirmed") return { enabled: false, reason: "Waiting for Naija Speech's permission for P2P Global (their API is free for non-commercial use only). Set VOICES_NAIJASPEECH_LICENCE=confirmed once it's given." };
+    return { enabled: true, reason: null };
+  },
+  async listVoices() {
+    const r = await fetchWithTimeout(`${NS_BASE}/audio/voices`, { provider: "naijaspeech", headers: { Authorization: `Bearer ${nsKey()}`, Accept: "application/json" }, timeoutMs: 20_000 });
+    const j = (await r.json()) as { data?: { id?: string; language?: string; default?: boolean }[] };
+    const at = now();
+    return (j.data ?? []).filter((v) => v?.id && /^[a-z0-9_]{1,40}$/.test(v.id) && (NAIJASPEECH_LANGUAGES as readonly string[]).includes(String(v.language)) && !/_clear$/.test(v.id))
+      .map((v): Voice => {
+        const lang = String(v.language);
+        const m = /_(female|male)(\d*)$/.exec(v.id!);
+        const presentation = m ? (m[1] as "female" | "male") : null;
+        const name = m ? `${NS_LANGUAGE_WORD[lang]} ${m[1]} voice${m[2] ? ` ${m[2]}` : ""}` : v.id!;
+        return { id: `naijaspeech:${v.id}`, provider: "naijaspeech", providerVoiceId: v.id!, name, ...describeLocale(lang), presentation,
+          characteristics: [], model: "naija-tts", preview: { kind: "generate" }, canSynthesize: true, status: "available",
+          source: `Naija Speech voice list${v.default ? " (their default)" : ""}`, refreshedAt: at };
+      });
+  },
+  async synthesize(text, voice, signal) {
+    if (text.length > 1000) throw new ProviderError("naijaspeech", "bad_response", "That passage is longer than Naija Speech reads at once.");
+    const r = await fetchWithTimeout(`${NS_BASE}/audio/speech`, { provider: "naijaspeech", signal, method: "POST", timeoutMs: 45_000,
+      headers: { Authorization: `Bearer ${nsKey()}`, "Content-Type": "application/json", Accept: "audio/mpeg" },
+      body: JSON.stringify({ model: "naija-tts", input: text, voice: voice.providerVoiceId, language: voice.language, response_format: "mp3" }) });
+    const audio = Buffer.from(await r.arrayBuffer());
+    if (audio.length < 100) throw new ProviderError("naijaspeech", "bad_response", "Naija Speech returned no audio.");
+    return { audio, contentType: "audio/mpeg", characters: text.length };
+  },
+};
+
+export const PROVIDERS: VoiceProvider[] = [azure, google, elevenlabs, spitch, naijalingo, naijaspeech];
 /** Advertised candidates that have NO adapter yet (not shown to anyone but admins). */
 export const CANDIDATES = [
   { id: "orinode", name: "Orinode", languages: ["ig"], advertisedVoices: ["Chiamaka (female)", "Obi (male)"],

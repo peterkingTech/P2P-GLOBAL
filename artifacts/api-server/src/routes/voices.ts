@@ -32,7 +32,7 @@ router.get("/catalogue", async (req, res) => {
   try {
     const presentation = req.query.presentation === "female" || req.query.presentation === "male" ? req.query.presentation : null;
     const characteristic = CHARACTERISTICS.includes(req.query.characteristic as Characteristic) ? (req.query.characteristic as Characteristic) : null;
-    const provider = ["azure", "google", "elevenlabs", "spitch", "naijalingo"].includes(String(req.query.provider)) ? (req.query.provider as ProviderId) : null;
+    const provider = ["azure", "google", "elevenlabs", "spitch", "naijalingo", "naijaspeech"].includes(String(req.query.provider)) ? (req.query.provider as ProviderId) : null;
     const purpose = req.query.purpose === "story" || req.query.purpose === "everyday" ? req.query.purpose : null;
     return res.json(await catalogue({ language: str(req.query.language, 8), accent: str(req.query.accent), provider, presentation, characteristic, q: str(req.query.q), purpose,
       page: Number(req.query.page) || 0, pageSize: Number(req.query.pageSize) || 40, honoursPolicy: req.query.policy === "1" }));

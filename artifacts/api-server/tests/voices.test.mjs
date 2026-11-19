@@ -155,8 +155,10 @@ ok("migration 254: additive, RLS on, API-only, one published recording per chapt
   const prevKey = process.env.P2P_Global_Igbo_Voice;
   delete process.env.P2P_Global_Igbo_Voice; delete process.env.NAIJALINGO_API_KEY;
   ok("9jaLingo: off without the key", nl.status().enabled === false);
-  process.env.P2P_Global_Igbo_Voice = "k";
-  ok("9jaLingo: on with the owner's Railway key (P2P_Global_Igbo_Voice)", nl.status().enabled === true);
+  process.env.P2P_Global_Igbo_Voice = "nlb_x";
+  ok("9jaLingo: NOT on with the owner's Naija Speech key (2026-11-20: it belongs to Naija Speech)", nl.status().enabled === false);
+  process.env.NAIJALINGO_API_KEY = "k";
+  ok("9jaLingo: on only with its own key (NAIJALINGO_API_KEY)", nl.status().enabled === true);
   process.env.VOICES_NAIJALINGO = "off"; ok("9jaLingo: VOICES_NAIJALINGO=off switches it off", nl.status().enabled === false); delete process.env.VOICES_NAIJALINGO;
   ok("9jaLingo: covers Igbo, Hausa, Pidgin and Yoruba", V.P.NAIJALINGO_LANGUAGES.join() === "ig,ha,pcm,yo");
   // Real adapter against a fake 9jaLingo server: request shape + header.
@@ -174,6 +176,27 @@ ok("migration 254: additive, RLS on, API-only, one published recording per chapt
   globalThis.fetch = async () => new Response(JSON.stringify({ status: "queued", job_id: "j" }), { status: 202 });
   let e202 = null; try { await nl.synthesize("Nnoo", voices[0]); } catch (e) { e202 = e; }
   ok("9jaLingo: engine still starting (202) → a soft failure, not an empty clip", e202?.code === "unavailable");
+  // ── Naija Speech (asr.naijallm.com) — the owner's key; free for NON-commercial use → off until permission recorded ──
+  const ns = V.P.naijaspeech;
+  ok("Naija Speech: live only — no server cache, no offline copy", ns.policy.cacheAllowed === false && ns.policy.offlineAllowed === false);
+  delete process.env.VOICES_NAIJASPEECH_LICENCE;
+  ok("Naija Speech: OFF with the key alone (their API is free for non-commercial use only)", ns.status().enabled === false && /permission/i.test(ns.status().reason ?? ""));
+  process.env.VOICES_NAIJASPEECH_LICENCE = "confirmed";
+  ok("Naija Speech: on once the owner records their permission", ns.status().enabled === true);
+  const nsCalls = [];
+  globalThis.fetch = async (url, init = {}) => {
+    nsCalls.push({ url: String(url), auth: init.headers?.Authorization, body: init.body ? JSON.parse(init.body) : null });
+    if (String(url).endsWith("/v1/audio/voices")) return new Response(JSON.stringify({ data: [{ id: "igbo_female2", language: "ig", default: true }, { id: "igbo_male2", language: "ig" }, { id: "hausa_clear", language: "ha" }, { id: "yoruba_clear", language: "yo" }, { id: "idera", language: "en" }, { id: "bad id", language: "ig" }] }), { status: 200 });
+    return new Response(Buffer.alloc(900, 4), { status: 200, headers: { "Content-Type": "audio/mpeg" } });
+  };
+  const nsv = await ns.listVoices();
+  ok("Naija Speech: Igbo/Hausa/Yoruba voices; the non-commercial *_clear voices never offered; Bearer key", nsv.map((v) => v.id).join() === "naijaspeech:igbo_female2,naijaspeech:igbo_male2" && nsv[0].name === "Igbo female voice 2" && nsv[0].presentation === "female" && nsCalls[0].auth === "Bearer nlb_x");
+  const nsOut = await ns.synthesize("Nnoo", nsv[0]);
+  const nsc = nsCalls.find((c) => c.url.endsWith("/v1/audio/speech"));
+  ok("Naija Speech: speech request = { model naija-tts, input, voice, language, mp3 }", nsOut.audio.length === 900 && nsc?.body?.input === "Nnoo" && nsc.body.voice === "igbo_female2" && nsc.body.language === "ig" && nsc.body.model === "naija-tts" && nsc.body.response_format === "mp3");
+  let nsLong = null; try { await ns.synthesize("a".repeat(1001), nsv[0]); } catch (e) { nsLong = e; }
+  ok("Naija Speech: never sends more than its 1,000-character limit", nsLong?.provider === "naijaspeech");
+  delete process.env.VOICES_NAIJASPEECH_LICENCE; delete process.env.NAIJALINGO_API_KEY;
   globalThis.fetch = realFetch;
   if (prevKey === undefined) delete process.env.P2P_Global_Igbo_Voice; else process.env.P2P_Global_Igbo_Voice = prevKey;
 
