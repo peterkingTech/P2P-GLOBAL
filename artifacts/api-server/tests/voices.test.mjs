@@ -83,13 +83,20 @@ V.setTranslationLookupForTests(async (code) => ({
   NIV: { translation_code: "NIV", provider: null, license_notes: "Copyright © Biblica" },
   ONEN: { translation_code: "ONEN", provider: null, license_notes: "Biblica® Open License — available in API.Bible" },
   "AO-eng_lsv": { translation_code: "AO-eng_lsv", provider: "helloao", licence_status: "approved", licence_name: "CC BY-SA 4.0" },
+  "AO-ibo_bib": { translation_code: "AO-ibo_bib", provider: "helloao", licence_status: "approved", licence_name: "CC BY-SA 4.0" },
+  "AO-deu_sch": { translation_code: "AO-deu_sch", provider: "helloao", licence_status: "approved", licence_name: "CC BY 4.0" },
+  "AO-x_nc": { translation_code: "AO-x_nc", provider: "helloao", licence_status: "approved", licence_name: "CC BY-NC 4.0" },
+  "AO-x_nd": { translation_code: "AO-x_nd", provider: "helloao", licence_status: "approved", licence_name: "CC BY-ND 4.0" },
+  "AO-x_review": { translation_code: "AO-x_review", provider: "helloao", licence_status: "needs_information", licence_name: "CC BY-SA 4.0" },
 }[code] ?? null));
 const tryReq = async (o) => { try { return { r: await req(o) }; } catch (e) { return { e }; } };
 for (const kind of ["bible", "playlist"]) {
   ok(`${kind}: no translation named → refused`, (await tryReq({ contentKind: kind })).e?.code === "translation_required");
   ok(`${kind}: public-domain API.Bible translation (KJV) → read`, !!(await tryReq({ contentKind: kind, contentKey: "bible:KJV:JHN.3", translation: "KJV" })).r?.url);
   ok(`${kind}: public-domain AO Lab translation (ASV) → read`, !!(await tryReq({ contentKind: kind, contentKey: "bible:AO-eng_asv:JHN.3", translation: "AO-eng_asv" })).r?.url);
-  for (const t of ["NIV", "ONEN", "AO-eng_lsv", "UNKNOWN"]) ok(`${kind}: ${t} (not public domain) → refused`, (await tryReq({ contentKind: kind, translation: t })).e?.code === "translation_not_permitted");
+  // Owner 2026-11-20: open licences that allow adaptations (CC BY, CC BY-SA) may be read — e.g. the Igbo open Bible.
+  for (const t of ["AO-eng_lsv", "AO-ibo_bib", "AO-deu_sch"]) ok(`${kind}: ${t} (CC BY / CC BY-SA, adaptations allowed) → read`, !!(await tryReq({ contentKind: kind, contentKey: `bible:${t}:JHN.3`, translation: t })).r?.url);
+  for (const t of ["NIV", "ONEN", "AO-x_nc", "AO-x_nd", "AO-x_review", "UNKNOWN"]) ok(`${kind}: ${t} (all rights reserved / NC / ND / not approved) → refused`, (await tryReq({ contentKind: kind, translation: t })).e?.code === "translation_not_permitted");
 }
 ok("study (commentary, dictionary, lexicon) → read", !!(await tryReq({ contentKind: "study", contentKey: "dictionary:grace" })).r?.url);
 ok("unknown content kinds are still refused", (await tryReq({ contentKind: "messages" })).e?.code === "not_eligible");

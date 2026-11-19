@@ -64,9 +64,14 @@ export const textCopyAllowed = (r: TranslationRow) =>
  *  P2P Voice only, and for the Bible ONLY public-domain translations — turning a copyrighted text into stored
  *  audio isn't something its licence grants. AO Lab: an approved row whose licence is "Public domain".
  *  API.Bible: the licence notes begin "Public domain". Open licences (Biblica Open, CC BY-SA) are not enough. */
+/** CC BY or CC BY-SA (any version): adaptations and commercial use allowed with attribution (SA: same licence). */
+export const OPEN_ADAPTABLE = /^CC BY(-SA)? \d(\.\d)?$/i;
 export function syntheticSpeechAllowed(r: TranslationRow): boolean {
   if (r.preview || providerOf(r) === "youversion") return false;
-  if (providerOf(r) === "helloao") return r.licence_status === "approved" && /^public domain$/i.test(String(r.licence_name ?? "").trim());
+  // AO Lab: public domain, or an open licence that allows adaptations and commercial use — CC BY / CC BY-SA (owner
+  // 2026-11-20: "run all the pending migrations" after approving the Igbo open-licence Bible). P2P Voice audio is then a
+  // credited derivative (attributionOf adds the notice). Never NC or ND licences.
+  if (providerOf(r) === "helloao") return r.licence_status === "approved" && (/^public domain$/i.test(String(r.licence_name ?? "").trim()) || OPEN_ADAPTABLE.test(String(r.licence_name ?? "").trim()));
   return /^\s*public domain\b/i.test(r.license_notes ?? "");
 }
 /** May a provider's RECORDED audio be played? (Device read-aloud reads displayed text and is not a recording.) */
@@ -75,7 +80,10 @@ export const canPlayRecordedAudio = (r: TranslationRow) => providerOf(r) === "he
 /** Where the text comes from and how to credit it, shown under every chapter. */
 export function attributionOf(r: TranslationRow): string | null {
   if (providerOf(r) !== "helloao") return null;   // API.Bible returns its own copyright per chapter
-  const parts = [r.copyright_notice, r.attribution, r.licence_name ? `Licence: ${r.licence_name}` : null, "Text via the Free Use Bible API (AO Lab)"].filter(Boolean);
+  // CC BY / CC BY-SA: P2P Voice audio is an adaptation — say so, and that it is shared under the same licence.
+  const adapted = OPEN_ADAPTABLE.test(String(r.licence_name ?? "").trim())
+    ? `P2P Voice audio is a synthetic reading of this text, shared under ${r.licence_name}` : null;
+  const parts = [r.copyright_notice, r.attribution, r.licence_name ? `Licence: ${r.licence_name}` : null, adapted, "Text via the Free Use Bible API (AO Lab)"].filter(Boolean);
   return parts.join(" · ");
 }
 
