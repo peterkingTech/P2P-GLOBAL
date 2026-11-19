@@ -53,7 +53,9 @@ function setAt(root: Record<string, unknown>, path: (string | number)[], v: stri
 
 type Fetcher = (url: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>;
 let fetcher: Fetcher = (u, i) => fetch(u, i) as never;
-export const setTranslatorFetcherForTests = (f: Fetcher) => { fetcher = f; };
+let wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+let RETRIES_429 = 5;
+export const setTranslatorFetcherForTests = (f: Fetcher, opts: { noWait?: boolean } = {}) => { fetcher = f; if (opts.noWait) { wait = async () => {}; RETRIES_429 = 2; } };
 
 /** Translates every text value of `source` into `targetLang`; same shape back. Returns the characters used. */
 export async function azureTranslate<T extends Record<string, unknown>>(source: T, targetLang: string): Promise<{ result: T; characters: number }> {
@@ -68,12 +70,20 @@ export async function azureTranslate<T extends Record<string, unknown>>(source: 
   for (let i = 0; i < leaves.length;) {
     const batch: Leaf[] = []; let size = 0;
     while (i < leaves.length && batch.length < 100 && (size + leaves[i].text.length < 40_000 || !batch.length)) { size += leaves[i].text.length; batch.push(leaves[i++]); }
-    const res = await fetcher(`${ENDPOINT}/translate?api-version=3.0&from=en&to=${encodeURIComponent(to)}&textType=html`, {
+    const call = () => fetcher(`${ENDPOINT}/translate?api-version=3.0&from=en&to=${encodeURIComponent(to)}&textType=html`, {
       method: "POST",
       headers: { "Ocp-Apim-Subscription-Key": key, ...(region ? { "Ocp-Apim-Subscription-Region": region } : {}), "Content-Type": "application/json" },
       body: JSON.stringify(batch.map((l) => ({ text: protect(l.text) }))),
     });
-    if (res.status === 429 || res.status === 403) throw new TranslatorError("The free translation allowance for this month is used up (Azure F0). Translation continues next month.", "quota");
+    // 429 = the free tier's SPEED limit (characters per minute): wait and try again. 403 = the MONTHLY allowance is
+    // used up: stop (the free tier never charges). Only the second ends translation for the month.
+    let res = await call();
+    for (let attempt = 1; res.status === 429 && attempt <= RETRIES_429; attempt++) {
+      await wait(Math.min(120_000, 20_000 * attempt));
+      res = await call();
+    }
+    if (res.status === 403) throw new TranslatorError("The free translation allowance for this month is used up (Azure F0). Translation continues next month.", "quota");
+    if (res.status === 429) throw new TranslatorError("Azure Translator is busy (free-tier speed limit). Try again in a few minutes.", "rate_limited");
     if (!res.ok) throw new TranslatorError(`Azure Translator error ${res.status}.`, "provider_error");
     const out = (await res.json()) as { translations: { text: string }[] }[];
     out.forEach((o, k) => { setAt(result as Record<string, unknown>, batch[k].path, unprotect(o.translations[0]?.text ?? batch[k].text)); });

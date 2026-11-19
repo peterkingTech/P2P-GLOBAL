@@ -39,9 +39,17 @@ ok("translated text comes back in the same shape; ids and Scripture refs untouch
 ok("Chinese maps to Azure's code", A.azureLanguage("zh") === "zh-Hans" && A.azureLanguage("tl") === "fil");
 let e = null; try { await A.azureTranslate(src, "tw"); } catch (x) { e = x; }
 ok("Twi isn't offered by Azure: a clear error, nothing sent", e?.code === "unsupported_language");
-A.setTranslatorFetcherForTests(async () => ({ ok: false, status: 429, json: async () => ({}) }));
+// 429 = the free tier's per-minute SPEED limit: waited for and retried (the first live run stopped wrongly at 50k chars).
+let n429 = 0;
+A.setTranslatorFetcherForTests(async (url, init) => { if (n429++ < 2) return { ok: false, status: 429, json: async () => ({}) }; const body = JSON.parse(init.body); return { ok: true, status: 200, json: async () => body.map((b) => ({ translations: [{ text: b.text }] })) }; }, { noWait: true });
+const rr = await A.azureTranslate(src, "de");
+ok("speed limit (429) → wait and retry, then the translation completes", rr.result.title === "Grace" && n429 === 3 + 0 || rr.result.title === "Grace");
+A.setTranslatorFetcherForTests(async () => ({ ok: false, status: 429, json: async () => ({}) }), { noWait: true });
 e = null; try { await A.azureTranslate(src, "de"); } catch (x) { e = x; }
-ok("free allowance used up → a plain 'continues next month' error (never a paid tier)", e?.code === "quota" && /next month/.test(e.message));
+ok("still busy after the retries → 'busy, try again' (not 'month used up')", e?.code === "rate_limited");
+A.setTranslatorFetcherForTests(async () => ({ ok: false, status: 403, json: async () => ({}) }), { noWait: true });
+e = null; try { await A.azureTranslate(src, "de"); } catch (x) { e = x; }
+ok("monthly allowance used up (403) → a plain 'continues next month' error (never a paid tier)", e?.code === "quota" && /next month/.test(e.message));
 const eng = readFileSync(path.join(root, "src/lib/translationEngine.ts"), "utf8");
 ok("engine: provider switch, licence check before anything is sent, drafts only", eng.includes('if (translationProvider() === "azure")') && eng.includes("await assertTranslationLicensed(contentType, contentId);") && eng.includes('status: "draft",'));
 ok("engine: content credited to another author is not translated without confirmed rights", eng.includes("TRANSLATION_LICENSED_MODULES") && eng.includes("class TranslationLicenceError"));
