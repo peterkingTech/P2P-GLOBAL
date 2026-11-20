@@ -404,7 +404,9 @@ ok("P2P Voice first; the phone's voice ONLY with no internet (or before P2P's vo
   return calls.length === 1 && ix.includes("function phoneVoice(text: string, o: Parameters<SpeechDriver[\"speak\"]>[1]) {") && uses.length === 2
     && ix.includes("const noInternet = () => { if (token !== cloudToken) return; markOffline(); phoneVoice(text, o); };")
     && ix.includes("if (isOffline() || !voiceDefaultsKnown()) { markOffline(); return phoneVoice(text, o); }")
-    && ix.includes("(e) => (isNetworkFailure(e) ? noInternet() : refused((e as Error).message))")
+    && ix.includes("if (isNetworkFailure(e)) return noInternet();") && ix.includes("refused((e as Error).message);")
+    // A voice that is gone (404) is forgotten; P2P's current voice carries on, or a plain "no P2P Voice" — never the phone.
+    && ix.includes("void forgetVoice(o.language, voice.voiceId).then(() => {") && ix.includes("else refused(noVoiceMessage(o.language));")
     && !/from "expo-speech"/.test(src("lib/listen/engine.ts") + src("components/listen/ListenPlayer.tsx")); })());
 ok("offline: a P2P Voice copy kept on this phone plays first; every voice heard (and fetched ahead) is kept", src("lib/listen/index.ts").includes("cachedVoiceUri(keptName(voice.voiceId, o, source)).then((uri) => (uri ? play(uri, true) : fresh()), fresh);")
   && src("lib/listen/index.ts").includes("keepVoice(keptName(voiceId, o, text), r.url)") && /File\.downloadFileAsync\(url, f\)/.test(src("lib/listen/voiceCache.ts")) && /MAX_FILES = \d+/.test(src("lib/listen/voiceCache.ts")));

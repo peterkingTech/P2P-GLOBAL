@@ -56,12 +56,22 @@ async function chapterRecording(d: BibleChapter, language: string): Promise<{ na
   const full = bibleListenContent(d, language);
   // The reader also reads the section headings ("Jisọs na Nikọdimọs") — counted in the timing (not highlighted), or
   // every verse after a heading would be highlighted too early (owner 2026-11-19: "the audio is not following the text").
-  const headingsBefore = (v: number) => (d.headings ?? []).filter((h) => h.beforeVerse === v && h.text.trim()).map((h) => ({ text: h.text, verse: null as number | null }));
+  const headingsBefore = (v: number) => (d.headings ?? []).filter((h) => h.beforeVerse === v && h.text.trim()).map((h) => ({ text: h.text, verse: null as number | null, heading: true }));
   const parts = full.sections.flatMap((s) => {
     const verse = /^\d+$/.test(s.id) ? Number(s.id) : null;
-    return [...(verse !== null ? headingsBefore(verse) : []), ...s.parts.map((p) => ({ text: p.text, verse }))];
+    return [...(verse !== null ? headingsBefore(verse) : []), ...s.parts.map((p) => ({ text: p.text, verse, heading: false }))];
   });
-  const narration = estimatedNarration(url, reader || d.translation.name, parts.map((p) => p.text), dur);
+  // The reading style, MEASURED (owner 2026-11-20: "keep testing it until you get the exact perfection"): the real
+  // pauses of 8 recordings (Igbo John 3, Genesis 1, Matthew 5, Psalm 23; Yoruba John 3, Genesis 1; BSB John 3,
+  // Psalm 23) located verse by verse, and these values fitted to them — the first verses went from ~4 s early to ~1.5 s.
+  //   opening quiet + the reader's announcement (book, chapter — at chapter 1 also the title): ~5.5 s where P2P has no
+  //   spoken heading of its own (Igbo, Yoruba …), ~0.5 s where its heading words already count (English);
+  //   ~0.5 s pause before and after a section heading; ~0.2 s between verses; ~2 s of quiet at the end.
+  //   Checked with this code on all 230 verses: mean 1.9 s → Igbo John 3 1.1 s, Psalm 23 0.35 s.
+  const ownHeading = full.sections.some((s) => s.id === "heading");
+  const introSeconds = (ownHeading ? 0.5 : 5.5) + (d.chapter === 1 ? 2 : 0);
+  const pausesBefore = parts.map((p, i) => (i === 0 ? 0 : p.heading || parts[i - 1].heading ? 0.5 : p.verse !== null ? 0.2 : 0));
+  const narration = estimatedNarration(url, reader || d.translation.name, parts.map((p) => p.text), dur, { leadSeconds: introSeconds, pausesBefore, tailSeconds: 2 });
   return narration ? { narration, texts: parts.map((p) => p.text), verseOf: parts.map((p) => p.verse) } : null;
 }
 

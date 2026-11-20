@@ -106,7 +106,11 @@ export function alignChunks(n: RecordedNarration, sources: readonly string[]): (
     if (!s) continue;
     const prev = i > 0 ? out[i - 1] : null;
     const nextSpan = spans.slice(i + 1).find((x) => x) ?? null;
-    const start = prev && prev.lastWord < s.first && s.first - prev.lastWord <= 4 ? prev.end : n.starts[s.first] / 100;
+    // Nothing the reader says is skipped (owner 2026-11-20): a sentence starts where the one before it ended (a heading
+    // read between verses belongs to the next verse), and the first one at the recording's first word (the
+    // introduction — book, chapter, title — is heard, not jumped over).
+    const earlier = spans.slice(0, i).some(Boolean);
+    const start = prev && prev.lastWord < s.first ? prev.end : !earlier ? n.starts[0] / 100 : n.starts[s.first] / 100;
     const end = nextSpan && nextSpan.first > s.last && nextSpan.first - s.last <= 4 ? n.starts[nextSpan.first] / 100 : n.ends[s.last] / 100;
     out[i] = { start, end: Math.max(end, start), firstWord: s.first, lastWord: s.last };
   }

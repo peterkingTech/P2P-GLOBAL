@@ -12,7 +12,7 @@ import { createListenEngine, VoiceUnavailable, type ListenState, type SpeechDriv
 import { labelsFrom, type SpokenLabels } from "./labels";
 import { baseLanguage } from "./voices";
 import { createUiPrefs, type ListenUiPrefs } from "./uiPrefs";
-import { chosenVoiceFor, getVoicePrefs, isEligibleKind, loadVoiceDefaults, loadVoicePrefs, setReadingSource, setVoiceNotice, speakChunk, voiceDefaultsKnown, type ChosenVoice } from "@/lib/voices";
+import { chosenVoiceFor, forgetVoice, getVoicePrefs, isEligibleKind, loadVoiceDefaults, loadVoicePrefs, setReadingSource, setVoiceNotice, speakChunk, voiceDefaultsKnown, type ChosenVoice } from "@/lib/voices";
 import { getLanguageName } from "@/lib/languageNames";
 
 /** Spoken signposts in the TEXT's language (no fallback to another language). */
@@ -208,7 +208,21 @@ function cloudSpeak(text: string, o: Parameters<SpeechDriver["speak"]>[1], voice
     if (token !== cloudToken) return;
     // Known offline and not yet time to try again: straight to the phone's voice (no waiting on every sentence).
     if (isOffline() && Date.now() - offlineSince < RETRY_MS) return noInternet();
-    cloudUrl(voice.voiceId, o, source).then((url) => play(url, false), (e) => (isNetworkFailure(e) ? noInternet() : refused((e as Error).message)));
+    cloudUrl(voice.voiceId, o, source).then((url) => play(url, false), (e) => {
+      if (isNetworkFailure(e)) return noInternet();
+      // 404: this voice is gone (its provider was switched off). Forget it and carry on with P2P's current voice for
+      // the language — or say plainly that there is none — instead of "That voice isn't available" on every sentence.
+      if ((e as { status?: number }).status === 404) {
+        void forgetVoice(o.language, voice.voiceId).then(() => {
+          if (token !== cloudToken) return;
+          const next = chosenVoiceFor(o.language);
+          if (next && next.voiceId !== voice.voiceId) cloudSpeak(text, o, next);
+          else refused(noVoiceMessage(o.language));
+        });
+        return;
+      }
+      refused((e as Error).message);
+    });
   };
   // A copy kept on this phone plays first (offline too); otherwise the server.
   cachedVoiceUri(keptName(voice.voiceId, o, source)).then((uri) => (uri ? play(uri, true) : fresh()), fresh);

@@ -40,5 +40,24 @@ const ps = N.alignChunks(part, sources);
 ok("verse selection: heading = zero-length (skipped), verses = their own stretch of the recording", ps.length === 3 && ps[0] && ps[0].end - ps[0].start < 0.01 && Math.abs(ps[1].start - seg[1].start) < 0.01 && Math.abs(ps[2].end - seg[2].end) < 0.01, JSON.stringify(ps));
 ok("nothing to keep → no narration", A.sliceNarration(n, igbo, () => false) === null);
 
+// Owner 2026-11-20: the recording opens with "Book, chapter" (and headings) before verse 1 — counted, not highlighted.
+// Owner 2026-11-20: "let it start from exactly the first word … and not skip words. The text is faster than the audio."
+const withIntro = A.estimatedNarration("u", "r", igbo, 30, 3);
+const si = N.alignChunks(withIntro, igbo);
+ok("playback starts at 0 s — the reader's very first word (introduction heard, never skipped)", si[0].start === 0, JSON.stringify(si[0]));
+ok("the introduction's seconds belong to verse 1, so verse 2 waits for it (text no longer ahead)", si[1].start > seg[1].start + 1.5 && Math.abs(si.at(-1).end - 30) < 0.01, `${si[1].start} vs ${seg[1].start}`);
+// A heading read between verses 1 and 2 (not on screen as a verse): verse 2's stretch starts where verse 1 ended.
+const withHeading = A.estimatedNarration("u", "r", [igbo[0], "Ozi ọma banyere ndụ ebighị ebi nke Chineke nyere", igbo[1], igbo[2]], 30, 3);
+const sh = N.alignChunks(withHeading, igbo);
+ok("a heading between verses is played, not jumped over (contiguous stretches)", sh.every(Boolean) && Math.abs(sh[1].start - sh[0].end) < 0.01 && Math.abs(sh[2].start - sh[1].end) < 0.01, JSON.stringify(sh));
+const src = readFileSync(path.join(root, "lib/listen/bibleContent.ts"), "utf8");
+ok("measured reading style: 5.5 s opening + announcement (0.5 s with P2P's heading), +2 s at chapter 1", src.includes(`const introSeconds = (ownHeading ? 0.5 : 5.5) + (d.chapter === 1 ? 2 : 0);`) && src.includes("{ leadSeconds: introSeconds, pausesBefore, tailSeconds: 2 }"));
+// Pauses: around a heading (0.5 s), between verses (0.2 s), quiet at the end (2 s) — measured on 8 recordings.
+const shaped = A.estimatedNarration("u", "r", [igbo[0], "Ozi ọma", igbo[1], igbo[2]], 30, { leadSeconds: 5.5, pausesBefore: [0, 0.5, 0.5, 0.2], tailSeconds: 2 });
+const sp = N.alignChunks(shaped, igbo);
+ok("shaped estimate: still starts at 0 s, contiguous, and the last verse ends 2 s before the recording does", sp.every(Boolean) && sp[0].start === 0 && Math.abs(sp[2].start - sp[1].end) < 0.01 && Math.abs(shaped.ends.at(-1) / 100 - 28) < 0.05, JSON.stringify(sp));
+const plain = A.estimatedNarration("u", "r", [igbo[0], "Ozi ọma", igbo[1], igbo[2]], 30, 5.5);
+const pausedOnly = A.estimatedNarration("u", "r", [igbo[0], "Ozi ọma", igbo[1], igbo[2]], 30, { leadSeconds: 5.5, pausesBefore: [0, 0.5, 0.5, 0.2] });
+ok("a heading's pauses move the next verse later (the text waits for the reader)", N.alignChunks(pausedOnly, igbo)[1].start > N.alignChunks(plain, igbo)[1].start + 0.3);
 console.log(`chapterAudio (app): ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

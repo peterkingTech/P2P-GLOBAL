@@ -106,6 +106,20 @@ async function fetchDefaults() {
   } catch { /* offline: last known defaults (none → the player asks to connect to the internet) */ }
   return defaults;
 }
+/** A voice the server no longer has (its provider switched off — owner 2026-11-20, Igbo): forget it, as the listener's
+ *  choice and as P2P's remembered default for the language, and fetch P2P's current defaults. */
+export async function forgetVoice(language: string, voiceId: string): Promise<void> {
+  const k = base(language);
+  if (prefs.byLanguage[k]?.voiceId === voiceId) chooseVoice(language, null);
+  if (defaults[k]?.voiceId === voiceId) {
+    const { [k]: _gone, ...rest } = defaults;
+    defaults = rest;
+    void AsyncStorage.setItem("p2p.voices.defaults", JSON.stringify(defaults)).catch(() => {});
+    emit();
+  }
+  defaultsLoaded = false;
+  await loadVoiceDefaults().catch(() => defaults);
+}
 /** True once P2P's default voices are known on this phone (fetched now, or kept from an earlier session). */
 export const voiceDefaultsKnown = () => defaultsLoaded || Object.keys(defaults).length > 0;
 export const defaultVoiceFor = (language: string) => defaults[base(language)] ?? null;

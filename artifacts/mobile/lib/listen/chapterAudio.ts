@@ -21,16 +21,39 @@ export function recordingDuration(url: string, timeoutMs = 8000): Promise<number
 /** Word timings spread across the duration in proportion to the text (verse by verse, in reading order).
  *  Same word form and time unit (1/100 s) as the matcher (narration.ts alignChunks) — 2026-11-19 fix: raw words in
  *  seconds never matched, so every API.Bible recording fell back to P2P Voice ("P2P only reads public translations"). */
-export function estimatedNarration(url: string, voice: string, texts: string[], duration: number): RecordedNarration | null {
-  const tokens = texts.join(" ").split(/[\s—–-]+/).map((raw) => ({ raw, w: normWord(raw) })).filter((t) => t.w);
+export interface EstimateShape {
+  /** Seconds before the first displayed words (opening quiet + the reader's introduction). */
+  leadSeconds?: number;
+  /** Seconds of pause before each text (same order as `texts`; e.g. around headings, between verses). */
+  pausesBefore?: number[];
+  /** Seconds of quiet after the last word. */
+  tailSeconds?: number;
+}
+export function estimatedNarration(url: string, voice: string, texts: string[], duration: number, shape: number | EstimateShape = 0): RecordedNarration | null {
+  const sh: EstimateShape = typeof shape === "number" ? { leadSeconds: shape } : shape;
+  const tokens: { raw: string; w: string; part: number }[] = [];
+  texts.forEach((text, part) => { for (const raw of text.split(/[\s—–-]+/)) { const w = normWord(raw); if (w) tokens.push({ raw, w, part }); } });
   if (!tokens.length || !(duration > 1)) return null;
   const total = tokens.reduce((n, t) => n + t.raw.length + 1, 0);
+  // The reader's introduction (book, chapter, title) before the first displayed words: `leadSeconds` of the
+  // recording belong to the FIRST word, so playback always starts at 0 s — the reader's very first word, nothing
+  // skipped (owner 2026-11-20) — and the text after it waits for the introduction instead of running ahead.
+  // Pauses before a text belong to the word before it (the next text starts after the pause; nothing is skipped).
+  const lead = Math.max(0, Math.min(sh.leadSeconds ?? 0, duration * 0.15));
+  const pauses = tokens.map((t, i) => (i > 0 && tokens[i - 1].part !== t.part ? Math.max(0, sh.pausesBefore?.[t.part] ?? 0) : 0));
+  const tail = Math.max(0, sh.tailSeconds ?? 0);
+  let fixed = lead + tail + pauses.reduce((a, b) => a + b, 0);
+  const scale = fixed > duration * 0.4 ? (duration * 0.4) / fixed : 1; // never let pauses swallow the speech
+  fixed *= scale;
+  const speech = duration - fixed;
   const words: string[] = [], starts: number[] = [], ends: number[] = [];
   let at = 0;
-  for (const t of tokens) {
-    const len = ((t.raw.length + 1) / total) * duration * 100;
+  tokens.forEach((t, i) => {
+    let len = ((t.raw.length + 1) / total) * speech * 100 + (i === 0 ? lead * scale * 100 : 0);
+    const nextPause = i + 1 < tokens.length ? pauses[i + 1] * scale : 0;
+    len += nextPause * 100;
     words.push(t.w); starts.push(at); ends.push(at + len); at += len;
-  }
+  });
   return { url, voice, words, starts, ends };
 }
 
