@@ -50,6 +50,8 @@ export interface SpeakOptions {
   background?: boolean;
   onStart?: () => void; onDone?: () => void; onStopped?: () => void;
   onError?: (e: Error) => void; onBoundary?: (e: { charIndex: number }) => void;
+  /** A recording is playing words that aren't on screen (a Bible reader's introduction) before this sentence's own. */
+  onLeadIn?: (on: boolean) => void;
   /** The chunk exactly as displayed (before speech preparation) — lets a recording find it. */
   source?: string;
   /** The content's recorded narration, when it has one (opaque here; see lib/listen/narration). */
@@ -142,6 +144,9 @@ export interface ListenState {
   content: (Omit<ListenContent, "sections"> & { sectionTitles: string[]; sections: ListenSection[] }) | null;
   section: number;
   partKey: string | null;
+  /** True while a recording plays its introduction before the current sentence's own words: nothing is highlighted yet
+   *  (owner 2026-11-20: "make the text wait till the first word of the first verse"). */
+  leadIn: boolean;
   chunk: number;
   chunkCount: number;
   chunks: ChunkPosition[];
@@ -196,7 +201,7 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
 } = {}) {
   const replayDelay = opts.replayDelaySeconds ?? 3;
   let state: ListenState = {
-    status: "idle", content: null, section: 0, partKey: null, chunk: 0, chunkCount: 0, chunks: [],
+    status: "idle", content: null, section: 0, partKey: null, leadIn: false, chunk: 0, chunkCount: 0, chunks: [],
     rate: 1, voice: null, voices: [], allVoices: [], error: null,
     capabilities: driver.capabilities ?? DEVICE_SPEECH, autoAgain: false, replayed: false, replayCountdown: null, upNext: null, presented: false,
     bibleContinue: "stop", range: null, previewing: null, background: true, focusedOwner: null, repeat: "off",
@@ -273,7 +278,7 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
     spokenFrom = Math.max(0, Math.min(offset, c.text.length - 1));
     boundary = null;
     const text = c.text.slice(spokenFrom);
-    set({ status: "playing", chunk: index, section: c.section, partKey: c.partKey, error: null, replayCountdown: null, upNext: null, previewing: null });
+    set({ status: "playing", chunk: index, section: c.section, partKey: c.partKey, leadIn: false, error: null, replayCountdown: null, upNext: null, previewing: null });
     savePosition(c);
     try {
       driver.speak(text, {
@@ -289,6 +294,7 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
         resuming,
         onBoundary: (e) => { if (g === gen && typeof e?.charIndex === "number") boundary = spokenFrom + e.charIndex; },
         onDone: () => { if (g === gen) advance(); },
+        onLeadIn: (on) => { if (g === gen && state.leadIn !== on) set({ leadIn: on }); },
         onError: (e) => { if (g === gen) fail("speech", (e as VoiceUnavailable | undefined)?.plain ? e.message : `Listening stopped: ${e?.message || "the speech engine reported a problem"}.`); },
       });
     } catch (e: any) {

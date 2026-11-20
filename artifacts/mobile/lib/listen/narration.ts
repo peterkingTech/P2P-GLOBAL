@@ -12,7 +12,11 @@
 
 import { getChapterNarration, type ChapterNarrationData } from "@/lib/kingdomStoriesApi";
 
-export interface RecordedNarration { url: string; voice: string; words: string[]; starts: readonly number[]; ends: readonly number[] }
+export interface RecordedNarration { url: string; voice: string; words: string[]; starts: readonly number[]; ends: readonly number[];
+  /** Where playback of the first sentence begins, in seconds, when the recording opens with words that aren't on screen
+   *  (a Bible reader's introduction): the first sentence plays from here, but its own words start later — the text
+   *  waits for them (owner 2026-11-20). Default: the first word's start. */
+  playFrom?: number }
 export interface NarrationSegment { start: number; end: number; firstWord: number; lastWord: number }
 
 export function fromData(d: ChapterNarrationData | null | undefined): RecordedNarration | null {
@@ -110,7 +114,7 @@ export function alignChunks(n: RecordedNarration, sources: readonly string[]): (
     // read between verses belongs to the next verse), and the first one at the recording's first word (the
     // introduction — book, chapter, title — is heard, not jumped over).
     const earlier = spans.slice(0, i).some(Boolean);
-    const start = prev && prev.lastWord < s.first ? prev.end : !earlier ? n.starts[0] / 100 : n.starts[s.first] / 100;
+    const start = prev && prev.lastWord < s.first ? prev.end : !earlier ? (n.playFrom ?? n.starts[0] / 100) : n.starts[s.first] / 100;
     const end = nextSpan && nextSpan.first > s.last && nextSpan.first - s.last <= 4 ? n.starts[nextSpan.first] / 100 : n.ends[s.last] / 100;
     out[i] = { start, end: Math.max(end, start), firstWord: s.first, lastWord: s.last };
   }

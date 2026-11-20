@@ -47,14 +47,14 @@ export function estimatedNarration(url: string, voice: string, texts: string[], 
   fixed *= scale;
   const speech = duration - fixed;
   const words: string[] = [], starts: number[] = [], ends: number[] = [];
-  let at = 0;
+  let at = lead * scale * 100; // the words begin after the introduction; playback still begins at 0 s (playFrom)
   tokens.forEach((t, i) => {
-    let len = ((t.raw.length + 1) / total) * speech * 100 + (i === 0 ? lead * scale * 100 : 0);
+    let len = ((t.raw.length + 1) / total) * speech * 100;
     const nextPause = i + 1 < tokens.length ? pauses[i + 1] * scale : 0;
     len += nextPause * 100;
     words.push(t.w); starts.push(at); ends.push(at + len); at += len;
   });
-  return { url, voice, words, starts, ends };
+  return { url, voice, words, starts, ends, playFrom: 0 };
 }
 
 /** The stretch of a chapter's estimated recording that covers some of its parts (a selection of verses, or one

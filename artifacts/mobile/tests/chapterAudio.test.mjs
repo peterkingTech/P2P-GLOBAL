@@ -51,7 +51,15 @@ const withHeading = A.estimatedNarration("u", "r", [igbo[0], "Ozi ọma banyere 
 const sh = N.alignChunks(withHeading, igbo);
 ok("a heading between verses is played, not jumped over (contiguous stretches)", sh.every(Boolean) && Math.abs(sh[1].start - sh[0].end) < 0.01 && Math.abs(sh[2].start - sh[1].end) < 0.01, JSON.stringify(sh));
 const src = readFileSync(path.join(root, "lib/listen/bibleContent.ts"), "utf8");
-ok("measured reading style: 5.5 s opening + announcement (0.5 s with P2P's heading), +2 s at chapter 1", src.includes(`const introSeconds = (ownHeading ? 0.5 : 5.5) + (d.chapter === 1 ? 2 : 0);`) && src.includes("{ leadSeconds: introSeconds, pausesBefore, tailSeconds: 2 }"));
+ok("measured introductions: 6 s (text with subheadings), 8 s (without — WEB), BSB 0.5 s, +2 s at chapter 1", src.includes("const INTRO_BY_EDITION: Record<string, number> = { BSB: 0.5 };") && src.includes("(INTRO_BY_EDITION[translation] ?? (textHasHeadings ? 6 : 8)) + (chapter === 1 ? 2 : 0)") && src.includes("{ leadSeconds: introSeconds, pausesBefore, tailSeconds: 2 }"));
+// Owner 2026-11-20: "make the text wait till the first word of the first verse" — playback from 0 s, the words later.
+ok("the first verse's own words start after the introduction (playFrom 0 s; the text waits)", withIntro.playFrom === 0 && withIntro.starts[0] / 100 > 2.5 && si[0].start === 0);
+ok("with a real recording, P2P's own spoken heading is dropped — the text starts at the first verse", src.includes(`const versesOnly = { ...content, sections: content.sections.filter((s) => s.id !== "heading") };`) && src.includes(`full.sections.filter((s) => s.id !== "heading")`));
+const ixSrc = readFileSync(path.join(root, "lib/listen/index.ts"), "utf8"), engSrc = readFileSync(path.join(root, "lib/listen/engine.ts"), "utf8");
+ok("lead-in: no highlight while the introduction plays (engine state, Read Along, Bible reader)", ixSrc.includes("let leadIn = ownStart - from > 0.6;") && ixSrc.includes("if (leadIn && s.currentTime >= ownStart - 0.05) { leadIn = false; o.onLeadIn?.(false); }")
+  && engSrc.includes("onLeadIn: (on) => { if (g === gen && state.leadIn !== on) set({ leadIn: on }); },") && readFileSync(path.join(root, "components/listen/ReadAlongText.tsx"), "utf8").includes("const cur = state.leadIn ? undefined : state.chunks[state.chunk];")
+  && readFileSync(path.join(root, "app/bible/index.tsx"), "utf8").includes("&& !listening!.leadIn ? Number(listening!.partKey) : null;"));
+ok("a new recording plays by itself: the play ticket is taken after the old player is stopped; only a REAL pause (p.paused) counts as outside", ixSrc.indexOf("const token = ++recToken;") > ixSrc.indexOf("recPlayer = createAudioPlayer({ uri: n.url }") && ixSrc.includes("!s.isBuffering && p.paused) systemPause();"));
 // Pauses: around a heading (0.5 s), between verses (0.2 s), quiet at the end (2 s) — measured on 8 recordings.
 const shaped = A.estimatedNarration("u", "r", [igbo[0], "Ozi ọma", igbo[1], igbo[2]], 30, { leadSeconds: 5.5, pausesBefore: [0, 0.5, 0.5, 0.2], tailSeconds: 2 });
 const sp = N.alignChunks(shaped, igbo);

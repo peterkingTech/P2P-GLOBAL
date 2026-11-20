@@ -50,7 +50,8 @@ export default function ReadAlongText({ state, c, dark, scale, highlight, follow
     return out;
   }, [content, state.chunks, bible]);
 
-  const cur = state.chunks[state.chunk];
+  // While a recording plays its introduction, nothing is highlighted yet — the text waits for the first verse's words.
+  const cur = state.leadIn ? undefined : state.chunks[state.chunk];
   const active = state.status === "playing" || state.status === "paused";
   const relationOf = (p: PartView): Relation => {
     if (!cur || !active) return state.status === "completed" ? "past" : "future";

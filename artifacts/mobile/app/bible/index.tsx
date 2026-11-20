@@ -297,7 +297,8 @@ export default function BibleReaderScreen() {
     ? { book: String(listening.content.meta.book), chapter: Number(listening.content.meta.chapter), t: String(listening.content.meta.t), label: listening.content.title } : null;
   const listeningElsewhere = !!listeningChapter && !!data && (listeningChapter.book !== data.book.code || listeningChapter.chapter !== data.chapter);
   const listeningHere = !!listening && !!data && listening.content!.key.startsWith(chapterListenKey(data));
-  const speakingVerse = listeningHere && listening!.partKey ? Number(listening!.partKey) : null;
+  // No verse is highlighted while the recording plays its introduction (owner 2026-11-20).
+  const speakingVerse = listeningHere && listening!.partKey && !listening!.leadIn ? Number(listening!.partKey) : null;
   const onListenChapter = () => {
     if (!data) return;
     if (listening && listening.content!.key === chapterListenKey(data)) return listen.present();

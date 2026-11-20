@@ -38,6 +38,19 @@ export async function playBibleChapter(bookCode: string, chapter: number, transl
  * A chapter (or the verses `part`) as listening content. `actions` are extra
  * buttons for when listening ends (e.g. the reader's "Choose another passage").
  */
+/**
+ * How long a recording's introduction lasts before verse 1's words — MEASURED (owner 2026-11-20: "keep testing it
+ * until you get the exact perfection"; "translations with no sub headings" ran ahead). The real pauses of 9
+ * recordings (Igbo John 3, Genesis 1, Matthew 5, Psalm 23; Yoruba John 3, Genesis 1; BSB John 3, Psalm 23; WEB John 3)
+ * were located verse by verse and these values fitted to them, with ~0.5 s around section headings, ~0.2 s between
+ * verses and ~2 s of quiet at the end. Readers of texts WITHOUT subheadings (WEB) still read a title — a longer
+ * introduction; BSB's reader announces only briefly. Verse 1 lands within ~1.3 s (WEB 0.4 s, Psalm 23 0 s).
+ */
+const INTRO_BY_EDITION: Record<string, number> = { BSB: 0.5 };
+export function recordingIntroSeconds(translation: string, textHasHeadings: boolean, chapter: number): number {
+  return (INTRO_BY_EDITION[translation] ?? (textHasHeadings ? 6 : 8)) + (chapter === 1 ? 2 : 0);
+}
+
 /** The whole chapter's licensed recording with estimated positions (the chapter's parts, in reading order), or null. */
 async function chapterRecording(d: BibleChapter, language: string): Promise<{ narration: RecordedNarration; texts: string[]; verseOf: (number | null)[] } | null> {
   if (d.offline) return null;
@@ -57,19 +70,12 @@ async function chapterRecording(d: BibleChapter, language: string): Promise<{ na
   // The reader also reads the section headings ("Jisọs na Nikọdimọs") — counted in the timing (not highlighted), or
   // every verse after a heading would be highlighted too early (owner 2026-11-19: "the audio is not following the text").
   const headingsBefore = (v: number) => (d.headings ?? []).filter((h) => h.beforeVerse === v && h.text.trim()).map((h) => ({ text: h.text, verse: null as number | null, heading: true }));
-  const parts = full.sections.flatMap((s) => {
+  // P2P's own spoken heading ("John chapter 3.") is not part of a recording — the reader announces the chapter itself.
+  const parts = full.sections.filter((s) => s.id !== "heading").flatMap((s) => {
     const verse = /^\d+$/.test(s.id) ? Number(s.id) : null;
     return [...(verse !== null ? headingsBefore(verse) : []), ...s.parts.map((p) => ({ text: p.text, verse, heading: false }))];
   });
-  // The reading style, MEASURED (owner 2026-11-20: "keep testing it until you get the exact perfection"): the real
-  // pauses of 8 recordings (Igbo John 3, Genesis 1, Matthew 5, Psalm 23; Yoruba John 3, Genesis 1; BSB John 3,
-  // Psalm 23) located verse by verse, and these values fitted to them — the first verses went from ~4 s early to ~1.5 s.
-  //   opening quiet + the reader's announcement (book, chapter — at chapter 1 also the title): ~5.5 s where P2P has no
-  //   spoken heading of its own (Igbo, Yoruba …), ~0.5 s where its heading words already count (English);
-  //   ~0.5 s pause before and after a section heading; ~0.2 s between verses; ~2 s of quiet at the end.
-  //   Checked with this code on all 230 verses: mean 1.9 s → Igbo John 3 1.1 s, Psalm 23 0.35 s.
-  const ownHeading = full.sections.some((s) => s.id === "heading");
-  const introSeconds = (ownHeading ? 0.5 : 5.5) + (d.chapter === 1 ? 2 : 0);
+  const introSeconds = recordingIntroSeconds(d.translation.code, (d.headings ?? []).length > 0, d.chapter);
   const pausesBefore = parts.map((p, i) => (i === 0 ? 0 : p.heading || parts[i - 1].heading ? 0.5 : p.verse !== null ? 0.2 : 0));
   const narration = estimatedNarration(url, reader || d.translation.name, parts.map((p) => p.text), dur, { leadSeconds: introSeconds, pausesBefore, tailSeconds: 2 });
   return narration ? { narration, texts: parts.map((p) => p.text), verseOf: parts.map((p) => p.verse) } : null;
@@ -96,13 +102,15 @@ export async function withChapterAudio(content: ListenContent, d: BibleChapter):
   const sel = content.key.startsWith(`${whole}:`) ? /:(\d+)-(\d+)$/.exec(content.key) : null;
   if (content.key !== whole && !sel) return content;
   try {
+    // With the real recording, P2P's own spoken heading is dropped: the reader announces the chapter, and the text
+    // starts at the first verse (owner 2026-11-20: "the text should not start from the subtopic and the chapter").
+    const versesOnly = { ...content, sections: content.sections.filter((s) => s.id !== "heading") };
     if (sel) {
-      const heading = content.sections.filter((s) => !/^\d+$/.test(s.id)).flatMap((s) => s.parts.map((p) => p.text));
-      const narration = await passageRecording(d, content.language, Number(sel[1]), Number(sel[2]), heading);
-      return narration ? { ...content, narration, subtitle: `${d.translation.name} · Recorded audio` } : content;
+      const narration = await passageRecording(d, content.language, Number(sel[1]), Number(sel[2]));
+      return narration ? { ...versesOnly, narration, subtitle: `${d.translation.name} · Recorded audio` } : content;
     }
     const rec = await chapterRecording(d, content.language);
-    return rec ? { ...content, narration: rec.narration, subtitle: `${d.translation.name} · Recorded audio` } : content;
+    return rec ? { ...versesOnly, narration: rec.narration, subtitle: `${d.translation.name} · Recorded audio` } : content;
   } catch { return content; }
 }
 

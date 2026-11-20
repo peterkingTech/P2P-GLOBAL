@@ -257,7 +257,6 @@ const recordedNarration: SpeechDriver = {
       : null;
     if (!seg) return viaP2P();
     setReadingSource({ mode: "official", voice: n.voice });
-    const token = ++recToken;
     if (recPause) { clearTimeout(recPause); recPause = null; }
     if (recWatch) { clearInterval(recWatch); recWatch = null; }
     try {
@@ -269,6 +268,10 @@ const recordedNarration: SpeechDriver = {
         recCursor = 0;
         playbackSession(!!o.background);
       }
+      // Taken AFTER the old player is stopped: recStop() above retires every earlier token, and taking this one
+      // before it silently cancelled the first play of every newly opened recording (owner 2026-11-20: "the Bible
+      // doesn't read unless you click it").
+      const token = ++recToken;
       const p = recPlayer;
       recCursor = seg.lastWord + 1;
       const chunk = typeof o.chunkIndex === "number" ? o.chunkIndex : -1;
@@ -285,9 +288,13 @@ const recordedNarration: SpeechDriver = {
       let heard = false;
       recSub = p.addListener("playbackStatusUpdate", (s) => {
         if (token !== recToken) return;
+        if (leadIn && s.currentTime >= ownStart - 0.05) { leadIn = false; o.onLeadIn?.(false); }
         if (s.didJustFinish || s.currentTime >= seg.end - 0.02) finish();
         // Paused from OUTSIDE the app (lock screen, headset, Bluetooth, a call): P2P Listen pauses at the same place.
-        else if (heard && !done && !s.playing && !s.isBuffering) systemPause();
+        // Only when the player is REALLY paused (p.paused): on the web, expo-audio reports "not playing" at 0 s and
+        // whenever it waits for the network, and never reports buffering — that wrongly paused every new recording
+        // the moment it started (owner 2026-11-20: "it doesn't read unless you click it").
+        else if (heard && !done && !s.playing && !s.isBuffering && p.paused) systemPause();
         else if (s.playing) heard = true;
       });
       // Resume after a pause: from the exact moment it was paused (within this sentence's stretch).
@@ -295,6 +302,10 @@ const recordedNarration: SpeechDriver = {
         && recPausedAt.time >= seg.start && recPausedAt.time < seg.end ? recPausedAt.time : null;
       recPausedAt = null;
       const from = pausedHere ?? seg.start;
+      // The reader's introduction plays first (from 0 s); the text waits — no highlight — until this sentence's own words.
+      const ownStart = (n.starts[seg.firstWord] ?? 0) / 100;
+      let leadIn = ownStart - from > 0.6;
+      o.onLeadIn?.(leadIn);
       // Carry straight on when the recording is already here (it just finished the sentence before).
       const here = p.currentTime;
       const contiguous = pausedHere === null && p.playing && here >= seg.start - 0.6 && here <= seg.start + 0.3;
