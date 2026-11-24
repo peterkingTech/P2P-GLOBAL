@@ -5294,382 +5294,6 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 11,
-  "title": "Christian Nubia: The African Kingdoms That Embraced the Gospel",
-  "subtitle": "God can establish strong Christian communities through faith, leadership, unity, and perseverance, even in changing political and cultural circumstances.",
-  "body": [
-   "Topic Overview",
-   "Christian Nubia was one of the most important centers of Christianity in ancient and medieval Africa. Located along the Nile River in what is now southern Egypt and northern Sudan, Nubia was home to African kingdoms that embraced Christianity and developed distinctive Christian traditions.",
-   "During the sixth century, Christianity spread into Nubia through missionary activity, diplomatic relationships, and the influence of neighboring Christian communities. The kingdoms of Nobatia, Makuria, and Alodia became important centers of Christian life.",
-   "Nubian Christians built churches, established religious communities, supported bishops, and developed traditions of worship and Christian education. Their churches were decorated with paintings, and their communities participated in the wider history of Christianity while maintaining their own cultural identity.",
-   "For centuries, Christian Nubian kingdoms preserved their faith along the Nile. Their history demonstrates that Christianity was deeply established in Africa long before the modern missionary era.",
-   "This topic explores the arrival of Christianity in Nubia, the development of its Christian kingdoms, the role of African leadership, the preservation of faith, and the spiritual lessons their history offers to believers today.",
-   "Central theme: God can establish strong Christian communities through faith, leadership, unity, and perseverance, even in changing political and cultural circumstances.",
-   "Christian Nubia demonstrates how African kingdoms embraced the Gospel, developed Christian institutions, and preserved their spiritual identity across generations.",
-   "Primary Scripture",
-   "Matthew 5:14",
-   "“Ye are the light of the world. A city that is set on an hill cannot be hid.”",
-   "Supporting Scriptures",
-   "• Matthew 28:19–20 — The Great Commission to make disciples of all nations.",
-   "• Acts 8:26–39 — The Ethiopian official encounters the Gospel through Philip.",
-   "• Acts 11:19–26 — The Gospel spreads and believers are strengthened in the faith.",
-   "• 1 Corinthians 12:12–27 — The Church is one body with many members.",
-   "• Ephesians 2:19–22 — Believers are members of God’s household.",
-   "• 2 Timothy 2:2 — Faithful believers are entrusted with teaching others.",
-   "• Hebrews 12:1–2 — Believers are called to persevere in faith.",
-   "Final Reflection — The Kingdoms That Preserved the Gospel",
-   "Christian Nubia reminds us that the history of Christianity in Africa is ancient, diverse, and deeply significant.",
-   "Along the Nile, African kingdoms embraced Christianity and developed communities of worship, religious leadership, education, and spiritual fellowship.",
-   "Nobatia, Makuria, and Alodia became important centers of Christian life.",
-   "Their churches, religious art, and traditions demonstrate the dedication of believers who sought to preserve their faith.",
-   "Their history also reminds us that Christian communities can experience political changes and difficult circumstances.",
-   "Faithfulness requires more than strong institutions or influential leaders.",
-   "It requires believers who continue to worship God, teach Scripture, serve one another, and pass the Gospel to future generations.",
-   "Christian Nubia encourages modern Christians to recognize the contributions of African believers and learn from their experiences.",
-   "It also challenges us to build communities that reflect the teachings of Jesus Christ.",
-   "Our responsibility is not simply to remember the faith of earlier generations.",
-   "We must live it.",
-   "We must teach it.",
-   "We must share it.",
-   "And we must remain faithful to God in every season.",
-   "8 Final Reflection Questions",
-   "1. What does Christian Nubia teach us about the history of Christianity in Africa?",
-   "2. How did Nobatia, Makuria, and Alodia contribute to the development of African Christianity?",
-   "3. What helped Nubian Christians preserve their faith for centuries?",
-   "4. Why is it important to recognize African Christian history beyond the modern missionary era?",
-   "5. How can churches strengthen spiritual education and Christian fellowship?",
-   "6. What can modern believers learn from the challenges experienced by historical Christian communities?",
-   "7. How can you help preserve and share the Gospel with the next generation?",
-   "8. What practical steps can you take to remain faithful to Jesus Christ in your own community?",
-   "Final Prayer",
-   "Heavenly Father,",
-   "Thank You for the history of Christian Nubia and for the African believers who embraced the Gospel and preserved their faith along the Nile.",
-   "Thank You for the kingdoms of Nobatia, Makuria, and Alodia and for the Christian communities that developed throughout their lands.",
-   "Help us remember the faithful people who worshipped You, taught Your Word, and served their communities.",
-   "Teach us to recognize the rich history of Christianity in Africa and to honor the contributions of believers from every nation.",
-   "Give us wisdom to learn from the past and courage to live faithfully in the present.",
-   "Strengthen our churches, guide our leaders, and help families teach the truth of the Gospel to their children.",
-   "When we face uncertainty or change, remind us that our faith is rooted in Jesus Christ.",
-   "Help us build communities where people can worship You, learn Your Word, care for one another, and grow in spiritual maturity.",
-   "May our lives reflect Your love and truth.",
-   "May we preserve the Gospel faithfully and share it with future generations.",
-   "In the name of Jesus Christ,",
-   "Amen."
-  ],
-  "chapters": [
-   {
-    "title": "Nubia: An African Land Along the Nile",
-    "scripture": "",
-    "narrative": [
-     "Along the Nile River, south of ancient Egypt, lay the lands known historically as Nubia.",
-     "The Nile provided water, transportation, agricultural resources, and connections between communities. It also helped shape the political, cultural, and religious life of the region.",
-     "Nubia was home to powerful African kingdoms that developed their own traditions, systems of government, artistic achievements, and relationships with neighboring civilizations.",
-     "Among the most important kingdoms were Nobatia in the north, Makuria in the central region, and Alodia farther south.",
-     "These kingdoms were not simply extensions of Egypt. They possessed their own rulers, institutions, and cultural identities.",
-     "Their location along the Nile brought them into contact with different peoples, including communities influenced by Christianity.",
-     "During the sixth century, Christianity began to take root more firmly in Nubia.",
-     "Missionaries, diplomatic relationships, and royal decisions contributed to the Christianization of the region.",
-     "Over time, churches were established, bishops served Christian communities, and religious traditions developed.",
-     "Nubian Christianity became an important part of African Christian history.",
-     "The kingdoms demonstrated that Christianity could take root in African societies and become connected with local culture, leadership, and community life.",
-     "Their history reminds believers that the Gospel is not limited to one nation or people.",
-     "God calls people from every culture to become part of His family."
-    ],
-    "lessons": [
-     "The Gospel is for every nation.\nChristianity is not restricted to one culture, language, or geographical region.",
-     "God can work through different communities.\nEvery people group has opportunities to hear, receive, and share the Gospel.",
-     "Faith can become part of a community’s identity.\nChristian belief can influence worship, education, leadership, and daily life.",
-     "Geographical connections can support the spread of faith.\nTrade, travel, and relationships can create opportunities for sharing the Gospel.",
-     "African Christian history is part of the wider story of the Church.\nNubia reminds believers that Christianity developed throughout Africa in different historical periods."
-    ],
-    "reflections": [
-     "What do you know about the ancient kingdoms of Nubia?",
-     "How can the Gospel reach communities with different cultural backgrounds?",
-     "Why is it important to recognize Christianity’s African history?",
-     "How can a community express its faith through daily life?",
-     "What opportunities do Christians have to share the Gospel in their own communities?"
-    ],
-    "assignment": {
-     "title": null,
-     "text": "1. Where was historical Nubia located?\n2. Which river played an important role in Nubian civilization?\n3. What were the three major Christian Nubian kingdoms?\n4. During which century did Christianity become established in Nubia?\n5. What does Nubian history teach about the spread of Christianity?"
-    }
-   },
-   {
-    "title": "The Arrival of Christianity in Nubia",
-    "scripture": "",
-    "narrative": [
-     "During the sixth century, Christianity began to spread more widely into the Nubian kingdoms.",
-     "At that time, the eastern Mediterranean and northeastern Africa were connected through trade, diplomacy, travel, and religious relationships.",
-     "Christian communities already existed in Egypt and other neighboring regions.",
-     "Missionaries and church leaders traveled to Nubia, where they introduced Christian teaching and helped establish relationships with local rulers.",
-     "The conversion of Nubia was not a single event that transformed every community immediately.",
-     "Christianity developed through a process involving royal decisions, missionary activity, local acceptance, and the gradual establishment of churches.",
-     "Historical accounts describe Christian missions connected with the Byzantine Empire and the Christian communities of Egypt.",
-     "Different Nubian kingdoms received Christianity through distinct historical circumstances.",
-     "The kingdom of Nobatia became Christian during the sixth century. Makuria also embraced Christianity during this period, and Alodia developed as another important Christian kingdom farther south.",
-     "The spread of Christianity helped establish religious institutions throughout the region.",
-     "Churches became places of worship, instruction, fellowship, and community life.",
-     "The arrival of Christianity in Nubia demonstrates that the Gospel traveled through relationships and the faithful work of people who shared their beliefs.",
-     "It also reminds Christians that spiritual transformation can take time.",
-     "Faith must be taught, understood, and lived."
-    ],
-    "lessons": [
-     "Sharing the Gospel requires relationships.\nChristian witness often begins through personal connections and meaningful conversations.",
-     "Faith should be taught clearly.\nPeople need opportunities to understand the message of Jesus Christ.",
-     "Spiritual growth can take time.\nCommunities develop in faith through teaching, worship, and discipleship.",
-     "God can use different people to spread His Word.\nMissionaries, leaders, families, and ordinary believers all have important roles.",
-     "Receiving the Gospel should lead to a transformed life.\nChristian faith is more than knowing religious information; it involves following Christ."
-    ],
-    "reflections": [
-     "What factors helped Christianity spread into Nubia?",
-     "Why are relationships important in sharing the Gospel?",
-     "How can Christians explain their faith clearly?",
-     "Why should believers be patient when helping others grow spiritually?",
-     "What role can ordinary Christians play in sharing the Gospel?"
-    ],
-    "assignment": {
-     "title": null,
-     "text": "1. During which century did Christianity spread widely into Nubia?\n2. Which neighboring Christian regions influenced Nubia?\n3. What role did missionaries play in the development of Nubian Christianity?\n4. Why was the Christianization of Nubia a gradual process?\n5. What does the history of Nubia teach about sharing the Gospel?"
-    }
-   },
-   {
-    "title": "Nobatia: A Kingdom That Embraced Christianity",
-    "scripture": "",
-    "narrative": [
-     "Nobatia was one of the northern Nubian kingdoms that embraced Christianity during the sixth century.",
-     "Its territory extended through parts of the Nile Valley south of Egypt.",
-     "The kingdom became an important center of Christian life as churches and religious institutions developed.",
-     "Christianity influenced the kingdom’s relationships with neighboring communities and its connections with the wider Christian world.",
-     "The establishment of bishops helped organize religious life and provide leadership for Christian communities.",
-     "Churches became places where believers gathered for worship, prayer, and instruction.",
-     "Over time, Christian traditions became part of Nobatia’s cultural and political identity.",
-     "The kingdom’s history demonstrates how Christianity could become established in an African society while interacting with local traditions.",
-     "Nobatia later became closely connected with Makuria, and the political history of the region changed over time.",
-     "The Christian heritage of northern Nubia continued to influence the region long after the earliest stages of conversion.",
-     "Nobatia reminds believers that the development of Christian communities requires both spiritual commitment and structures that support worship and teaching.",
-     "Faith becomes stronger when believers gather, learn Scripture, and encourage one another."
-    ],
-    "lessons": [
-     "Christian communities need spiritual leadership.\nChurches benefit from leaders who teach Scripture and care for believers.",
-     "Worship strengthens community identity.\nGathering together helps Christians grow in faith and fellowship.",
-     "Faith can influence society.\nChristianity can shape relationships, values, and community responsibilities.",
-     "Spiritual institutions should serve people.\nChurches exist to worship God, teach the Gospel, and care for believers.",
-     "Christian history should be remembered.\nThe story of Nobatia helps us recognize the development of African Christianity."
-    ],
-    "reflections": [
-     "Why was Nobatia important in the history of Christian Nubia?",
-     "How can spiritual leaders strengthen a Christian community?",
-     "What role does worship play in Christian fellowship?",
-     "How can churches serve their surrounding communities?",
-     "Why should Christians study the history of their faith?"
-    ],
-    "assignment": {
-     "title": null,
-     "text": "1. Which region of Nubia was associated with Nobatia?\n2. During which century did Nobatia embrace Christianity?\n3. What role did bishops play in Nubian Christian communities?\n4. How did Christianity influence Nobatia’s identity?\n5. What spiritual lessons can Christians learn from Nobatia?"
-    }
-   },
-   {
-    "title": "Makuria: A Christian Kingdom Along the Nile",
-    "scripture": "",
-    "narrative": [
-     "Makuria became one of the most powerful Christian kingdoms in Nubia.",
-     "Its territory included important areas of the Nile Valley, and its political center was associated with Old Dongola.",
-     "During the sixth century, Makuria embraced Christianity and developed institutions that supported Christian worship and leadership.",
-     "The kingdom became known for its churches, religious communities, and connections with other Christian regions.",
-     "Makuria’s rulers maintained relationships with neighboring powers, including Egypt and the Byzantine world.",
-     "These relationships sometimes involved diplomacy, trade, and political agreements.",
-     "Christianity was not simply a private belief among individuals.",
-     "It influenced the kingdom’s religious institutions, artistic traditions, and cultural life.",
-     "Churches were constructed, and Christian religious art became an important expression of faith.",
-     "Makuria also developed a distinctive Christian identity.",
-     "Its history demonstrates that African kingdoms could maintain political independence while participating in the wider Christian world.",
-     "The kingdom’s Christian heritage continued for centuries.",
-     "Makuria reminds believers that Christian faith can influence the life of a society while remaining connected to the spiritual mission of the Church.",
-     "It also teaches that political strength alone cannot preserve faith.",
-     "The spiritual life of a community depends on continued worship, teaching, and commitment to God."
-    ],
-    "lessons": [
-     "Faith can influence public life.\nChristian values should guide believers in their responsibilities within society.",
-     "Relationships require wisdom and respect.\nCommunities must navigate differences while seeking peace and cooperation.",
-     "Christian identity can be expressed through culture.\nArt, worship, and education can reflect faith.",
-     "Political strength is not the same as spiritual strength.\nA community must continue nurturing its relationship with God.",
-     "Faith should remain central during changing circumstances.\nBelievers must continue following Christ through political and social changes."
-    ],
-    "reflections": [
-     "What made Makuria an important Christian kingdom?",
-     "How can Christian values influence public responsibilities?",
-     "Why are peaceful relationships important between communities?",
-     "How can art and culture express Christian faith?",
-     "What helps a Christian community remain spiritually strong?"
-    ],
-    "assignment": {
-     "title": null,
-     "text": "1. What was the political center associated with Makuria?\n2. During which century did Makuria embrace Christianity?\n3. How did Christianity influence Makuria’s cultural life?\n4. What relationships did Makuria maintain with neighboring regions?\n5. What does Makuria teach about faith and leadership?"
-    }
-   },
-   {
-    "title": "Alodia: Christianity in Southern Nubia",
-    "scripture": "",
-    "narrative": [
-     "Farther south along the Nile, the kingdom of Alodia became another important center of Christian Nubian life.",
-     "Alodia was one of the major Nubian kingdoms and developed its own political and cultural traditions.",
-     "Christianity became established in the kingdom during the medieval period.",
-     "Its capital was associated with Soba, near present-day Khartoum in Sudan.",
-     "The kingdom supported Christian institutions and participated in the broader religious life of Nubia.",
-     "Churches and religious communities helped maintain Christian traditions.",
-     "Alodia’s history shows that Christianity was not limited to the northern parts of Nubia.",
-     "The faith spread across different regions and became part of the spiritual identity of multiple African kingdoms.",
-     "The Christian kingdoms of Nubia were connected through religious relationships, but they also had their own political histories and local circumstances.",
-     "Their shared Christian heritage did not erase their differences.",
-     "Instead, Christianity became part of the way these communities understood worship, leadership, and spiritual life.",
-     "Alodia reminds Christians that the Gospel can reach different regions and communities while bringing people together through faith in Jesus Christ.",
-     "It also teaches that believers should respect the diversity of Christian communities while remaining united in the Gospel."
-    ],
-    "lessons": [
-     "The Gospel can reach different regions.\nChristian witness should extend beyond familiar communities.",
-     "Unity does not require every community to be identical.\nChristians can share faith while maintaining different cultural traditions.",
-     "Local communities have an important role in preserving faith.\nSpiritual growth depends on believers who teach and practice the Gospel.",
-     "Christianity can become deeply rooted in African societies.\nAlodia demonstrates the historical depth of African Christian life.",
-     "Believers should respect Christian diversity.\nDifferent traditions can contribute to the wider life of the Church."
-    ],
-    "reflections": [
-     "Why is Alodia important in the history of Christian Nubia?",
-     "How can the Gospel reach communities far from major Christian centers?",
-     "What does Christian unity mean when communities have different traditions?",
-     "How can local churches preserve faith?",
-     "How can Christians learn from other Christian traditions?"
-    ],
-    "assignment": {
-     "title": null,
-     "text": "1. Where was Alodia located?\n2. What was its capital?\n3. How did Christianity become part of Alodia’s history?\n4. What does Alodia demonstrate about the spread of Christianity in Nubia?\n5. What spiritual lesson can Christians learn from its history?"
-    }
-   },
-   {
-    "title": "Nubian Churches: Places of Worship and Christian Learning",
-    "scripture": "",
-    "narrative": [
-     "As Christianity developed in Nubia, churches became important centers of worship and community life.",
-     "Nubian Christians constructed churches in different parts of their kingdoms.",
-     "These buildings provided places for prayer, Scripture reading, religious instruction, and the celebration of Christian worship.",
-     "Some Nubian churches were decorated with paintings that depicted biblical figures, saints, and religious scenes.",
-     "These paintings offer valuable evidence about the spiritual life and artistic traditions of Nubian Christianity.",
-     "Churches also helped preserve religious knowledge.",
-     "Christian leaders taught Scripture, guided worship, and supported the spiritual needs of their communities.",
-     "The church was not simply a place where people gathered for ceremonies.",
-     "It was part of the community’s spiritual foundation.",
-     "Believers learned about God, participated in worship, and developed relationships with one another.",
-     "The churches of Nubia remind modern Christians that worship and teaching belong together.",
-     "A healthy Christian community encourages people to understand the Bible and apply its teachings.",
-     "It also creates opportunities for believers to serve one another.",
-     "The history of Nubian churches demonstrates how Christian communities can express their faith through architecture, art, education, and fellowship."
-    ],
-    "lessons": [
-     "Worship should be centered on God.\nChristian gatherings should honor the Lord and encourage faith.",
-     "Teaching Scripture is essential.\nBelievers need to understand God’s Word and apply it to their lives.",
-     "Art can communicate spiritual truth.\nCreative gifts can help people reflect on biblical teachings.",
-     "Churches should strengthen community.\nChristian fellowship encourages believers to support one another.",
-     "Faith must be practiced, not merely displayed.\nReligious buildings are most meaningful when they support genuine worship and discipleship."
-    ],
-    "reflections": [
-     "What roles did Nubian churches play in Christian communities?",
-     "How can churches help people understand Scripture?",
-     "What are some ways art can communicate biblical truth?",
-     "How can Christian fellowship strengthen believers?",
-     "What makes a church community spiritually healthy?"
-    ],
-    "assignment": {
-     "title": null,
-     "text": "1. Why were churches important in Nubian society?\n2. What subjects appeared in Nubian Christian paintings?\n3. How did church leaders support Christian communities?\n4. Why should worship and biblical teaching remain connected?\n5. What does Nubian church history teach about Christian community?"
-    }
-   },
-   {
-    "title": "Christian Nubia and the Preservation of Faith",
-    "scripture": "",
-    "narrative": [
-     "Christian Nubian kingdoms preserved their faith for centuries.",
-     "Their communities experienced political changes, relationships with neighboring societies, and different historical challenges.",
-     "Christianity remained an important part of their religious and cultural life.",
-     "The preservation of faith depended on many people.",
-     "Bishops provided spiritual leadership.",
-     "Priests served congregations.",
-     "Monks devoted themselves to prayer and religious life.",
-     "Families taught Christian traditions to their children.",
-     "Communities gathered for worship and celebrated religious festivals.",
-     "Christian Nubia also maintained connections with other Christian regions.",
-     "These relationships helped support religious life and the exchange of ideas.",
-     "However, the history of Nubia was not without change.",
-     "Political circumstances shifted, and the Christian kingdoms eventually declined as independent political powers.",
-     "The transition took place over a long period and involved different circumstances across the region.",
-     "The decline of the kingdoms did not mean that every Christian community disappeared immediately.",
-     "Christian traditions continued in different forms, and the history of Nubia remains part of the wider story of Christianity in Africa.",
-     "Their experience reminds believers that faith requires perseverance.",
-     "Christian communities may face difficult circumstances, but they can continue to worship God, teach Scripture, and support one another.",
-     "The preservation of faith depends not only on rulers or institutions but also on the commitment of ordinary believers."
-    ],
-    "lessons": [
-     "Faith requires perseverance.\nChristians must remain committed to God through changing circumstances.",
-     "Every believer contributes to the spiritual life of the Church.\nFaith is preserved through the service of leaders, families, and communities.",
-     "Teaching the next generation matters.\nChildren need to learn Scripture and develop their own faith.",
-     "Political change does not determine God’s faithfulness.\nBelievers can continue trusting God during uncertainty.",
-     "Christian history should be studied honestly.\nUnderstanding both growth and decline helps believers learn from the past."
-    ],
-    "reflections": [
-     "What helped Christian Nubian communities preserve their faith?",
-     "Why is perseverance important in Christian life?",
-     "How can families help preserve Christian teaching?",
-     "What can believers learn from political and social changes?",
-     "How should Christians study difficult periods in church history?"
-    ],
-    "assignment": {
-     "title": null,
-     "text": "1. What groups helped preserve Christianity in Nubia?\n2. How did Christian communities maintain their traditions?\n3. What kinds of changes affected the Nubian kingdoms?\n4. Did the decline of the kingdoms mean that all Christianity immediately disappeared?\n5. What spiritual lessons can Christians learn from Nubian history?"
-    }
-   },
-   {
-    "title": "Christian Nubia and the Wider African Church",
-    "scripture": "",
-    "narrative": [
-     "The Christian kingdoms of Nubia are an important part of the wider history of Christianity in Africa.",
-     "Their history demonstrates that Christianity developed in different African regions through distinct historical experiences.",
-     "In Egypt, Christianity became established in ancient communities along the Nile.",
-     "In Nubia, Christian kingdoms developed their own institutions and traditions.",
-     "In Ethiopia, Christianity became deeply connected with the country’s religious and cultural identity.",
-     "These African Christian communities maintained relationships with other parts of the Christian world while developing distinctive traditions.",
-     "Their history challenges the idea that Christianity in Africa began only with European missionary activity.",
-     "African Christians participated in the life of the Church across many centuries.",
-     "They built churches, developed religious art, established communities, and taught the faith.",
-     "Nubian Christianity also reminds believers that the history of the Church includes both flourishing and difficult periods.",
-     "Christian communities can experience growth, political change, and challenges to their institutions.",
-     "The important question is how believers remain faithful to Jesus Christ.",
-     "Modern Christians can learn from Nubia by studying its history, respecting its heritage, and recognizing the contributions of African believers.",
-     "The story of Christian Nubia encourages the Church to remember its diverse history and continue sharing the Gospel."
-    ],
-    "lessons": [
-     "Christianity has deep roots throughout Africa.\nAfrican believers have contributed to the history of the Church for centuries.",
-     "The Church includes many cultures.\nChristians can express their faith through different languages and traditions.",
-     "History helps believers understand their identity.\nStudying the past can strengthen spiritual appreciation and responsibility.",
-     "Faith should be shared across generations and communities.\nThe Gospel calls believers to teach and encourage others.",
-     "Jesus Christ remains the center of Christian unity.\nChristian communities are united through faith in the Lord, even when their traditions differ."
-    ],
-    "reflections": [
-     "What does Christian Nubia teach us about African Christianity?",
-     "Why is it important to recognize different African Christian traditions?",
-     "How can history strengthen Christian identity?",
-     "What can believers learn from the experiences of earlier communities?",
-     "How can Christians share the Gospel across cultural differences?"
-    ],
-    "assignment": {
-     "title": null,
-     "text": "1. Why is Christian Nubia important to African church history?\n2. What other African Christian regions developed distinctive traditions?\n3. How did Nubian Christians contribute to the wider Church?\n4. Why should Christians study both the growth and challenges of historical communities?\n5. What is the central message of Christian Nubian history for believers today?"
-    }
-   }
-  ],
-  "source": "011.txt",
-  "lostTables": 0,
-  "topicSlug": "christianity-in-ancient-nubia"
- },
- {
-  "categorySlug": "african-christianity",
   "topicNumber": 12,
   "title": "The Christian Kingdoms of Nubia: Faith Along the Nile",
   "subtitle": "God can establish communities of faith across different nations and cultures, and believers are called to preserve, practice, and share the Gospel through every generation.",
@@ -5768,6 +5392,44 @@ export default [
     "assignment": {
      "title": null,
      "text": "1. Which river played a central role in Nubian history?\n2. What benefits did the Nile provide to Nubian communities?\n3. How did connections with neighboring regions influence Christianity in Nubia?\n4. Which three kingdoms became important centers of Nubian Christianity?\n5. What spiritual lesson can Christians learn from the role of the Nile?"
+    }
+   },
+   {
+    "title": "The Arrival of Christianity in Nubia",
+    "scripture": "",
+    "narrative": [
+     "During the sixth century, Christianity began to spread more widely into the Nubian kingdoms.",
+     "At that time, the eastern Mediterranean and northeastern Africa were connected through trade, diplomacy, travel, and religious relationships.",
+     "Christian communities already existed in Egypt and other neighboring regions.",
+     "Missionaries and church leaders traveled to Nubia, where they introduced Christian teaching and helped establish relationships with local rulers.",
+     "The conversion of Nubia was not a single event that transformed every community immediately.",
+     "Christianity developed through a process involving royal decisions, missionary activity, local acceptance, and the gradual establishment of churches.",
+     "Historical accounts describe Christian missions connected with the Byzantine Empire and the Christian communities of Egypt.",
+     "Different Nubian kingdoms received Christianity through distinct historical circumstances.",
+     "The kingdom of Nobatia became Christian during the sixth century. Makuria also embraced Christianity during this period, and Alodia developed as another important Christian kingdom farther south.",
+     "The spread of Christianity helped establish religious institutions throughout the region.",
+     "Churches became places of worship, instruction, fellowship, and community life.",
+     "The arrival of Christianity in Nubia demonstrates that the Gospel traveled through relationships and the faithful work of people who shared their beliefs.",
+     "It also reminds Christians that spiritual transformation can take time.",
+     "Faith must be taught, understood, and lived."
+    ],
+    "lessons": [
+     "Sharing the Gospel requires relationships.\nChristian witness often begins through personal connections and meaningful conversations.",
+     "Faith should be taught clearly.\nPeople need opportunities to understand the message of Jesus Christ.",
+     "Spiritual growth can take time.\nCommunities develop in faith through teaching, worship, and discipleship.",
+     "God can use different people to spread His Word.\nMissionaries, leaders, families, and ordinary believers all have important roles.",
+     "Receiving the Gospel should lead to a transformed life.\nChristian faith is more than knowing religious information; it involves following Christ."
+    ],
+    "reflections": [
+     "What factors helped Christianity spread into Nubia?",
+     "Why are relationships important in sharing the Gospel?",
+     "How can Christians explain their faith clearly?",
+     "Why should believers be patient when helping others grow spiritually?",
+     "What role can ordinary Christians play in sharing the Gospel?"
+    ],
+    "assignment": {
+     "title": null,
+     "text": "1. During which century did Christianity spread widely into Nubia?\n2. Which neighboring Christian regions influenced Nubia?\n3. What role did missionaries play in the development of Nubian Christianity?\n4. Why was the Christianization of Nubia a gradual process?\n5. What does the history of Nubia teach about sharing the Gospel?"
     }
    },
    {
