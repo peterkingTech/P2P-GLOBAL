@@ -10984,7 +10984,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What is the central teaching of Mark 10:43–45?\nAnswer: Anyone who wants to become great among Jesus’ followers must become a servant, because Jesus Himself came to serve and give His life for others.\n2. Why is Jesus considered the foundation of Christian leadership?\nAnswer: He provides the perfect example of leadership through humility, love, obedience, sacrifice, and service.\n3. How did Jesus demonstrate servant leadership when He washed His disciples’ feet?\nAnswer: He performed a humble task for His followers even though He was their Lord and Teacher.\n4. Why should Christian leaders serve before seeking recognition?\nAnswer: Serving demonstrates that leadership is motivated by love and responsibility rather than pride or personal ambition.\n5. How can a believer begin practicing Christian leadership without holding a church position?\nAnswer: By helping others, showing kindness, listening, participating in church activities, and living according to Christ’s teachings."
+     "text": "1. What is the central teaching of Mark 10:43–45?\n2. Why is Jesus considered the foundation of Christian leadership?\n3. How did Jesus demonstrate servant leadership when He washed His disciples’ feet?\n4. Why should Christian leaders serve before seeking recognition?\n5. How can a believer begin practicing Christian leadership without holding a church position?"
     }
    },
    {
@@ -11020,7 +11020,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What is the Great Commission?\nAnswer: Jesus’ command to make disciples of all nations, baptize them, and teach them to obey His commands.\n2. Why is sharing the gospel an important part of Christian leadership?\nAnswer: Christian leaders help people hear, understand, and respond to the message of Jesus Christ.\n3. How can Christian leaders demonstrate respect when sharing their faith?\nAnswer: They can listen carefully, speak honestly and kindly, respect people’s freedom, and avoid coercion or discrimination.\n4. Why does discipleship continue after someone becomes a Christian?\nAnswer: Believers need continued teaching, spiritual growth, fellowship, and guidance in living according to Scripture.\n5. Who can participate in the mission of sharing the gospel?\nAnswer: All Christians can participate through their words, actions, relationships, prayers, and service."
+     "text": "1. What is the Great Commission?\n2. Why is sharing the gospel an important part of Christian leadership?\n3. How can Christian leaders demonstrate respect when sharing their faith?\n4. Why does discipleship continue after someone becomes a Christian?\n5. Who can participate in the mission of sharing the gospel?"
     }
    },
    {
@@ -11056,7 +11056,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. Who was Samuel Ajayi Crowther?\nAnswer: He was a nineteenth-century African Christian missionary, educator, translator, and Anglican bishop associated with Yoruba Bible translation.\n2. Why is Crowther remembered in African Christian history?\nAnswer: He contributed to Christian education, African leadership, and Bible translation into Yoruba.\n3. How does Bible translation support Christian discipleship?\nAnswer: It makes Scripture more accessible and allows people to learn, discuss, and apply biblical teachings in a language they understand.\n4. What does Crowther’s story demonstrate about African Christian contributions?\nAnswer: African Christians actively shaped the church through learning, translation, teaching, and leadership.\n5. How can modern Christian learners follow Crowther’s example?\nAnswer: They can pursue education, develop useful skills, serve others, and communicate biblical teaching clearly and faithfully."
+     "text": "1. Who was Samuel Ajayi Crowther?\n2. Why is Crowther remembered in African Christian history?\n3. How does Bible translation support Christian discipleship?\n4. What does Crowther’s story demonstrate about African Christian contributions?\n5. How can modern Christian learners follow Crowther’s example?"
     }
    },
    {
@@ -11094,7 +11094,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. How can Christian leaders support education?\nAnswer: They can organize learning activities, provide supplies, encourage families, support teachers, and create opportunities for children to develop skills.\n2. Why should churches cooperate with families and educators?\nAnswer: Cooperation allows communities to use their resources wisely and provide more effective support.\n3. What does Christian dignity mean in educational service?\nAnswer: Every learner should be treated with respect, patience, fairness, and encouragement.\n4. Why should churches avoid making educational assistance conditional on religious participation?\nAnswer: Because genuine service respects people’s dignity and seeks their well-being without coercion.\n5. How can education contribute to community transformation?\nAnswer: It can improve literacy, strengthen confidence, expand knowledge, and help people participate more fully in society."
+     "text": "1. How can Christian leaders support education?\n2. Why should churches cooperate with families and educators?\n3. What does Christian dignity mean in educational service?\n4. Why should churches avoid making educational assistance conditional on religious participation?\n5. How can education contribute to community transformation?"
     }
    },
    {
@@ -11132,7 +11132,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What does Matthew 25:35–40 teach about serving others?\nAnswer: Jesus identifies acts of care for people in need as meaningful expressions of service to Him.\n2. Why should Christian leaders listen before deciding how to help?\nAnswer: Listening helps them understand people’s actual needs, preferences, and circumstances.\n3. How can churches protect the dignity of people receiving assistance?\nAnswer: They can respect privacy, avoid public humiliation, seek consent, and provide help without discrimination.\n4. Why is cooperation with professional services sometimes necessary?\nAnswer: Certain situations require specialized knowledge, training, or resources beyond what church volunteers can safely provide.\n5. How does consistent community service strengthen Christian witness?\nAnswer: It demonstrates compassion, reliability, and practical love through actions rather than words alone."
+     "text": "1. What does Matthew 25:35–40 teach about serving others?\n2. Why should Christian leaders listen before deciding how to help?\n3. How can churches protect the dignity of people receiving assistance?\n4. Why is cooperation with professional services sometimes necessary?\n5. How does consistent community service strengthen Christian witness?"
     }
    },
    {
@@ -11173,7 +11173,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What is integrity in Christian leadership?\nAnswer: Integrity means living honestly and consistently with Christian values in public and private life.\n2. Why are financial records important for church projects?\nAnswer: They help demonstrate how donations are received, managed, and used.\n3. How should Christian leaders respond to correction?\nAnswer: They should listen humbly, examine the concern, acknowledge mistakes when appropriate, and take responsible action.\n4. What is the danger of using spiritual authority to intimidate people?\nAnswer: It can harm people, undermine trust, and contradict the servant leadership taught by Jesus.\n5. How does accountability reflect biblical leadership?\nAnswer: It supports honesty, responsibility, stewardship, and care for the people entrusted to leaders."
+     "text": "1. What is integrity in Christian leadership?\n2. Why are financial records important for church projects?\n3. How should Christian leaders respond to correction?\n4. What is the danger of using spiritual authority to intimidate people?\n5. How does accountability reflect biblical leadership?"
     }
    },
    {
@@ -11215,7 +11215,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What does the image of the church as one body teach?\nAnswer: It teaches that believers have different roles and gifts but belong to one community in Christ.\n2. Does Christian unity mean every church must have identical practices?\nAnswer: No. Unity can include meaningful differences in tradition, worship, and organization.\n3. How can Christian leaders promote respectful cooperation?\nAnswer: They can listen, communicate honestly, focus on shared responsibilities, and avoid insulting other traditions.\n4. Why is cooperation valuable for community service?\nAnswer: It allows churches to combine resources, skills, and volunteers to address shared needs.\n5. What responsibility do Christian leaders have when disagreements arise?\nAnswer: They should encourage respectful dialogue, seek understanding, and work toward peace without hiding important differences."
+     "text": "1. What does the image of the church as one body teach?\n2. Does Christian unity mean every church must have identical practices?\n3. How can Christian leaders promote respectful cooperation?\n4. Why is cooperation valuable for community service?\n5. What responsibility do Christian leaders have when disagreements arise?"
     }
    },
    {
@@ -11256,7 +11256,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What responsibility does 2 Timothy 2:1–2 describe?\nAnswer: Faithful teaching should be entrusted to reliable people who can teach others as well.\n2. Why should Christian leaders encourage young people to serve?\nAnswer: Young people have gifts and abilities that can strengthen the church and community when developed responsibly.\n3. What is mentoring in Christian leadership?\nAnswer: Mentoring is the process of guiding, teaching, encouraging, and supporting another person as they grow in faith and service.\n4. How can churches help young leaders develop responsibly?\nAnswer: They can provide biblical teaching, appropriate responsibilities, supervision, encouragement, and opportunities to learn.\n5. Why is passing on Christian faith important for the future?\nAnswer: It helps ensure that biblical teaching, spiritual practices, and faithful service continue through future generations."
+     "text": "1. What responsibility does 2 Timothy 2:1–2 describe?\n2. Why should Christian leaders encourage young people to serve?\n3. What is mentoring in Christian leadership?\n4. How can churches help young leaders develop responsibly?\n5. Why is passing on Christian faith important for the future?"
     }
    }
   ],
@@ -11386,7 +11386,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What makes African Christianity diverse?\nAnswer: African Christianity includes many countries, cultures, languages, historical traditions, denominations, and forms of worship.\n2. Why is the Great Commission important for the growth of Christianity?\nAnswer: It calls Christians to make disciples, baptize them, and teach them to obey Jesus.\n3. How is spiritual growth different from numerical growth?\nAnswer: Numerical growth concerns the number of people attending or belonging to a church, while spiritual growth concerns maturity in faith, character, obedience, and service.\n4. Why should African Christians learn about different church traditions?\nAnswer: Understanding different traditions encourages respect, historical awareness, cooperation, and meaningful Christian dialogue.\n5. What should accompany the growth of a Christian congregation?\nAnswer: Faithful teaching, discipleship, prayer, compassionate service, responsible leadership, and spiritual maturity."
+     "text": "1. What makes African Christianity diverse?\n2. Why is the Great Commission important for the growth of Christianity?\n3. How is spiritual growth different from numerical growth?\n4. Why should African Christians learn about different church traditions?\n5. What should accompany the growth of a Christian congregation?"
     }
    },
    {
@@ -11431,7 +11431,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What does 2 Timothy 3:16–17 teach about Scripture?\nAnswer: Scripture is inspired by God and useful for teaching, correcting, training in righteousness, and preparing believers for good works.\n2. Why should Bible study lead to practical application?\nAnswer: God’s Word is intended to shape believers’ faith, character, decisions, and actions.\n3. How can asking questions improve Bible study?\nAnswer: Questions help learners examine meaning, context, interpretation, and practical implications.\n4. Why should biblical passages be interpreted in context?\nAnswer: Context helps prevent misunderstanding and supports faithful interpretation.\n5. How does regular Bible teaching strengthen a church?\nAnswer: It equips believers with knowledge, spiritual maturity, discernment, and the ability to live faithfully."
+     "text": "1. What does 2 Timothy 3:16–17 teach about Scripture?\n2. Why should Bible study lead to practical application?\n3. How can asking questions improve Bible study?\n4. Why should biblical passages be interpreted in context?\n5. How does regular Bible teaching strengthen a church?"
     }
    },
    {
@@ -11475,7 +11475,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What does Philippians 4:6–7 teach about prayer?\nAnswer: Believers are encouraged to bring their concerns to God through prayer and thanksgiving, trusting Him for peace.\n2. What are some forms of Christian prayer?\nAnswer: Praise, thanksgiving, confession, requests, and intercession.\n3. Does prayer guarantee that every request will be answered exactly as requested?\nAnswer: No. Prayer expresses trust in God and seeks His guidance, while believers remain faithful through uncertainty.\n4. Why should prayer be accompanied by practical service?\nAnswer: Christian love calls believers to respond to real needs when they have the ability and responsibility to help.\n5. How can shared prayer strengthen a congregation?\nAnswer: It encourages fellowship, mutual concern, spiritual support, and a shared dependence on God."
+     "text": "1. What does Philippians 4:6–7 teach about prayer?\n2. What are some forms of Christian prayer?\n3. Does prayer guarantee that every request will be answered exactly as requested?\n4. Why should prayer be accompanied by practical service?\n5. How can shared prayer strengthen a congregation?"
     }
    },
    {
@@ -11518,7 +11518,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What does James 2:14–17 teach about faith and works?\nAnswer: Genuine faith should be expressed through practical concern and action toward people in need.\n2. How can churches identify community needs responsibly?\nAnswer: They can listen to residents, consult local organizations, assess available resources, and consider people’s actual circumstances.\n3. Why are long-term plans important for community service?\nAnswer: They help projects remain useful, organized, sustainable, and responsive to changing needs.\n4. How can churches cooperate with community organizations?\nAnswer: They can share information, coordinate resources, refer people to appropriate services, and work together on common concerns.\n5. Why should community assistance be offered fairly?\nAnswer: Fairness reflects Christian love and protects the dignity of people regardless of their religious background or social position."
+     "text": "1. What does James 2:14–17 teach about faith and works?\n2. How can churches identify community needs responsibly?\n3. Why are long-term plans important for community service?\n4. How can churches cooperate with community organizations?\n5. Why should community assistance be offered fairly?"
     }
    },
    {
@@ -11562,7 +11562,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What does 1 Timothy 4:12 teach about young believers?\nAnswer: Young believers should set an example through speech, conduct, love, faith, and purity.\n2. Why should youth ministry include opportunities for service?\nAnswer: Service helps young people develop their gifts, practice responsibility, and contribute to the church.\n3. What is the role of mentoring in youth ministry?\nAnswer: Mentoring provides guidance, encouragement, teaching, and support as young people grow in faith.\n4. Why should youth responsibilities be appropriate to their age and experience?\nAnswer: Appropriate responsibilities protect young people and help them develop skills safely and confidently.\n5. How can churches recognize young people as active members of the Christian community?\nAnswer: They can include them in worship, teaching, service, decision-making appropriate to their maturity, and supportive relationships."
+     "text": "1. What does 1 Timothy 4:12 teach about young believers?\n2. Why should youth ministry include opportunities for service?\n3. What is the role of mentoring in youth ministry?\n4. Why should youth responsibilities be appropriate to their age and experience?\n5. How can churches recognize young people as active members of the Christian community?"
     }
    },
    {
@@ -11605,7 +11605,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What does 1 Peter 5:2–3 teach about leadership?\nAnswer: Leaders should care for God’s people willingly, humbly, and without seeking personal gain or controlling others.\n2. Why is financial accountability important for churches?\nAnswer: It helps protect resources, demonstrate responsible stewardship, and maintain trust.\n3. What is spiritual authority intended to accomplish?\nAnswer: It should guide, teach, protect, and serve people in accordance with Christian principles.\n4. How should Christian leaders respond to concerns about wrongdoing?\nAnswer: They should listen, examine the facts fairly, protect people from retaliation, and take appropriate action.\n5. How does integrity strengthen Christian witness?\nAnswer: It demonstrates that Christian teaching is reflected in the conduct of believers and leaders."
+     "text": "1. What does 1 Peter 5:2–3 teach about leadership?\n2. Why is financial accountability important for churches?\n3. What is spiritual authority intended to accomplish?\n4. How should Christian leaders respond to concerns about wrongdoing?\n5. How does integrity strengthen Christian witness?"
     }
    },
    {
@@ -11646,7 +11646,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What does Romans 12:18 teach about peace?\nAnswer: Believers should seek peaceful relationships with others as far as it depends on them.\n2. Does peace require ignoring injustice?\nAnswer: No. Peaceful conduct can include addressing wrongdoing honestly and responsibly.\n3. How can Christians reduce conflict during disagreements?\nAnswer: They can listen carefully, speak respectfully, avoid rumors, examine facts, and seek constructive solutions.\n4. Why can churches cooperate on community concerns?\nAnswer: Cooperation allows communities to address shared needs and strengthen relationships.\n5. How can Christian witness support peaceful relationships?\nAnswer: By demonstrating love, fairness, respect, honesty, and a commitment to reconciliation."
+     "text": "1. What does Romans 12:18 teach about peace?\n2. Does peace require ignoring injustice?\n3. How can Christians reduce conflict during disagreements?\n4. Why can churches cooperate on community concerns?\n5. How can Christian witness support peaceful relationships?"
     }
    },
    {
@@ -11688,7 +11688,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What does Acts 1:8 teach about Christian witness?\nAnswer: Jesus promises the Holy Spirit and calls His disciples to be witnesses to Him across different regions and communities.\n2. What are some ways African Christians participate in global mission?\nAnswer: Through evangelism, teaching, translation, church partnerships, community service, prayer, and missionary work.\n3. Why should mission workers learn about local communities?\nAnswer: Understanding local culture, language, needs, and church traditions helps them serve respectfully and effectively.\n4. How can churches support global mission without sending missionaries abroad?\nAnswer: They can pray, provide resources, teach about mission, support partnerships, and encourage local ministries.\n5. What should guide Christian mission?\nAnswer: Faithfulness to Scripture, love, humility, respect, responsible service, and the desire to make disciples of Jesus Christ."
+     "text": "1. What does Acts 1:8 teach about Christian witness?\n2. What are some ways African Christians participate in global mission?\n3. Why should mission workers learn about local communities?\n4. How can churches support global mission without sending missionaries abroad?\n5. What should guide Christian mission?"
     }
    }
   ],
@@ -11837,7 +11837,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What were the main activities of the early church in Acts 2:42–47?\nAnswer: The believers devoted themselves to teaching, fellowship, breaking bread, prayer, generosity, and worship.\n2. Why is biblical teaching important for Christian movements?\nAnswer: It provides the foundation for faith, discipleship, spiritual growth, and responsible Christian living.\n3. How does fellowship strengthen Christian communities?\nAnswer: Fellowship encourages mutual support, spiritual growth, cooperation, and care for one another.\n4. Why should Christian movements demonstrate generosity?\nAnswer: Generosity expresses love, compassion, and practical concern for people in need.\n5. What is the purpose of discipleship in a Christian movement?\nAnswer: Discipleship helps believers understand Scripture, follow Jesus, develop Christian character, and serve others."
+     "text": "1. What were the main activities of the early church in Acts 2:42–47?\n2. Why is biblical teaching important for Christian movements?\n3. How does fellowship strengthen Christian communities?\n4. Why should Christian movements demonstrate generosity?\n5. What is the purpose of discipleship in a Christian movement?"
     }
    },
    {
@@ -11883,7 +11883,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What is evangelism?\nAnswer: Evangelism is sharing the message of Jesus Christ and inviting people to hear and respond to the gospel.\n2. What does Jesus command in Matthew 28:19–20?\nAnswer: He commands His followers to make disciples of all nations, baptize them, and teach them to obey His commands.\n3. Why should evangelism respect people’s dignity?\nAnswer: Christian witness should reflect the love and compassion of Jesus and respect people’s freedom to respond.\n4. Why is follow-up important after evangelistic activities?\nAnswer: Follow-up provides teaching, fellowship, encouragement, and opportunities for spiritual growth.\n5. How can ordinary Christians participate in evangelism?\nAnswer: They can share their faith, invite people to learn, demonstrate Christian character, pray, and serve their communities."
+     "text": "1. What is evangelism?\n2. What does Jesus command in Matthew 28:19–20?\n3. Why should evangelism respect people’s dignity?\n4. Why is follow-up important after evangelistic activities?\n5. How can ordinary Christians participate in evangelism?"
     }
    },
    {
@@ -11928,7 +11928,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What does Philippians 4:6–7 teach about prayer?\nAnswer: Believers should bring their concerns to God through prayer and thanksgiving, trusting Him for peace.\n2. What is intercessory prayer?\nAnswer: Intercessory prayer is praying to God on behalf of other people or situations.\n3. Why should prayer movements be grounded in Scripture?\nAnswer: Scripture provides guidance for understanding God’s character, the purpose of prayer, and faithful Christian living.\n4. How can prayer encourage community service?\nAnswer: Prayer can help believers become more attentive to needs and encourage them to respond with compassion and practical assistance.\n5. What should Christians remember when praying for difficult situations?\nAnswer: They should trust God, pray honestly, remain faithful, and recognize that prayer does not guarantee every desired outcome."
+     "text": "1. What does Philippians 4:6–7 teach about prayer?\n2. What is intercessory prayer?\n3. Why should prayer movements be grounded in Scripture?\n4. How can prayer encourage community service?\n5. What should Christians remember when praying for difficult situations?"
     }
    },
    {
@@ -11973,7 +11973,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What does Acts 1:8 teach about the Holy Spirit?\nAnswer: The Holy Spirit empowers believers to become witnesses of Jesus Christ.\n2. Why are spiritual gifts given?\nAnswer: Spiritual gifts are given to strengthen the church and enable believers to serve others.\n3. What does 1 Corinthians 12 teach about the church?\nAnswer: The church is one body with many members who have different gifts and responsibilities.\n4. What is the fruit of the Holy Spirit?\nAnswer: It includes love, joy, peace, patience, kindness, goodness, faithfulness, gentleness, and self-control.\n5. How should Christian movements evaluate spiritual experiences?\nAnswer: They should examine them in light of Scripture, Christian character, responsible leadership, and the purpose of strengthening the church."
+     "text": "1. What does Acts 1:8 teach about the Holy Spirit?\n2. Why are spiritual gifts given?\n3. What does 1 Corinthians 12 teach about the church?\n4. What is the fruit of the Holy Spirit?\n5. How should Christian movements evaluate spiritual experiences?"
     }
    },
    {
@@ -12021,7 +12021,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What does James 2:14–17 teach about faith?\nAnswer: Genuine faith should be expressed through practical concern and action toward people in need.\n2. How can Christian movements contribute to community development?\nAnswer: They can support education, provide appropriate assistance, organize volunteers, encourage cooperation, and connect people with services.\n3. Why should leaders listen before organizing community projects?\nAnswer: Listening helps them understand actual needs, avoid assumptions, and plan appropriate activities.\n4. How can churches protect the dignity of people receiving assistance?\nAnswer: They can respect privacy, seek consent, avoid humiliation, and offer support fairly.\n5. Why is cooperation important for community development?\nAnswer: Cooperation allows organizations and individuals to combine resources, skills, and knowledge to address shared needs."
+     "text": "1. What does James 2:14–17 teach about faith?\n2. How can Christian movements contribute to community development?\n3. Why should leaders listen before organizing community projects?\n4. How can churches protect the dignity of people receiving assistance?\n5. Why is cooperation important for community development?"
     }
    },
    {
@@ -12066,7 +12066,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What are some contributions African Christians have made to Christianity?\nAnswer: They have contributed through evangelism, Bible translation, education, scholarship, worship, community service, and church leadership.\n2. What does Jesus teach about Christian leadership in Mark 10:43–45?\nAnswer: Christian greatness is demonstrated through service, humility, and willingness to give oneself for others.\n3. Why is local leadership important?\nAnswer: Local leaders can understand community languages, relationships, needs, and cultural circumstances while teaching the gospel faithfully.\n4. How can churches prepare future leaders?\nAnswer: Through biblical education, mentoring, practical responsibilities, prayer, and opportunities to develop their gifts.\n5. Why should Christian leaders remain accountable?\nAnswer: Accountability protects people, strengthens trust, and helps leaders exercise authority responsibly."
+     "text": "1. What are some contributions African Christians have made to Christianity?\n2. What does Jesus teach about Christian leadership in Mark 10:43–45?\n3. Why is local leadership important?\n4. How can churches prepare future leaders?\n5. Why should Christian leaders remain accountable?"
     }
    },
    {
@@ -12112,7 +12112,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What does the image of the church as one body teach?\nAnswer: It teaches that believers have different gifts and responsibilities but belong to one Christian community.\n2. Does unity require every Christian tradition to have identical practices?\nAnswer: No. Unity can include differences in worship, history, and organization.\n3. How can Christian movements encourage respectful cooperation?\nAnswer: They can listen carefully, communicate honestly, focus on shared responsibilities, and avoid unnecessary hostility.\n4. Why is cooperation useful for community service?\nAnswer: It allows churches to combine resources and skills to address shared needs.\n5. How can unity strengthen Christian witness?\nAnswer: It demonstrates love, humility, respect, and a willingness to work together for the good of others."
+     "text": "1. What does the image of the church as one body teach?\n2. Does unity require every Christian tradition to have identical practices?\n3. How can Christian movements encourage respectful cooperation?\n4. Why is cooperation useful for community service?\n5. How can unity strengthen Christian witness?"
     }
    },
    {
@@ -12158,7 +12158,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What responsibility does 2 Timothy 2:1–2 describe?\nAnswer: Faithful teaching should be entrusted to reliable people who can teach others.\n2. Why should Christian movements encourage young people to participate?\nAnswer: Young people have gifts and abilities that can strengthen the church and contribute to its mission.\n3. What is mentoring?\nAnswer: Mentoring is guiding, teaching, encouraging, and supporting another person as they grow in faith and service.\n4. How can churches prepare young leaders responsibly?\nAnswer: They can provide biblical teaching, appropriate responsibilities, supervision, mentoring, and opportunities to learn.\n5. Why is passing on Christian faith important?\nAnswer: It helps ensure that biblical teaching, spiritual practices, and faithful service continue through future generations."
+     "text": "1. What responsibility does 2 Timothy 2:1–2 describe?\n2. Why should Christian movements encourage young people to participate?\n3. What is mentoring?\n4. How can churches prepare young leaders responsibly?\n5. Why is passing on Christian faith important?"
     }
    }
   ],
@@ -12306,7 +12306,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What happened at Pentecost according to Acts 2:1–18?\nAnswer: The Holy Spirit came upon the disciples, and they began speaking in other languages as they proclaimed God’s wonders.\n2. Why is Pentecost important for the Christian church?\nAnswer: It marks the empowering of the disciples by the Holy Spirit for their mission of witnessing to Jesus Christ.\n3. What does Acts 1:8 teach about the Holy Spirit?\nAnswer: The Holy Spirit empowers believers to become witnesses of Jesus Christ.\n4. Why should spiritual experiences be connected to Christian service?\nAnswer: The Holy Spirit empowers believers to share the gospel, serve others, and live faithfully.\n5. What should remain central in Pentecostal Christianity?\nAnswer: Jesus Christ, the teaching of Scripture, the work of the Holy Spirit, and faithful Christian discipleship."
+     "text": "1. What happened at Pentecost according to Acts 2:1–18?\n2. Why is Pentecost important for the Christian church?\n3. What does Acts 1:8 teach about the Holy Spirit?\n4. Why should spiritual experiences be connected to Christian service?\n5. What should remain central in Pentecostal Christianity?"
     }
    },
    {
@@ -12356,7 +12356,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What is Christian worship?\nAnswer: Christian worship is honoring God through praise, thanksgiving, prayer, reverence, obedience, and faithful living.\n2. Why is worship more than music?\nAnswer: Worship includes the whole life of a believer and should influence character, relationships, and daily actions.\n3. How can congregational singing strengthen the church?\nAnswer: It allows believers to express faith together, encourage one another, and remember biblical truths.\n4. Why should Christians respect different expressions of worship?\nAnswer: Believers have different cultural backgrounds and worship practices, and respectful fellowship helps maintain unity.\n5. How can worship influence daily life?\nAnswer: It can encourage gratitude, honesty, kindness, forgiveness, and obedience to God’s Word."
+     "text": "1. What is Christian worship?\n2. Why is worship more than music?\n3. How can congregational singing strengthen the church?\n4. Why should Christians respect different expressions of worship?\n5. How can worship influence daily life?"
     }
    },
    {
@@ -12404,7 +12404,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What does Philippians 4:6–7 teach about prayer?\nAnswer: Believers should bring their concerns to God through prayer and thanksgiving, trusting Him for peace.\n2. What is intercessory prayer?\nAnswer: Intercessory prayer is praying to God on behalf of other people or situations.\n3. Does prayer guarantee that every request will be answered exactly as requested?\nAnswer: No. Prayer expresses trust in God, while believers remain faithful through uncertainty.\n4. How can prayer encourage compassion?\nAnswer: It can help believers become more attentive to the needs of others and encourage practical acts of service.\n5. Why is prayer important for Christian fellowship?\nAnswer: It encourages shared faith, mutual support, spiritual growth, and dependence on God."
+     "text": "1. What does Philippians 4:6–7 teach about prayer?\n2. What is intercessory prayer?\n3. Does prayer guarantee that every request will be answered exactly as requested?\n4. How can prayer encourage compassion?\n5. Why is prayer important for Christian fellowship?"
     }
    },
    {
@@ -12452,7 +12452,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What does 1 Corinthians 12:4–11 teach about spiritual gifts?\nAnswer: The Holy Spirit gives different gifts to believers according to His purpose.\n2. Why are spiritual gifts given?\nAnswer: They are given to strengthen the church and help believers serve others.\n3. What does 1 Corinthians 13 teach about love?\nAnswer: Love is essential to Christian life and must guide the use of spiritual gifts.\n4. How can believers develop their gifts?\nAnswer: Through prayer, biblical teaching, mentoring, practice, and opportunities to serve.\n5. Why should spiritual gifts not be used to create pride?\nAnswer: Gifts are given by God for service, not personal superiority or control."
+     "text": "1. What does 1 Corinthians 12:4–11 teach about spiritual gifts?\n2. Why are spiritual gifts given?\n3. What does 1 Corinthians 13 teach about love?\n4. How can believers develop their gifts?\n5. Why should spiritual gifts not be used to create pride?"
     }
    },
    {
@@ -12501,7 +12501,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What does Romans 10:14–17 teach about evangelism?\nAnswer: People need to hear the message of Christ, and the message is shared through those who proclaim it.\n2. Why should evangelism be respectful?\nAnswer: Christian witness should reflect love, honesty, compassion, and respect for people’s freedom.\n3. What is discipleship?\nAnswer: Discipleship is helping people learn to follow Jesus, understand Scripture, develop Christian character, and serve others.\n4. Why is follow-up important after evangelistic outreach?\nAnswer: It provides continued teaching, fellowship, encouragement, and opportunities for spiritual growth.\n5. How can Christians support evangelism through their daily lives?\nAnswer: They can demonstrate Christian character, share their faith honestly, serve others, pray, and invite people to learn about Jesus."
+     "text": "1. What does Romans 10:14–17 teach about evangelism?\n2. Why should evangelism be respectful?\n3. What is discipleship?\n4. Why is follow-up important after evangelistic outreach?\n5. How can Christians support evangelism through their daily lives?"
     }
    },
    {
@@ -12547,7 +12547,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What is the fruit of the Holy Spirit?\nAnswer: It includes love, joy, peace, patience, kindness, goodness, faithfulness, gentleness, and self-control.\n2. How does the Holy Spirit influence Christian character?\nAnswer: The Holy Spirit helps believers grow in Christlike attitudes and behavior.\n3. Why is love important in Christian life?\nAnswer: Love reflects the character of God and guides believers in how they treat others.\n4. How can patience and gentleness improve relationships?\nAnswer: They help people communicate respectfully, respond calmly, and avoid unnecessary conflict.\n5. How can believers develop spiritual maturity?\nAnswer: Through prayer, Scripture, fellowship, obedience, service, and continued growth in Christian character."
+     "text": "1. What is the fruit of the Holy Spirit?\n2. How does the Holy Spirit influence Christian character?\n3. Why is love important in Christian life?\n4. How can patience and gentleness improve relationships?\n5. How can believers develop spiritual maturity?"
     }
    },
    {
@@ -12594,7 +12594,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What does 1 Peter 5:2–3 teach about Christian leaders?\nAnswer: Leaders should care for God’s people willingly, humbly, and without seeking personal gain or controlling others.\n2. Why is accountability important for churches?\nAnswer: It protects people, supports responsible stewardship, and strengthens trust.\n3. How should Christian leaders use spiritual authority?\nAnswer: They should use it to teach, guide, protect, and serve people faithfully.\n4. Why should churches provide appropriate supervision for volunteers?\nAnswer: Supervision helps protect people, clarify responsibilities, and ensure that service is carried out responsibly.\n5. How can leaders demonstrate humility?\nAnswer: By listening, accepting correction, acknowledging mistakes, and remaining willing to learn."
+     "text": "1. What does 1 Peter 5:2–3 teach about Christian leaders?\n2. Why is accountability important for churches?\n3. How should Christian leaders use spiritual authority?\n4. Why should churches provide appropriate supervision for volunteers?\n5. How can leaders demonstrate humility?"
     }
    },
    {
@@ -12641,7 +12641,7 @@ export default [
     ],
     "assignment": {
      "title": null,
-     "text": "1. What responsibility does 2 Timothy 2:1–2 describe?\nAnswer: Faithful teaching should be entrusted to reliable people who can teach others.\n2. Why should churches encourage young people to participate in ministry?\nAnswer: Young people have gifts and abilities that can strengthen the church and contribute to its mission.\n3. What is mentoring?\nAnswer: Mentoring is guiding, teaching, encouraging, and supporting another person as they grow in faith and service.\n4. How can churches prepare young leaders responsibly?\nAnswer: They can provide biblical teaching, appropriate responsibilities, supervision, mentoring, and opportunities to learn.\n5. Why is passing on Christian faith important?\nAnswer: It helps ensure that biblical teaching, spiritual practices, and faithful service continue through future generations."
+     "text": "1. What responsibility does 2 Timothy 2:1–2 describe?\n2. Why should churches encourage young people to participate in ministry?\n3. What is mentoring?\n4. How can churches prepare young leaders responsibly?\n5. Why is passing on Christian faith important?"
     }
    }
   ],
