@@ -12036,7 +12036,7 @@ export default [
  },
  {
   "categorySlug": "asian-christianity",
-  "topicNumber": 33,
+  "topicNumber": 32,
   "title": "Christianity in Uzbekistan and the Ancient Sogdians",
   "subtitle": "Christianity in Uzbekistan and among the ancient Sogdians demonstrates how the Gospel traveled along the Silk Road, reached the trading cities of Central Asia, developed through East Syriac Christian communities, and left a lasting heritage preserved in manuscripts, inscriptions, and historical memory.",
   "body": [
@@ -12391,7 +12391,7 @@ export default [
  },
  {
   "categorySlug": "asian-christianity",
-  "topicNumber": 34,
+  "topicNumber": 33,
   "title": "Christianity Among the Mongols",
   "subtitle": "Christianity among the Mongols demonstrates how the Gospel reached nomadic peoples and influential tribal communities, entered parts of the Mongol imperial court, and created opportunities for missionary and diplomatic relationships between Asia and Europe.",
   "body": [
@@ -12782,7 +12782,7 @@ export default [
  },
  {
   "categorySlug": "asian-christianity",
-  "topicNumber": 35,
+  "topicNumber": 34,
   "title": "Christianity in Pakistan",
   "subtitle": "Christianity in Pakistan is a story of ancient connections, missionary work, community formation, perseverance, and faithful witness. It demonstrates how the Christian message has taken root in the Indus region and developed through generations of believers who have sought to follow Christ in changing circumstances.",
   "body": [

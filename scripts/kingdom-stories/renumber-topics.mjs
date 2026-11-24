@@ -18,7 +18,7 @@ if (!cats.length) { console.error("name at least one category slug"); process.ex
 if (process.argv.includes("--content")) {
   const dir = path.join(repo, "scripts/kingdom-stories/content");
   for (const cat of cats) {
-    const file = path.join(dir, `${cat}-stories.mjs`);
+    const file = path.join(dir, readdirSync(dir).find((f) => f.startsWith(`${cat}-`) && f.endsWith(".mjs")));
     const stories = (await import(pathToFileURL(file).href)).default;
     const sorted = [...stories].sort((a, b) => a.topicNumber - b.topicNumber);
     sorted.forEach((s, i) => { s.topicNumber = i + 1; });
