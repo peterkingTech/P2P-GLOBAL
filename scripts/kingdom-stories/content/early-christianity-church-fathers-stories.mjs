@@ -7869,7 +7869,7 @@ export default [
  },
  {
   "categorySlug": "early-christianity-church-fathers",
-  "topicNumber": 12,
+  "topicNumber": 11,
   "title": "The Council of Nicaea: Defining the Church’s Confession of Christ",
   "subtitle": null,
   "body": [
@@ -8526,7 +8526,7 @@ export default [
  },
  {
   "categorySlug": "early-christianity-church-fathers",
-  "topicNumber": 14,
+  "topicNumber": 12,
   "title": "Basil the Great: Serving the Poor and Shaping Christian Community",
   "subtitle": null,
   "body": [
@@ -9235,7 +9235,7 @@ export default [
  },
  {
   "categorySlug": "early-christianity-church-fathers",
-  "topicNumber": 15,
+  "topicNumber": 13,
   "title": "Gregory of Nazianzus: The Theologian of the Trinity",
   "subtitle": null,
   "body": [
@@ -10101,7 +10101,7 @@ export default [
  },
  {
   "categorySlug": "early-christianity-church-fathers",
-  "topicNumber": 16,
+  "topicNumber": 14,
   "title": "Gregory of Nyssa: Faith, Mystery, and Spiritual Growth",
   "subtitle": null,
   "body": [
@@ -10893,7 +10893,7 @@ export default [
  },
  {
   "categorySlug": "early-christianity-church-fathers",
-  "topicNumber": 17,
+  "topicNumber": 15,
   "title": "John Chrysostom: The Golden-mouthed Preacher",
   "subtitle": null,
   "body": [
@@ -11694,7 +11694,7 @@ export default [
  },
  {
   "categorySlug": "early-christianity-church-fathers",
-  "topicNumber": 18,
+  "topicNumber": 16,
   "title": "Ambrose of Milan: The Bishop Who Challenged an Emperor",
   "subtitle": null,
   "body": [
@@ -12484,7 +12484,7 @@ export default [
  },
  {
   "categorySlug": "early-christianity-church-fathers",
-  "topicNumber": 23,
+  "topicNumber": 17,
   "title": "The Cappadocian Fathers: Defending the Faith Together",
   "subtitle": null,
   "body": [
@@ -13209,7 +13209,7 @@ export default [
  },
  {
   "categorySlug": "early-christianity-church-fathers",
-  "topicNumber": 24,
+  "topicNumber": 18,
   "title": "The Donatist Controversy: Unity, Holiness, and Church Authority",
   "subtitle": null,
   "body": [
@@ -13769,7 +13769,7 @@ export default [
  },
  {
   "categorySlug": "early-christianity-church-fathers",
-  "topicNumber": 25,
+  "topicNumber": 19,
   "title": "The Pelagian Controversy: Grace, Human Freedom, and Salvation",
   "subtitle": null,
   "body": [
@@ -14413,7 +14413,7 @@ export default [
  },
  {
   "categorySlug": "early-christianity-church-fathers",
-  "topicNumber": 26,
+  "topicNumber": 20,
   "title": "The Early Church Under Persecution",
   "subtitle": null,
   "body": [
@@ -15058,7 +15058,7 @@ export default [
  },
  {
   "categorySlug": "early-christianity-church-fathers",
-  "topicNumber": 27,
+  "topicNumber": 21,
   "title": "Constantine and the Changing Relationship Between Church and Empire",
   "subtitle": null,
   "body": [
@@ -15688,7 +15688,7 @@ export default [
  },
  {
   "categorySlug": "early-christianity-church-fathers",
-  "topicNumber": 28,
+  "topicNumber": 22,
   "title": "The Church Fathers and Biblical Interpretation",
   "subtitle": null,
   "body": [
@@ -16499,7 +16499,7 @@ export default [
  },
  {
   "categorySlug": "early-christianity-church-fathers",
-  "topicNumber": 29,
+  "topicNumber": 23,
   "title": "Women in the Early Church: Faith, Leadership, and Influence",
   "subtitle": null,
   "body": [
@@ -17271,7 +17271,7 @@ export default [
  },
  {
   "categorySlug": "early-christianity-church-fathers",
-  "topicNumber": 30,
+  "topicNumber": 24,
   "title": "The Legacy of the Church Fathers: Faith, Debate, and Christian Tradition",
   "subtitle": null,
   "body": [

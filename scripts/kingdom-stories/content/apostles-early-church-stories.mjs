@@ -375,7 +375,7 @@ export default [
  },
  {
   "categorySlug": "apostles-early-church",
-  "topicNumber": 3,
+  "topicNumber": 2,
   "title": "Stephen: Faithful Until Death",
   "subtitle": "True discipleship means serving faithfully, speaking the truth with wisdom and courage, standing firm under opposition, and remaining committed to Jesus Christ even when obedience comes at a great personal cost.",
   "body": [
@@ -1013,7 +1013,7 @@ export default [
  },
  {
   "categorySlug": "apostles-early-church",
-  "topicNumber": 4,
+  "topicNumber": 3,
   "title": "Philip and the Ethiopian Official: The Gospel Reaches Beyond Boundaries",
   "subtitle": "God directs His servants to people who need the gospel, and He uses faithful witnesses to explain Scripture, remove barriers to understanding, and help others respond to Jesus Christ.",
   "body": [
@@ -1584,7 +1584,7 @@ export default [
  },
  {
   "categorySlug": "apostles-early-church",
-  "topicNumber": 7,
+  "topicNumber": 4,
   "title": "The Church in Antioch: A Community That Sent Missionaries",
   "subtitle": "A healthy Christian community grows through the Gospel, strengthens believers through discipleship, serves others through generosity, and responds obediently when God calls it to participate in His mission.",
   "body": [
@@ -2041,7 +2041,7 @@ export default [
  },
  {
   "categorySlug": "apostles-early-church",
-  "topicNumber": 8,
+  "topicNumber": 5,
   "title": "Paul’s First Missionary Journey: Proclaiming Christ Across Nations",
   "subtitle": "The Gospel must be proclaimed faithfully among all nations, even when the journey involves opposition, suffering, and sacrifice.",
   "body": [
@@ -2449,7 +2449,7 @@ export default [
  },
  {
   "categorySlug": "apostles-early-church",
-  "topicNumber": 9,
+  "topicNumber": 6,
   "title": "The Council at Jerusalem: Salvation by Grace Through Faith",
   "subtitle": "Salvation is a gift of God’s grace through the Lord Jesus Christ, and the Church must remain faithful to the Gospel while pursuing unity, truth, and love.",
   "body": [
@@ -2832,7 +2832,7 @@ export default [
  },
  {
   "categorySlug": "apostles-early-church",
-  "topicNumber": 10,
+  "topicNumber": 7,
   "title": "Paul and Barnabas Separate: Disagreement, Restoration, and Continuing the Mission",
   "subtitle": "Disagreements may arise among faithful servants of God, but believers must respond with wisdom, humility, and a commitment to the continuing work of the Gospel.",
   "body": [
@@ -3202,7 +3202,7 @@ export default [
  },
  {
   "categorySlug": "apostles-early-church",
-  "topicNumber": 11,
+  "topicNumber": 8,
   "title": "Paul’s Third Missionary Journey: Strengthening the Churches",
   "subtitle": "Spiritual maturity is built through faithful teaching, courageous obedience, genuine discipleship, and a commitment to strengthen others in the faith.",
   "body": [
@@ -3683,7 +3683,7 @@ export default [
  },
  {
   "categorySlug": "apostles-early-church",
-  "topicNumber": 12,
+  "topicNumber": 9,
   "title": "The Conversion of Lydia: An Open Heart and an Open Home",
   "subtitle": "When God opens a heart to His truth, a life can become an instrument of faith, hospitality, and service in His Kingdom.",
   "body": [
@@ -3967,7 +3967,7 @@ export default [
  },
  {
   "categorySlug": "apostles-early-church",
-  "topicNumber": 13,
+  "topicNumber": 10,
   "title": "Paul and Silas in Prison: Praise in the Midnight Hour",
   "subtitle": "Faithfulness to God remains possible in suffering, and our response to difficult circumstances can become an opportunity to demonstrate His truth, love, and transforming power.",
   "body": [
@@ -4459,7 +4459,7 @@ export default [
  },
  {
   "categorySlug": "apostles-early-church",
-  "topicNumber": 14,
+  "topicNumber": 11,
   "title": "Paul’s Arrest in Jerusalem: Faithful Under Pressure",
   "subtitle": "Faithfulness to God means remaining committed to His calling, speaking the truth with courage, and trusting His sovereignty even when obedience leads to opposition and suffering.",
   "body": [
@@ -4811,7 +4811,7 @@ export default [
  },
  {
   "categorySlug": "apostles-early-church",
-  "topicNumber": 15,
+  "topicNumber": 12,
   "title": "Paul’s Trials Before Governors and Kings",
   "subtitle": "Faithfulness to Christ means standing firmly in the truth, responding to opposition with wisdom, and continuing to bear witness to the gospel even when circumstances appear to restrict our freedom.",
   "body": [
@@ -5228,7 +5228,7 @@ export default [
  },
  {
   "categorySlug": "apostles-early-church",
-  "topicNumber": 16,
+  "topicNumber": 13,
   "title": "Paul’s Voyage to Rome: Faith in the Midst of the Storm",
   "subtitle": "Faith in God gives us courage during life’s storms, strengthens us to encourage others, and helps us remain faithful to our calling even when circumstances appear hopeless.",
   "body": [
@@ -5642,7 +5642,7 @@ export default [
  },
  {
   "categorySlug": "apostles-early-church",
-  "topicNumber": 17,
+  "topicNumber": 14,
   "title": "Paul in Rome: The Gospel Continues Without Hindrance",
   "subtitle": null,
   "body": [
@@ -5997,7 +5997,7 @@ export default [
  },
  {
   "categorySlug": "apostles-early-church",
-  "topicNumber": 18,
+  "topicNumber": 15,
   "title": "Paul’s Final Years: Finishing the Race and Keeping the Faith",
   "subtitle": null,
   "body": [
@@ -6492,7 +6492,7 @@ export default [
  },
  {
   "categorySlug": "apostles-early-church",
-  "topicNumber": 20,
+  "topicNumber": 16,
   "title": "Peter and Cornelius: God Welcomes the Gentiles",
   "subtitle": null,
   "body": [
@@ -6879,7 +6879,7 @@ export default [
  },
  {
   "categorySlug": "apostles-early-church",
-  "topicNumber": 21,
+  "topicNumber": 17,
   "title": "James, the Brother of Jesus: Leadership in the Jerusalem Church",
   "subtitle": null,
   "body": [
@@ -7522,7 +7522,7 @@ export default [
  },
  {
   "categorySlug": "apostles-early-church",
-  "topicNumber": 22,
+  "topicNumber": 18,
   "title": "John the Apostle: A Witness to Jesus and His Church",
   "subtitle": null,
   "body": [
@@ -8234,7 +8234,7 @@ export default [
  },
  {
   "categorySlug": "apostles-early-church",
-  "topicNumber": 23,
+  "topicNumber": 19,
   "title": "Thomas the Apostle: From Doubt to Faith",
   "subtitle": null,
   "body": [
@@ -8818,7 +8818,7 @@ export default [
  },
  {
   "categorySlug": "apostles-early-church",
-  "topicNumber": 24,
+  "topicNumber": 20,
   "title": "The Seven Chosen Servants: Leadership and the Needs of the Church",
   "subtitle": null,
   "body": [
@@ -9451,7 +9451,7 @@ export default [
  },
  {
   "categorySlug": "apostles-early-church",
-  "topicNumber": 25,
+  "topicNumber": 21,
   "title": "Barnabas: The Son of Consolation and a Faithful Encourager",
   "subtitle": null,
   "body": [
@@ -10169,7 +10169,7 @@ export default [
  },
  {
   "categorySlug": "apostles-early-church",
-  "topicNumber": 26,
+  "topicNumber": 22,
   "title": "Timothy: A Young Leader Raised to Serve the Church",
   "subtitle": null,
   "body": [
@@ -10726,7 +10726,7 @@ export default [
  },
  {
   "categorySlug": "apostles-early-church",
-  "topicNumber": 27,
+  "topicNumber": 23,
   "title": "Silas: A Faithful Companion in the Work of the Gospel",
   "subtitle": null,
   "body": [
@@ -11309,7 +11309,7 @@ export default [
  },
  {
   "categorySlug": "apostles-early-church",
-  "topicNumber": 29,
+  "topicNumber": 24,
   "title": "Paul the Apostle — From Persecutor to Proclaimer of Jesus Christ",
   "subtitle": null,
   "body": [
@@ -12311,7 +12311,7 @@ export default [
  },
  {
   "categorySlug": "apostles-early-church",
-  "topicNumber": 30,
+  "topicNumber": 25,
   "title": "Peter the Apostle — From a Fisherman to a Shepherd of God’s People",
   "subtitle": null,
   "body": [

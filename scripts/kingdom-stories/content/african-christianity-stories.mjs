@@ -5294,7 +5294,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 12,
+  "topicNumber": 11,
   "title": "The Christian Kingdoms of Nubia: Faith Along the Nile",
   "subtitle": "God can establish communities of faith across different nations and cultures, and believers are called to preserve, practice, and share the Gospel through every generation.",
   "body": [
@@ -5749,7 +5749,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 13,
+  "topicNumber": 12,
   "title": "North African Christianity: The Church Before the Rise of Islam",
   "subtitle": "The Gospel can transform communities, establish strong spiritual foundations, and produce faithful believers who preserve and share the truth of Jesus Christ across generations.",
   "body": [
@@ -6133,7 +6133,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 14,
+  "topicNumber": 13,
   "title": "Cyprian of Carthage: An African Bishop Who Defended the Church",
   "subtitle": "Faithful Christian leadership means protecting the unity of the Church, remaining committed to Christ during persecution, and showing mercy while upholding the truth of the Gospel.",
   "body": [
@@ -6545,7 +6545,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 15,
+  "topicNumber": 14,
   "title": "Samuel Ajayi Crowther: From Enslavement to African Anglican Leadership",
   "subtitle": "God can transform suffering into a testimony of hope and use faithful people to share the Gospel, develop African Christian leadership, and make Scripture accessible in local languages.",
   "body": [
@@ -6968,7 +6968,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 16,
+  "topicNumber": 15,
   "title": "African Bible Translation: Bringing God’s Word into African Languages",
   "subtitle": "God’s Word should be communicated clearly and faithfully so that people from every language and culture can understand the Gospel, grow in faith, and become disciples of Jesus Christ.",
   "body": [
@@ -7400,7 +7400,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 17,
+  "topicNumber": 16,
   "title": "Christianity and African Languages: Making the Gospel Understandable",
   "subtitle": "God’s message can be communicated faithfully through every language, and African Christians can use their languages, cultural knowledge, and communication skills to share the Gospel and strengthen the Church.",
   "body": [
@@ -7835,7 +7835,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 19,
+  "topicNumber": 17,
   "title": "The East African Revival: A Movement of Repentance and Renewal",
   "subtitle": "God calls His people to repentance, spiritual renewal, reconciliation, and a life of faithful discipleship through Jesus Christ.",
   "body": [
@@ -8374,7 +8374,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 20,
+  "topicNumber": 18,
   "title": "African-Led Missionary Movements: Taking the Gospel Across Africa",
   "subtitle": "God calls His people to share the Gospel, make disciples, serve communities, and carry the message of Jesus Christ beyond their own surroundings.",
   "body": [
@@ -8933,7 +8933,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 21,
+  "topicNumber": 19,
   "title": "African Independent Churches: When African Christians Built Their Own Churches",
   "subtitle": "African Christians are called to follow Jesus faithfully, build churches that serve their communities, and exercise spiritual leadership with humility, biblical understanding, accountability, and love.",
   "body": [
@@ -9421,7 +9421,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 22,
+  "topicNumber": 20,
   "title": "African Pentecostal Movements: The Growth of Spirit-Filled Christianity",
   "subtitle": "The Holy Spirit empowers believers to follow Jesus Christ, proclaim the gospel, develop spiritual gifts, serve others, and build the church in love, holiness, unity, and truth.",
   "body": [
@@ -9984,7 +9984,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 23,
+  "topicNumber": 21,
   "title": "The Growth of Christianity in Nigeria: Faith, Mission, and African Leadership",
   "subtitle": "God calls Nigerian Christians to proclaim Jesus Christ, develop faithful African Christian leadership, serve their communities, promote peace, and remain committed to biblical truth.",
   "body": [
@@ -10551,7 +10551,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 24,
+  "topicNumber": 22,
   "title": "African Christian Leaders: Serving God and Transforming Communities",
   "subtitle": "True Christian leadership follows the example of Jesus Christ by serving others, teaching God’s Word, demonstrating integrity, and helping communities grow in faith, peace, and hope.",
   "body": [
@@ -10933,7 +10933,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 25,
+  "topicNumber": 23,
   "title": "African Christianity Today: A Growing Christian Continent",
   "subtitle": "African Christianity is called to grow in faith, discipleship, unity, integrity, compassion, and mission, so that the church can serve God and bring hope to communities across Africa and beyond.",
   "body": [
@@ -11365,7 +11365,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 26,
+  "topicNumber": 24,
   "title": "African Christian Movements: Faith, Evangelism, and Community Transformation",
   "subtitle": "African Christian movements are called to share the gospel, strengthen discipleship, encourage spiritual renewal, and transform communities through the faithful teaching and practice of God’s Word.",
   "body": [
@@ -11835,7 +11835,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 27,
+  "topicNumber": 25,
   "title": "African Pentecostal Churches: Worship, Prayer, and the Work of the Holy Spirit",
   "subtitle": "African Pentecostal churches are called to worship God, depend on the Holy Spirit, share the gospel, develop Christlike character, and serve communities through faithful biblical teaching and compassionate action.",
   "body": [
@@ -12318,7 +12318,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 28,
+  "topicNumber": 26,
   "title": "African Christianity and the Next Generation: Passing on the Faith",
   "subtitle": "Passing on the faith means teaching the next generation to know Jesus Christ, understand God’s Word, live by the Holy Spirit, serve others, and become faithful disciples who continue the work of the Kingdom of God.",
   "body": [
@@ -12804,7 +12804,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 29,
+  "topicNumber": 27,
   "title": "African Christianity and Global Missions: From Africa to the Nations",
   "subtitle": "African Christians are called to participate in God’s mission by sharing the gospel of Jesus Christ, making disciples among all nations, serving communities with compassion, respecting different cultures, and working together to strengthen the worldwide church.",
   "body": [
@@ -13280,7 +13280,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 30,
+  "topicNumber": 28,
   "title": "The Ethiopian Eunuch: An African Encounter with the Gospel in the Book of Acts",
   "subtitle": "God brings the gospel to people from every nation and background, and faithful believers are called to explain Scripture, proclaim Jesus Christ, and welcome those who respond to the good news.",
   "body": [
@@ -13760,7 +13760,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 31,
+  "topicNumber": 29,
   "title": "Simon of Cyrene: The African Who Carried the Cross of Jesus",
   "subtitle": "God can use unexpected encounters and difficult circumstances to teach us about discipleship, sacrifice, humility, and the privilege of serving Jesus Christ.",
   "body": [
@@ -14191,7 +14191,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 32,
+  "topicNumber": 30,
   "title": "Mark the Evangelist: The Christian Tradition That Connects Him to Egypt",
   "subtitle": "God uses faithful servants to proclaim the Gospel, establish communities of faith, and preserve the message of Jesus Christ across generations and cultures.",
   "body": [
@@ -14676,7 +14676,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 33,
+  "topicNumber": 31,
   "title": "The Church of Carthage: Christianity in Ancient Roman Africa",
   "subtitle": "The Church of Carthage demonstrates how African Christians helped establish, strengthen, defend, and develop the Christian faith through worship, biblical teaching, courageous leadership, community life, and faithful service.",
   "body": [
