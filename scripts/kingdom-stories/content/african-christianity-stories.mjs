@@ -9794,6 +9794,52 @@ export default [
     }
    },
    {
+    "title": "The Fruit of the Holy Spirit: Living a Christlike Life",
+    "scripture": "",
+    "narrative": [
+     "In a church youth group, several young Christians began discussing what it meant to live a Spirit-filled life.",
+     "Some thought it mainly involved powerful prayer meetings.",
+     "Others believed it included spiritual gifts and worship.",
+     "The youth leader read Galatians 5:22–23.",
+     "The passage described the fruit of the Holy Spirit.",
+     "The leader explained that the Holy Spirit helps believers develop Christlike character.",
+     "The group discussed love, joy, peace, patience, kindness, goodness, faithfulness, gentleness, and self-control.",
+     "A student named Daniel realized that he sometimes became impatient when people disagreed with him.",
+     "Another participant admitted that she struggled to forgive people who had hurt her.",
+     "The leader encouraged them to consider how the fruit of the Spirit could influence their relationships.",
+     "They discussed practical examples.",
+     "Love could be demonstrated by caring for others.",
+     "Patience could be practiced when someone needed more time to understand.",
+     "Gentleness could influence how people responded during disagreements.",
+     "Self-control could help believers resist harmful behavior.",
+     "The group realized that spiritual growth required practice and prayer.",
+     "They began encouraging one another to respond with kindness and honesty.",
+     "Daniel discovered that a Spirit-filled life should influence his behavior at school and at home.",
+     "He understood that spiritual maturity was not simply about what happened during worship.",
+     "It also involved the way he treated people every day.",
+     "The youth group continued studying Scripture and practicing Christian service.",
+     "They learned that the fruit of the Holy Spirit was an important sign of spiritual growth."
+    ],
+    "lessons": [
+     "The Holy Spirit develops Christian character. Spiritual growth should influence the way believers live.",
+     "Love is central to Christian life. Believers should treat others with compassion and respect.",
+     "Patience and gentleness strengthen relationships. They help Christians respond wisely during disagreements.",
+     "Self-control supports faithful living. Believers need discipline in their words and actions.",
+     "Spiritual maturity requires ongoing growth. Prayer, Scripture, fellowship, and practice help develop Christlike character."
+    ],
+    "reflections": [
+     "What does Galatians 5:22–23 teach about the fruit of the Spirit?",
+     "How can love influence relationships?",
+     "Why are patience and gentleness important?",
+     "How can self-control help young Christians?",
+     "What aspect of Christian character would you like to develop?"
+    ],
+    "assignment": {
+     "title": null,
+     "text": "1. What is the fruit of the Holy Spirit?\n2. How does the Holy Spirit influence Christian character?\n3. Why is love important in Christian life?\n4. How can patience and gentleness improve relationships?\n5. How can believers develop spiritual maturity?"
+    }
+   },
+   {
     "title": "Worship, Music, and African Pentecostal Identity",
     "scripture": "",
     "narrative": [
@@ -9908,6 +9954,53 @@ export default [
     "assignment": {
      "title": null,
      "text": "1. Explain the relationship between Pentecostal Christianity and evangelism.\n2. Describe the biblical foundation of the Great Commission.\n3. Why should evangelism include discipleship?\n4. How can churches communicate the gospel across religious and cultural differences?\n5. Identify practical ways a congregation can support new believers."
+    }
+   },
+   {
+    "title": "African Pentecostal Churches and Responsible Leadership",
+    "scripture": "",
+    "narrative": [
+     "A Pentecostal church in an African city began reviewing its leadership practices.",
+     "The congregation had grown.",
+     "More people attended worship.",
+     "The church organized Bible study, prayer meetings, community service, and evangelistic activities.",
+     "The leaders recognized that growth created additional responsibilities.",
+     "They read 1 Peter 5:2–3.",
+     "The passage encouraged leaders to care for God’s people willingly and humbly.",
+     "A young church member named Joseph asked what responsible leadership looked like.",
+     "The pastor explained that Christian leaders should teach Scripture faithfully, treat people with respect, and use their authority to serve.",
+     "The church committee discussed financial responsibility.",
+     "They decided to keep clear records of donations and expenditures.",
+     "They also reviewed how decisions were made.",
+     "The leaders agreed that members should have appropriate opportunities to ask questions and express concerns.",
+     "The congregation discussed the importance of protecting vulnerable people.",
+     "Leaders should not use spiritual authority to intimidate, manipulate, or exploit others.",
+     "They also needed to recognize when professional assistance was necessary.",
+     "Joseph learned that responsible leadership required humility.",
+     "A leader should be willing to listen, accept correction, and acknowledge mistakes.",
+     "The church began training new volunteers.",
+     "They explained responsibilities and provided appropriate supervision.",
+     "The congregation discovered that leadership was not simply about preaching or organizing large gatherings.",
+     "It involved caring for people and protecting the trust placed in the church.",
+     "The leaders continued their work with a renewed commitment to integrity and accountability."
+    ],
+    "lessons": [
+     "Christian leadership is service. Leaders should care for people rather than seek personal control.",
+     "Integrity strengthens trust. Leaders should be honest in their words, actions, and decisions.",
+     "Accountability protects the church. Clear procedures help manage resources and responsibilities.",
+     "Spiritual authority must not be abused. Leaders should protect people’s dignity and safety.",
+     "Humility supports growth. Responsible leaders listen, accept correction, and learn."
+    ],
+    "reflections": [
+     "What does 1 Peter 5:2–3 teach about Christian leadership?",
+     "Why is integrity important in Pentecostal churches?",
+     "How can churches manage donations responsibly?",
+     "What should leaders do when concerns are raised?",
+     "How can young Christians encourage responsible leadership?"
+    ],
+    "assignment": {
+     "title": null,
+     "text": "1. What does 1 Peter 5:2–3 teach about Christian leaders?\n2. Why is accountability important for churches?\n3. How should Christian leaders use spiritual authority?\n4. Why should churches provide appropriate supervision for volunteers?\n5. How can leaders demonstrate humility?"
     }
    },
    {
@@ -11836,489 +11929,6 @@ export default [
  {
   "categorySlug": "african-christianity",
   "topicNumber": 25,
-  "title": "African Pentecostal Churches: Worship, Prayer, and the Work of the Holy Spirit",
-  "subtitle": "African Pentecostal churches are called to worship God, depend on the Holy Spirit, share the gospel, develop Christlike character, and serve communities through faithful biblical teaching and compassionate action.",
-  "body": [
-   "Topic Overview",
-   "African Pentecostal churches have become an important part of Christianity across many African countries. These churches emphasize the work of the Holy Spirit, prayer, worship, evangelism, spiritual gifts, biblical teaching, and personal transformation through faith in Jesus Christ.",
-   "Pentecostal Christianity includes many different churches, ministries, and traditions. Some congregations developed through international missionary movements, while others were established and led by African Christians. Many African Pentecostal churches emphasize lively worship, prayer meetings, evangelistic outreach, Bible study, testimonies, and the expectation that God continues to work in the lives of believers.",
-   "The biblical foundation of Pentecostal Christianity is found especially in the book of Acts, where the Holy Spirit empowers the disciples to witness to Jesus Christ. Pentecostal churches often emphasize the importance of spiritual gifts, the experience of God’s presence, and the responsibility of believers to live holy lives.",
-   "However, genuine spiritual growth must also include biblical understanding, Christian character, humility, love, and responsible leadership. Spiritual experiences should not replace Scripture, and church leaders should use their authority to serve rather than control people.",
-   "This topic explores the biblical foundation of Pentecostal worship, the work of the Holy Spirit, prayer, spiritual gifts, evangelism, Christian character, community service, and the responsibility of preparing future generations.",
-   "It encourages learners to understand that the purpose of Pentecostal Christianity is not simply to create emotional experiences or large gatherings. Its purpose is to help believers follow Jesus Christ, grow in faith, serve others, and become faithful witnesses of the gospel.",
-   "Central theme: African Pentecostal churches are called to worship God, depend on the Holy Spirit, share the gospel, develop Christlike character, and serve communities through faithful biblical teaching and compassionate action.",
-   "Primary Scripture",
-   "Acts 1:8",
-   "“But you will receive power when the Holy Spirit comes on you; and you will be my witnesses.”",
-   "Jesus promised His disciples that the Holy Spirit would empower them to become witnesses.",
-   "This passage teaches that the work of the Holy Spirit is connected to Christian mission. The Spirit strengthens believers to share the gospel, serve others, and live faithfully.",
-   "Supporting Scriptures",
-   "• Joel 2:28–29 — God’s promise concerning the outpouring of His Spirit.",
-   "• Matthew 28:19–20 — Jesus commissions His followers to make disciples.",
-   "• Luke 11:13 — Jesus teaches about the Father’s willingness to give the Holy Spirit.",
-   "• John 14:16–17 — Jesus promises the Holy Spirit.",
-   "• John 15:26–27 — The Spirit and the disciples bear witness to Christ.",
-   "• Acts 1:8 — The Holy Spirit empowers Christian witness.",
-   "• Acts 2:1–18 — The Holy Spirit comes upon the disciples at Pentecost.",
-   "• Acts 2:42–47 — The early church practices teaching, fellowship, prayer, and generosity.",
-   "• Acts 4:31–35 — Believers pray and demonstrate unity and generosity.",
-   "• 1 Corinthians 12:4–11 — Spiritual gifts are given by the Holy Spirit.",
-   "• 1 Corinthians 12:12–27 — The church is one body with many members.",
-   "• 1 Corinthians 13:1–13 — Love is essential to Christian life and spiritual gifts.",
-   "• 1 Corinthians 14:26–33 — Spiritual gatherings should encourage order and edification.",
-   "• Galatians 5:22–23 — The fruit of the Holy Spirit.",
-   "• Ephesians 5:18–21 — Believers are encouraged to be filled with the Spirit.",
-   "• 1 Peter 4:10–11 — Spiritual gifts should be used to serve others.",
-   "Final Reflection",
-   "African Pentecostal churches have contributed significantly to the growth and expression of Christianity across the continent.",
-   "Their emphasis on prayer, worship, evangelism, spiritual gifts, and the work of the Holy Spirit has encouraged many believers to develop a personal and active faith.",
-   "The book of Acts provides an important foundation for understanding Pentecostal Christianity.",
-   "The disciples received the Holy Spirit and became witnesses of Jesus Christ.",
-   "The early church devoted itself to teaching, fellowship, prayer, and practical care.",
-   "These examples remind Pentecostal churches that spiritual experiences should lead to faithful discipleship and compassionate service.",
-   "Worship should honor God and influence daily life.",
-   "Prayer should strengthen trust in God and encourage practical action.",
-   "Spiritual gifts should be used to serve others rather than create pride or division.",
-   "Christian character should reflect the fruit of the Holy Spirit.",
-   "Church leaders should teach Scripture faithfully, protect people, and exercise authority responsibly.",
-   "Young Christians should receive biblical teaching, mentoring, and opportunities to serve.",
-   "Pentecostal churches also have opportunities to contribute to education, community development, evangelism, and global mission.",
-   "Their growth should be accompanied by integrity, accountability, humility, and love.",
-   "The central lesson is that a Spirit-filled church should become a Christ-centered church.",
-   "It should help people understand the gospel, develop Christian character, serve their communities, and grow as disciples.",
-   "Every believer can participate in this mission.",
-   "Through prayer, worship, teaching, evangelism, encouragement, and practical service, Christians can strengthen their churches and demonstrate the love of Jesus Christ.",
-   "8 Final Reflection Questions",
-   "1. What does Acts 1:8 teach about the purpose of the Holy Spirit’s power?",
-   "2. Why is Pentecost important for the Christian church?",
-   "3. How can worship influence the daily lives of believers?",
-   "4. What does the Bible teach about spiritual gifts and their purpose?",
-   "5. How can African Pentecostal churches share the gospel respectfully?",
-   "6. Why is the fruit of the Holy Spirit important for Christian maturity?",
-   "7. How can Pentecostal churches demonstrate integrity and responsible leadership?",
-   "8. What practical step can you take to help your church grow in prayer, worship, discipleship, and service?",
-   "Final Prayer",
-   "Heavenly Father,",
-   "Thank You for the gift of the Holy Spirit.",
-   "Thank You for the promise that Your Spirit empowers believers to become witnesses of Jesus Christ.",
-   "Thank You for African Pentecostal churches and the many believers who faithfully worship You, pray, teach Scripture, share the gospel, and serve their communities.",
-   "Help us understand the true purpose of spiritual power.",
-   "Teach us to use our gifts with humility, love, wisdom, and responsibility.",
-   "Strengthen our churches through faithful biblical teaching.",
-   "Help us worship You with sincere hearts and lives that reflect Your goodness.",
-   "Teach us to pray with thanksgiving and trust.",
-   "Help us remember people who are suffering, discouraged, or in need.",
-   "Give us courage to share the gospel with love and respect.",
-   "Help us demonstrate the fruit of the Holy Spirit in our words, decisions, and relationships.",
-   "Protect Christian leaders from pride, dishonesty, and the misuse of authority.",
-   "Give them wisdom to care for Your people and manage responsibilities faithfully.",
-   "Bless young Christians as they learn Your Word and develop their gifts.",
-   "Help mature believers mentor the next generation with patience and compassion.",
-   "Teach our churches to cooperate, respect one another, and pursue peace.",
-   "Help us serve our communities with practical compassion.",
-   "May our worship glorify You.",
-   "May our prayers strengthen our faith.",
-   "May our spiritual gifts build up the church.",
-   "May our lives demonstrate the love of Jesus Christ.",
-   "Let African Pentecostal churches become communities of faithful discipleship, responsible leadership, prayer, evangelism, and service.",
-   "May everything we do bring glory to Your name.",
-   "In the name of Jesus Christ, our Lord and Savior,",
-   "Amen."
-  ],
-  "chapters": [
-   {
-    "title": "Pentecost: The Holy Spirit Empowers the Church",
-    "scripture": "",
-    "narrative": [
-     "In a growing African town, a young Christian named Daniel began studying the history of Pentecostal Christianity.",
-     "His church had organized a Bible study about the book of Acts.",
-     "During one meeting, the teacher read Acts 2:1–18.",
-     "The passage described the disciples gathering in Jerusalem when the Holy Spirit came upon them.",
-     "The teacher explained that Pentecost was an important event in the history of the church.",
-     "Jesus had promised His disciples that they would receive power from the Holy Spirit.",
-     "When the promise was fulfilled, the disciples began speaking in other languages, and people from different nations heard them proclaiming God’s wonders.",
-     "Daniel learned that the event demonstrated God’s power and the beginning of a new stage in the church’s mission.",
-     "The teacher explained that the Holy Spirit empowered the disciples to become witnesses of Jesus Christ.",
-     "The disciples were not receiving power simply to become famous or important.",
-     "They were being prepared to share the gospel.",
-     "Daniel began thinking about his own church.",
-     "He noticed that many people attended prayer meetings and worship services.",
-     "Some shared testimonies about how their faith had helped them through difficult circumstances.",
-     "Others participated in evangelism and community service.",
-     "The teacher reminded the group that the purpose of Pentecost was connected to Christian witness.",
-     "Daniel realized that the work of the Holy Spirit should help believers become more faithful to Jesus.",
-     "It should encourage courage, love, humility, and service.",
-     "He began participating more actively in church activities.",
-     "He helped welcome visitors and joined a Bible study group.",
-     "Through these experiences, Daniel learned that Pentecostal Christianity should remain centered on Jesus Christ and the mission of the church."
-    ],
-    "lessons": [
-     "The Holy Spirit empowers Christian witness. Acts 1:8 connects the Spirit’s power with the mission of sharing the gospel.",
-     "Pentecost is an important event in church history. It marks the empowering of the disciples for their mission.",
-     "Spiritual experiences should lead to faithful service. God’s work in believers should influence their conduct and relationships.",
-     "The gospel is intended for all nations. Pentecost demonstrates the importance of communicating God’s message across language and cultural differences.",
-     "The Holy Spirit helps believers follow Jesus. Christian spirituality should remain centered on Christ and His teachings."
-    ],
-    "reflections": [
-     "What happened when the Holy Spirit came upon the disciples in Acts 2?",
-     "Why is Pentecost important in Christian history?",
-     "What does Acts 1:8 teach about the purpose of the Holy Spirit’s power?",
-     "How can spiritual experiences encourage Christian service?",
-     "How can your church help believers understand the meaning of Pentecost?"
-    ],
-    "assignment": {
-     "title": null,
-     "text": "1. What happened at Pentecost according to Acts 2:1–18?\n2. Why is Pentecost important for the Christian church?\n3. What does Acts 1:8 teach about the Holy Spirit?\n4. Why should spiritual experiences be connected to Christian service?\n5. What should remain central in Pentecostal Christianity?"
-    }
-   },
-   {
-    "title": "African Pentecostal Worship: Praising God with Heart and Understanding",
-    "scripture": "",
-    "narrative": [
-     "In a church in an African city, the congregation gathered for Sunday worship.",
-     "People arrived from different neighborhoods.",
-     "Some were farmers who had traveled from nearby villages.",
-     "Others were students, teachers, business owners, and families.",
-     "The worship service began with singing.",
-     "The congregation sang songs of praise, thanksgiving, and worship.",
-     "A young woman named Miriam enjoyed the music.",
-     "She noticed that people expressed their worship in different ways.",
-     "Some clapped their hands.",
-     "Others raised their hands in prayer.",
-     "Several members sang quietly, while others sang with great enthusiasm.",
-     "The worship leader encouraged everyone to focus on God.",
-     "He explained that worship was not simply about music or outward expressions.",
-     "It was about honoring God with the heart, mind, and life.",
-     "The congregation read Psalm 100.",
-     "The pastor reminded them that worship included thanksgiving, praise, reverence, and obedience.",
-     "Miriam began thinking about what worship meant outside the church building.",
-     "She realized that praising God should influence how she treated people.",
-     "If she sang about God’s love but behaved dishonestly, her worship would not reflect the character of Christ.",
-     "The pastor encouraged the congregation to live faithfully throughout the week.",
-     "He explained that worship could be expressed through kindness, honesty, forgiveness, and service.",
-     "Miriam began helping with church activities.",
-     "She welcomed visitors and assisted with preparations for a community service project.",
-     "She discovered that worship and practical service belonged together.",
-     "The congregation continued singing and praying.",
-     "Their worship encouraged them to remember God’s goodness and seek to live according to His Word."
-    ],
-    "lessons": [
-     "Worship honors God. Christian worship expresses praise, thanksgiving, reverence, and devotion.",
-     "Worship involves the whole person. It includes the heart, mind, words, and actions.",
-     "Music can encourage spiritual fellowship. Congregational singing helps believers express faith together.",
-     "Worship should influence daily life. Christian praise should be reflected in honesty, compassion, and obedience.",
-     "Different expressions of worship can coexist. Believers should respect others while keeping worship focused on God."
-    ],
-    "reflections": [
-     "What does Psalm 100 teach about worship?",
-     "Why is worship more than singing?",
-     "How can music strengthen Christian fellowship?",
-     "What does it mean to worship God through everyday actions?",
-     "How can churches encourage meaningful worship?"
-    ],
-    "assignment": {
-     "title": null,
-     "text": "1. What is Christian worship?\n2. Why is worship more than music?\n3. How can congregational singing strengthen the church?\n4. Why should Christians respect different expressions of worship?\n5. How can worship influence daily life?"
-    }
-   },
-   {
-    "title": "African Pentecostal Prayer: Seeking God in Every Season",
-    "scripture": "",
-    "narrative": [
-     "In a community near a busy African market, a church organized a weekly prayer meeting.",
-     "Many members were facing difficult situations.",
-     "Some were worried about employment.",
-     "Others were caring for relatives or preparing for examinations.",
-     "The pastor invited the congregation to read Philippians 4:6–7.",
-     "He explained that prayer was an important part of Christian life.",
-     "The congregation began gathering regularly.",
-     "They prayed for families, churches, community leaders, and people experiencing hardship.",
-     "A young man named Joseph joined the meetings.",
-     "At first, he was nervous about praying aloud.",
-     "The prayer leader encouraged him to speak honestly and simply.",
-     "Joseph learned that prayer could include thanksgiving, confession, praise, requests, and intercession.",
-     "He also learned that prayer was not a way to control God.",
-     "Instead, it was an opportunity to seek God’s guidance and trust Him.",
-     "The church prayed for people who were sick, discouraged, or struggling financially.",
-     "After praying, members discussed practical ways to help.",
-     "Some organized visits.",
-     "Others provided food or connected families with community resources.",
-     "Joseph realized that prayer should influence the way believers respond to people’s needs.",
-     "The congregation continued meeting.",
-     "Its members became more attentive to one another.",
-     "They encouraged people who felt discouraged and supported those experiencing difficulties.",
-     "Joseph discovered that prayer strengthened his relationship with God and helped him become more compassionate.",
-     "He understood that Christian prayer involved both trusting God and faithfully responding to the responsibilities before him."
-    ],
-    "lessons": [
-     "Prayer is central to Christian life. Believers seek God’s guidance, express gratitude, and bring their concerns before Him.",
-     "Prayer encourages trust in God. Christians can remain faithful during uncertainty.",
-     "Prayer includes many expressions. Praise, thanksgiving, confession, requests, and intercession all have a place.",
-     "Prayer should encourage practical compassion. Believers should respond to needs when they are able.",
-     "Prayer strengthens fellowship. Shared prayer helps Christians support one another."
-    ],
-    "reflections": [
-     "What does Philippians 4:6–7 teach about prayer?",
-     "Why is prayer important in Pentecostal churches?",
-     "What different forms of prayer can Christians practice?",
-     "How can prayer encourage community service?",
-     "What needs could your church remember in prayer?"
-    ],
-    "assignment": {
-     "title": null,
-     "text": "1. What does Philippians 4:6–7 teach about prayer?\n2. What is intercessory prayer?\n3. Does prayer guarantee that every request will be answered exactly as requested?\n4. How can prayer encourage compassion?\n5. Why is prayer important for Christian fellowship?"
-    }
-   },
-   {
-    "title": "Spiritual Gifts: Serving Through the Holy Spirit",
-    "scripture": "",
-    "narrative": [
-     "A group of young Christians in an African town began studying spiritual gifts.",
-     "Their church had members with different abilities.",
-     "Some were good at teaching.",
-     "Others enjoyed helping people.",
-     "Several were skilled at organizing activities.",
-     "Some members were particularly encouraging when people faced difficult situations.",
-     "The Bible study leader read 1 Corinthians 12:4–11.",
-     "The passage explained that the Holy Spirit gives different gifts to believers.",
-     "The teacher explained that spiritual gifts were not intended to make one person more important than another.",
-     "They were given for the benefit of the church.",
-     "The group discussed how different abilities could strengthen Christian fellowship.",
-     "A student named Esther realized that she enjoyed teaching younger children.",
-     "Another participant discovered that he was good at organizing community activities.",
-     "Several others volunteered to visit elderly church members.",
-     "The teacher reminded them that spiritual gifts should be used with love.",
-     "He also read 1 Corinthians 13.",
-     "The passage explained that love was essential to the Christian life.",
-     "Without love, spiritual gifts could become a source of pride or division.",
-     "The group began using their abilities in church activities.",
-     "They helped with Bible study, children’s ministry, community service, and encouragement.",
-     "Esther discovered that serving others helped her grow in confidence.",
-     "She also learned that she needed guidance and practice.",
-     "The church encouraged everyone to develop their gifts responsibly.",
-     "The young Christians realized that spiritual gifts were opportunities to serve God and strengthen the community."
-    ],
-    "lessons": [
-     "The Holy Spirit gives different gifts. Believers have different abilities and responsibilities.",
-     "Spiritual gifts should benefit others. They are intended to strengthen the church.",
-     "Love must guide spiritual service. Christian gifts should be used with humility and compassion.",
-     "Every believer can contribute. Different gifts are valuable to the church.",
-     "Gifts should be developed responsibly. Teaching, mentoring, and practice help believers serve effectively."
-    ],
-    "reflections": [
-     "What does 1 Corinthians 12:4–11 teach about spiritual gifts?",
-     "Why are different gifts important for the church?",
-     "How can believers discover their abilities?",
-     "Why should love guide the use of spiritual gifts?",
-     "What gift or ability could you use to serve others?"
-    ],
-    "assignment": {
-     "title": null,
-     "text": "1. What does 1 Corinthians 12:4–11 teach about spiritual gifts?\n2. Why are spiritual gifts given?\n3. What does 1 Corinthians 13 teach about love?\n4. How can believers develop their gifts?\n5. Why should spiritual gifts not be used to create pride?"
-    }
-   },
-   {
-    "title": "African Pentecostal Evangelism: Sharing the Gospel with Love",
-    "scripture": "",
-    "narrative": [
-     "In a growing African community, a Pentecostal church organized an evangelistic outreach.",
-     "The congregation wanted to share the message of Jesus Christ with people in nearby neighborhoods.",
-     "A young Christian named Miriam volunteered.",
-     "Before the outreach, the pastor read Romans 10:14–17.",
-     "He explained that people needed opportunities to hear and understand the gospel.",
-     "The church prepared carefully.",
-     "Some members organized the gathering.",
-     "Others helped welcome visitors.",
-     "Several volunteers prepared Bible study materials.",
-     "During the event, the pastor preached about Jesus’ life, death, and resurrection.",
-     "He encouraged people to learn about Christ and consider His teachings.",
-     "Miriam helped answer questions.",
-     "She listened respectfully and did not pressure people.",
-     "The church explained that evangelism should be honest and compassionate.",
-     "People should be able to ask questions and make decisions freely.",
-     "After the outreach, the congregation organized follow-up Bible study.",
-     "Those who wanted to learn more could participate.",
-     "Miriam began helping with the meetings.",
-     "She discovered that evangelism required patience and humility.",
-     "Some participants had questions about Christianity.",
-     "Others wanted to understand how faith influenced family life, work, and personal decisions.",
-     "The church encouraged discussion and continued teaching.",
-     "Miriam realized that sharing the gospel was not simply about organizing an event.",
-     "It involved helping people understand Jesus and grow as disciples.",
-     "The congregation continued its evangelistic work through prayer, teaching, hospitality, and service."
-    ],
-    "lessons": [
-     "Evangelism is part of the Christian mission. Believers are called to share the gospel.",
-     "The gospel should be communicated clearly. People need opportunities to understand the message of Christ.",
-     "Evangelism should respect people’s dignity. Christian witness must not involve coercion or humiliation.",
-     "Discipleship follows evangelism. People need continued teaching and spiritual support.",
-     "Christian character supports evangelism. Believers should demonstrate the message through their actions."
-    ],
-    "reflections": [
-     "What does Romans 10:14–17 teach about hearing the gospel?",
-     "Why is clear communication important in evangelism?",
-     "How can Christians share their faith respectfully?",
-     "Why should churches provide follow-up Bible study?",
-     "What opportunities for evangelism exist in your community?"
-    ],
-    "assignment": {
-     "title": null,
-     "text": "1. What does Romans 10:14–17 teach about evangelism?\n2. Why should evangelism be respectful?\n3. What is discipleship?\n4. Why is follow-up important after evangelistic outreach?\n5. How can Christians support evangelism through their daily lives?"
-    }
-   },
-   {
-    "title": "The Fruit of the Holy Spirit: Living a Christlike Life",
-    "scripture": "",
-    "narrative": [
-     "In a church youth group, several young Christians began discussing what it meant to live a Spirit-filled life.",
-     "Some thought it mainly involved powerful prayer meetings.",
-     "Others believed it included spiritual gifts and worship.",
-     "The youth leader read Galatians 5:22–23.",
-     "The passage described the fruit of the Holy Spirit.",
-     "The leader explained that the Holy Spirit helps believers develop Christlike character.",
-     "The group discussed love, joy, peace, patience, kindness, goodness, faithfulness, gentleness, and self-control.",
-     "A student named Daniel realized that he sometimes became impatient when people disagreed with him.",
-     "Another participant admitted that she struggled to forgive people who had hurt her.",
-     "The leader encouraged them to consider how the fruit of the Spirit could influence their relationships.",
-     "They discussed practical examples.",
-     "Love could be demonstrated by caring for others.",
-     "Patience could be practiced when someone needed more time to understand.",
-     "Gentleness could influence how people responded during disagreements.",
-     "Self-control could help believers resist harmful behavior.",
-     "The group realized that spiritual growth required practice and prayer.",
-     "They began encouraging one another to respond with kindness and honesty.",
-     "Daniel discovered that a Spirit-filled life should influence his behavior at school and at home.",
-     "He understood that spiritual maturity was not simply about what happened during worship.",
-     "It also involved the way he treated people every day.",
-     "The youth group continued studying Scripture and practicing Christian service.",
-     "They learned that the fruit of the Holy Spirit was an important sign of spiritual growth."
-    ],
-    "lessons": [
-     "The Holy Spirit develops Christian character. Spiritual growth should influence the way believers live.",
-     "Love is central to Christian life. Believers should treat others with compassion and respect.",
-     "Patience and gentleness strengthen relationships. They help Christians respond wisely during disagreements.",
-     "Self-control supports faithful living. Believers need discipline in their words and actions.",
-     "Spiritual maturity requires ongoing growth. Prayer, Scripture, fellowship, and practice help develop Christlike character."
-    ],
-    "reflections": [
-     "What does Galatians 5:22–23 teach about the fruit of the Spirit?",
-     "How can love influence relationships?",
-     "Why are patience and gentleness important?",
-     "How can self-control help young Christians?",
-     "What aspect of Christian character would you like to develop?"
-    ],
-    "assignment": {
-     "title": null,
-     "text": "1. What is the fruit of the Holy Spirit?\n2. How does the Holy Spirit influence Christian character?\n3. Why is love important in Christian life?\n4. How can patience and gentleness improve relationships?\n5. How can believers develop spiritual maturity?"
-    }
-   },
-   {
-    "title": "African Pentecostal Churches and Responsible Leadership",
-    "scripture": "",
-    "narrative": [
-     "A Pentecostal church in an African city began reviewing its leadership practices.",
-     "The congregation had grown.",
-     "More people attended worship.",
-     "The church organized Bible study, prayer meetings, community service, and evangelistic activities.",
-     "The leaders recognized that growth created additional responsibilities.",
-     "They read 1 Peter 5:2–3.",
-     "The passage encouraged leaders to care for God’s people willingly and humbly.",
-     "A young church member named Joseph asked what responsible leadership looked like.",
-     "The pastor explained that Christian leaders should teach Scripture faithfully, treat people with respect, and use their authority to serve.",
-     "The church committee discussed financial responsibility.",
-     "They decided to keep clear records of donations and expenditures.",
-     "They also reviewed how decisions were made.",
-     "The leaders agreed that members should have appropriate opportunities to ask questions and express concerns.",
-     "The congregation discussed the importance of protecting vulnerable people.",
-     "Leaders should not use spiritual authority to intimidate, manipulate, or exploit others.",
-     "They also needed to recognize when professional assistance was necessary.",
-     "Joseph learned that responsible leadership required humility.",
-     "A leader should be willing to listen, accept correction, and acknowledge mistakes.",
-     "The church began training new volunteers.",
-     "They explained responsibilities and provided appropriate supervision.",
-     "The congregation discovered that leadership was not simply about preaching or organizing large gatherings.",
-     "It involved caring for people and protecting the trust placed in the church.",
-     "The leaders continued their work with a renewed commitment to integrity and accountability."
-    ],
-    "lessons": [
-     "Christian leadership is service. Leaders should care for people rather than seek personal control.",
-     "Integrity strengthens trust. Leaders should be honest in their words, actions, and decisions.",
-     "Accountability protects the church. Clear procedures help manage resources and responsibilities.",
-     "Spiritual authority must not be abused. Leaders should protect people’s dignity and safety.",
-     "Humility supports growth. Responsible leaders listen, accept correction, and learn."
-    ],
-    "reflections": [
-     "What does 1 Peter 5:2–3 teach about Christian leadership?",
-     "Why is integrity important in Pentecostal churches?",
-     "How can churches manage donations responsibly?",
-     "What should leaders do when concerns are raised?",
-     "How can young Christians encourage responsible leadership?"
-    ],
-    "assignment": {
-     "title": null,
-     "text": "1. What does 1 Peter 5:2–3 teach about Christian leaders?\n2. Why is accountability important for churches?\n3. How should Christian leaders use spiritual authority?\n4. Why should churches provide appropriate supervision for volunteers?\n5. How can leaders demonstrate humility?"
-    }
-   },
-   {
-    "title": "African Pentecostal Churches and the Next Generation",
-    "scripture": "",
-    "narrative": [
-     "In a church youth group, several young Christians began discussing how Pentecostal churches could prepare future leaders.",
-     "They wanted to understand how they could participate in ministry.",
-     "The youth leader, Grace, read 2 Timothy 2:1–2.",
-     "The passage described the responsibility of passing faithful teaching to others who could continue teaching.",
-     "Grace explained that young Christians needed biblical foundations.",
-     "They also needed opportunities to discover their gifts and develop their abilities.",
-     "The church organized a youth Bible study.",
-     "Members discussed Scripture and how it applied to everyday life.",
-     "Some students helped with children’s ministry.",
-     "Others participated in worship, prayer, and community service.",
-     "Grace encouraged them to ask questions.",
-     "She reminded them that learning to lead required patience and guidance.",
-     "The church also invited mature believers to mentor young people.",
-     "The mentors helped the students understand Christian character, responsibility, and service.",
-     "The youth group began organizing practical activities.",
-     "They supported younger children, helped elderly residents, and participated in church projects.",
-     "The students discovered that they could contribute meaningfully while continuing to learn.",
-     "Grace reminded them that leadership was not a competition.",
-     "Different people had different gifts.",
-     "Some could teach.",
-     "Others could organize activities, encourage people, or provide practical assistance.",
-     "The youth group began praying for wisdom and opportunities to serve.",
-     "They understood that Pentecostal churches could remain strong when they taught Scripture faithfully and prepared future generations."
-    ],
-    "lessons": [
-     "Christian faith must be passed on faithfully. Young believers need biblical teaching and spiritual guidance.",
-     "Young people can serve today. Their gifts should be recognized and developed responsibly.",
-     "Mentoring strengthens discipleship. Guidance helps young Christians grow in wisdom and confidence.",
-     "Leadership involves cooperation. Different gifts contribute to the life of the church.",
-     "The next generation needs both teaching and practice. Biblical knowledge and responsible service support spiritual maturity."
-    ],
-    "reflections": [
-     "What does 2 Timothy 2:1–2 teach about passing on faith?",
-     "How can Pentecostal churches prepare young people for leadership?",
-     "Why is mentoring important?",
-     "What gifts could you use to serve your church?",
-     "How can young Christians demonstrate the fruit of the Spirit?"
-    ],
-    "assignment": {
-     "title": null,
-     "text": "1. What responsibility does 2 Timothy 2:1–2 describe?\n2. Why should churches encourage young people to participate in ministry?\n3. What is mentoring?\n4. How can churches prepare young leaders responsibly?\n5. Why is passing on Christian faith important?"
-    }
-   }
-  ],
-  "source": "027.txt",
-  "lostTables": 0,
-  "topicSlug": "african-pentecostal-churches-worship-prayer-and-the-work-of-the-holy-spirit",
-  "newTopic": {
-   "title": "African Pentecostal Churches: Worship, Prayer, and the Work of the Holy Spirit",
-   "priority": "P2",
-   "afterSlug": "african-christian-movements-faith-evangelism-and-community-transformation"
-  }
- },
- {
-  "categorySlug": "african-christianity",
-  "topicNumber": 26,
   "title": "African Christianity and the Next Generation: Passing on the Faith",
   "subtitle": "Passing on the faith means teaching the next generation to know Jesus Christ, understand God’s Word, live by the Holy Spirit, serve others, and become faithful disciples who continue the work of the Kingdom of God.",
   "body": [
@@ -12804,7 +12414,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 27,
+  "topicNumber": 26,
   "title": "African Christianity and Global Missions: From Africa to the Nations",
   "subtitle": "African Christians are called to participate in God’s mission by sharing the gospel of Jesus Christ, making disciples among all nations, serving communities with compassion, respecting different cultures, and working together to strengthen the worldwide church.",
   "body": [
@@ -13280,7 +12890,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 28,
+  "topicNumber": 27,
   "title": "The Ethiopian Eunuch: An African Encounter with the Gospel in the Book of Acts",
   "subtitle": "God brings the gospel to people from every nation and background, and faithful believers are called to explain Scripture, proclaim Jesus Christ, and welcome those who respond to the good news.",
   "body": [
@@ -13760,7 +13370,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 29,
+  "topicNumber": 28,
   "title": "Simon of Cyrene: The African Who Carried the Cross of Jesus",
   "subtitle": "God can use unexpected encounters and difficult circumstances to teach us about discipleship, sacrifice, humility, and the privilege of serving Jesus Christ.",
   "body": [
@@ -14191,7 +13801,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 30,
+  "topicNumber": 29,
   "title": "Mark the Evangelist: The Christian Tradition That Connects Him to Egypt",
   "subtitle": "God uses faithful servants to proclaim the Gospel, establish communities of faith, and preserve the message of Jesus Christ across generations and cultures.",
   "body": [
@@ -14676,7 +14286,7 @@ export default [
  },
  {
   "categorySlug": "african-christianity",
-  "topicNumber": 31,
+  "topicNumber": 30,
   "title": "The Church of Carthage: Christianity in Ancient Roman Africa",
   "subtitle": "The Church of Carthage demonstrates how African Christians helped establish, strengthen, defend, and develop the Christian faith through worship, biblical teaching, courageous leadership, community life, and faithful service.",
   "body": [

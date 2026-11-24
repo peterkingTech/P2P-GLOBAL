@@ -18,7 +18,13 @@ const arg = (n) => { const i = process.argv.indexOf(n); return i > 0 ? process.a
 const apply = process.argv.includes("--apply");
 
 // keep: topic kept · drop: topic recycled · add: [chapter of drop, insert after chapter N of keep (original numbering)]
+// Topic numbers are those at the time of the merge. DONE lists are history only — the topics were
+// renumbered afterwards (renumber-topics.mjs), so those numbers now point at OTHER stories: never re-run them.
 export const PLAN = [
+  // 2026-11-24 (after renumbering): African Pentecostal pair.
+  { cat: "african-christianity", file: "african-christianity-stories.mjs", keep: 20, drop: 25, add: [[6, 5], [7, 7]], done: true },
+];
+export const DONE_2026_11_24 = [
   { cat: "early-christianity-church-fathers", file: "early-christianity-church-fathers-stories.mjs", keep: 7, drop: 11, add: [[9, 13]] },
   { cat: "early-christianity-church-fathers", file: "early-christianity-church-fathers-stories.mjs", keep: 23, drop: 13, add: [[9, 8], [10, 13], [12, 15]] },
   { cat: "early-christianity-church-fathers", file: "early-christianity-church-fathers-stories.mjs", keep: 15, drop: 21, add: [[9, 9]] },
@@ -48,7 +54,7 @@ if (process.argv.includes("--content")) {
   for (const file of [...new Set(PLAN.map((p) => p.file))]) {
     const full = path.join(dir, file);
     let stories = (await import(pathToFileURL(full).href)).default;
-    for (const p of PLAN.filter((x) => x.file === file)) {
+    for (const p of PLAN.filter((x) => x.file === file && !x.done)) {
       const K = stories.find((s) => s.topicNumber === p.keep), D = stories.find((s) => s.topicNumber === p.drop);
       if (!K || !D) { console.log(`${file}: T${p.keep}/T${p.drop} already merged`); continue; }
       K.chapters = order(K.chapters.length, p.add).map((x) => (x.from === "keep" ? K : D).chapters[x.n - 1]);
@@ -85,7 +91,7 @@ try {
   const who = actor ?? (await c.query("select id from public.p2p_profiles where role::text = 'super_admin' order by created_at limit 1")).rows[0]?.id;
   const cols = (await c.query(`select column_name from information_schema.columns where table_schema = 'public' and table_name = 'p2p_kingdom_story_chapters'
     and column_name not in ('id', 'story_id', 'chapter_number', 'created_at', 'updated_at') and is_generated = 'NEVER' order by ordinal_position`)).rows.map((r) => r.column_name);
-  for (const p of PLAN) {
+  for (const p of PLAN.filter((x) => !x.done)) {
     const get = async (n) => (await c.query(`select s.id, s.title, s.status from public.p2p_kingdom_stories s join public.p2p_kingdom_story_categories k on k.id = s.category_id
       where k.slug = $1 and s.topic_number = $2`, [p.cat, n])).rows[0];
     const K = await get(p.keep), D = await get(p.drop);
