@@ -80,6 +80,8 @@ const NAV_ITEMS = [
   { label: "Kingdom Stories", path: "/admin/kingdom-stories", icon: "book" as const, roles: ["super_admin", "admin_content"], section: "Content" },
   // Official Kingdom Stories narration (P2P Voices, 2026-11-18): OWNER ONLY — the API requires super_admin on every action.
   { label: "Story Narration", path: "/admin/narrations", icon: "mic" as const, roles: ["super_admin"], section: "Content" },
+  // About P2P introduction videos (2026-11-26): language review — the API enforces review/publish roles (routes/introVideos).
+  { label: "About P2P Videos", path: "/admin/intro-videos", icon: "film" as const, roles: ["super_admin", "admin_content", "admin_translation"], section: "Content" },
   // Bible licences (owner 2026-11-19): OWNER ONLY — the API requires super_admin (routes/bibleTranslationsAdmin).
   { label: "Bible Licences", path: "/admin/bible-licences", icon: "shield-checkmark" as const, roles: ["super_admin"], section: "Content" },
   // Publishing Studio — same role list as the API's STUDIO_VIEW_ROLES (display only; /api/studio enforces it).

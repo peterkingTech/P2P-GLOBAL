@@ -15,6 +15,7 @@ import colors from "@/constants/colors";
 import { useSheetWidth } from "@/hooks/useLayout";
 import { AppButton } from "@/components/ui";
 import { showAlert } from "@/lib/alerts";
+import { IntroVideoGate } from "@/components/introVideo/useIntroVideo";
 const CHURCH_TYPES = [
   { value: "local_church", label: "Local Church" },
   { value: "christian_fellowship", label: "Christian Fellowship" },
@@ -227,6 +228,8 @@ export default function RegisterChurchScreen() {
   const step2Valid = isPrimaryContact !== null && (isPrimaryContact || (!!contactName.trim() && !!contactEmail.trim()));
 
   return (
+    <>
+    <IntroVideoGate id="05" context="church_setup" />
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + (Platform.OS === "web" ? 40 : 24) }]}>
       <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => (step === 1 ? router.back() : setStep(step - 1))} style={styles.backBtn}>
         <Ionicons name="arrow-back" size={22} color={colors.lightGreen} />
@@ -373,6 +376,7 @@ export default function RegisterChurchScreen() {
         </View>
       )}
     </ScrollView>
+    </>
   );
 }
 

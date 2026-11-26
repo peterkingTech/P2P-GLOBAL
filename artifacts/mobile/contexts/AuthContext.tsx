@@ -12,6 +12,7 @@ import { unregisterCurrentPushToken } from "@/lib/push";
 import { PROFILE_COLUMNS, isMissingFunction } from "@/lib/profileColumns";
 import { resolveSupabaseConfig } from "@/config/supabaseEnv";
 import { setOfflineUser } from "@/lib/offline";
+import { deviceLanguage } from "@/lib/i18n";
 import { loadVoiceDefaults, loadVoicePrefs } from "@/lib/voices"; // P2P Voices: the person's choices and defaults after sign-in
 
 const SUPABASE_URL = "https://omkqkasniakcnmfcwrvs.supabase.co";
@@ -512,7 +513,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) return { error: error.message, locationSaved: null };
 
     if (data.user) {
-      const onboardingLanguage = await AsyncStorage.getItem("@p2p/appLanguage");
+      // the language chosen before sign-up — or, if none was chosen, the device's own language (not English by default)
+      const onboardingLanguage = (await AsyncStorage.getItem("@p2p/appLanguage")) || deviceLanguage();
       const profileRow: Record<string, unknown> = {
         id: data.user.id,
         email,

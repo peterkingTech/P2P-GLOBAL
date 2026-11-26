@@ -9,7 +9,7 @@ import { useSyncExternalStore } from "react";
 import { apiRequest } from "@/lib/apiClient";
 import { getOfflineUser } from "@/lib/offline";
 
-export type VoiceProviderId = "azure" | "google" | "elevenlabs" | "spitch" | "naijalingo" | "naijaspeech";
+export type VoiceProviderId = "azure" | "google" | "elevenlabs" | "spitch" | "naijalingo" | "naijaspeech" | "giggy";
 export type Presentation = "female" | "male";
 export interface P2PVoice {
   id: string; provider: VoiceProviderId; providerVoiceId: string; name: string; language: string; languageName: string; locale: string; accent: string;
@@ -156,4 +156,4 @@ export function setReadingSource(s: ReadingSource) {
 /** A short, friendly note (never a provider's technical error). */
 export function setVoiceNotice(n: string | null) { if (n === notice) return; notice = n; snapshot = { source, notice }; rtEmit(); }
 export const useReadingSource = () => useSyncExternalStore((l) => { rtListeners.add(l); return () => { rtListeners.delete(l); }; }, () => snapshot, () => snapshot);
-export const PROVIDER_LABEL: Record<string, string> = { azure: "Azure", google: "Google", elevenlabs: "ElevenLabs", spitch: "Verified specialist provider", naijalingo: "9jaLingo", naijaspeech: "Naija Speech" };
+export const PROVIDER_LABEL: Record<string, string> = { azure: "Azure", google: "Google", elevenlabs: "ElevenLabs", spitch: "Verified specialist provider", naijalingo: "9jaLingo", naijaspeech: "Naija Speech", giggy: "Giggy" };

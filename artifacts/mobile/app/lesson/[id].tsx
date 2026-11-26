@@ -54,6 +54,7 @@ import { useStudyTimeTracker } from "@/lib/studyTime";
 import { AppButton } from "@/components/ui";
 import { showAlert } from "@/lib/alerts";
 import { electiveAccess } from "@/lib/planOrganiserApi";
+import { IntroVideoGate } from "@/components/introVideo/useIntroVideo";
 
 interface LessonContent {
   title: string;
@@ -670,6 +671,8 @@ export default function LessonScreen() {
   const [isLoading, setIsLoading] = useState(() => !(id && peekCached(qk.lessonContent(id))));
   usePerfVisit("lesson", "Lesson", id, !!content && !isLoading);
   const [completing, setCompleting] = useState(false);
+  // From Learning to Living (Video 11): opens the first time someone finishes a lesson (brief §3K).
+  const [justCompleted, setJustCompleted] = useState(false);
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [assignmentQuestions, setAssignmentQuestions] = useState<{ id: string; question: string }[]>([]);
   const [questionSubs, setQuestionSubs] = useState<Map<string, QuestionSubmission>>(new Map());
@@ -990,7 +993,7 @@ export default function LessonScreen() {
   async function handleComplete() {
     if (!id || completing) return;
     setCompleting(true);
-    try { await markLessonComplete(id); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); }
+    try { await markLessonComplete(id); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); setJustCompleted(true); }
     finally { setCompleting(false); }
   }
 
@@ -1042,6 +1045,8 @@ export default function LessonScreen() {
   }
 
   return (
+    <>
+    <IntroVideoGate id="11" context="application" enabled={justCompleted} />
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <GatheringReturnBar />
@@ -1283,6 +1288,7 @@ export default function LessonScreen() {
         </TouchableOpacity>
       </Modal>
     </View>
+    </>
   );
 }
 

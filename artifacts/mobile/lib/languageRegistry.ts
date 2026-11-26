@@ -79,7 +79,7 @@ export const LANGUAGES: LanguageEntry[] = [
   L("am", "አማርኛ", "Amharic", "ET", ["amh"]),
   L("cs", "Čeština", "Czech", "CZ", ["ces", "cze"]),
   L("mr", "मराठी", "Marathi", "IN", ["mar"]),
-  L("pcm", "Naijá", "Nigerian Pidgin", "NG", [], { aliases: ["Pidgin", "Naija"] }),
+  L("pcm", "Naija Pidgin", "Nigerian Pidgin", "NG", [], { aliases: ["Pidgin", "Naija", "Naijá"] }),   // owner 2026-11-26: "Naija Pidgin" (more specific than "Naijá")
   L("af", "Afrikaans", "Afrikaans", "ZA", ["afr"], { also: ["NA"] }),
   L("da", "Dansk", "Danish", "DK", ["dan"]),
   L("no", "Norsk", "Norwegian", "NO", ["nor", "nob", "nb", "nno", "nn"], { aliases: ["Bokmål", "Nynorsk"] }),

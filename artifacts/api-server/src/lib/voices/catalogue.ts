@@ -61,11 +61,17 @@ export function providerStatuses(): ProviderStatus[] {
 }
 export const candidates = () => CANDIDATES;
 
+/** Owner 2026-11-26: "use Giggy for all Igbo, Twi, Hausa, Yoruba, Nigerian Pidgin in P2P Voices, not Naija Speech —
+ *  let all resources use Giggy". In these languages only Giggy's voices are offered or used (Naija Speech, 9jaLingo,
+ *  Spitch, Azure, Google voices are left out); without Giggy they fall back to the phone's own voice. */
+export const GIGGY_ONLY_LANGUAGES = new Set(["ig", "tw", "ha", "yo", "pcm"]);
+const allowed = (v: Voice) => !GIGGY_ONLY_LANGUAGES.has(v.language) || v.provider === "giggy";
+
 /** Every voice of every ENABLED provider (a disabled provider contributes nothing, not even cached voices). */
 export async function allVoices(force = false): Promise<{ voices: Voice[]; providers: (ProviderStatus & { refreshedAt: string | null; stale: boolean; count: number })[] }> {
   const ps = providers();
   const entries = await Promise.all(ps.map(async (p) => (p.status().enabled ? { p, e: await load(p, force) } : { p, e: null })));
-  const voices = entries.flatMap(({ e }) => e?.voices ?? []);
+  const voices = entries.flatMap(({ e }) => e?.voices ?? []).filter(allowed);
   return { voices, providers: entries.map(({ p, e }) => ({ id: p.id, name: p.name, role: p.role, ...p.status(), policy: p.policy, refreshedAt: e?.refreshedAt ?? null, stale: !!e?.stale, count: e?.voices.length ?? 0 })) };
 }
 /** A provider whose audio may not be kept (policy.offlineAllowed false) is offered only to app versions that keep no
@@ -76,7 +82,8 @@ export async function voiceById(id: string): Promise<Voice | null> {
   const provider = id.split(":")[0] as ProviderId;
   const p = providers().find((x) => x.id === provider);
   if (!p || !p.status().enabled) return null;
-  return (await load(p)).voices.find((v) => v.id === id) ?? null;
+  const v = (await load(p)).voices.find((x) => x.id === id) ?? null;
+  return v && allowed(v) ? v : null;   // a saved Naija Speech Igbo voice, for example, is no longer used
 }
 
 export interface CatalogueQuery { language?: string | null; accent?: string | null; provider?: ProviderId | null; presentation?: Presentation | null; characteristic?: Characteristic | null;

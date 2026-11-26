@@ -175,6 +175,31 @@ export function loadLocale(lng: string | null | undefined): Promise<boolean> {
   return p;
 }
 
+// ── The device's own language (owner 2026-11-26: "the default should be the device's language — someone's default
+// language might not be English; they can change it later"). No new native module: the web reads the browser's list
+// (navigator.languages), phones the JavaScript engine's locale (Hermes Intl follows the phone's language setting).
+const LANGUAGE_ALIASES: Record<string, string> = { iw: "he", in: "id", fil: "tl", nb: "no", nn: "no", ak: "tw", twi: "tw" };
+function matchAppLanguage(raw: string): SupportedLanguage | null {
+  const tag = String(raw || "").replace(/_/g, "-").toLowerCase();
+  if (!tag) return null;
+  const parts = tag.split("-");
+  if (parts[0] === "zh") return (/(hant|tw|hk|mo)/.test(tag) ? "zh-TW" : "zh") as SupportedLanguage;
+  const base = LANGUAGE_ALIASES[parts[0]] ?? parts[0];
+  return (SUPPORTED_LANGUAGES as readonly string[]).includes(base) ? (base as SupportedLanguage) : null;
+}
+/** The phone's (or browser's) language, as one of the app languages; English only when none of them matches. */
+export function deviceLanguage(): SupportedLanguage {
+  const candidates: string[] = [];
+  try {
+    const nav: any = typeof navigator !== "undefined" ? navigator : null;
+    if (nav && Array.isArray(nav.languages)) candidates.push(...nav.languages);
+    else if (nav && typeof nav.language === "string") candidates.push(nav.language);
+  } catch {}
+  try { const l = Intl.DateTimeFormat().resolvedOptions().locale; if (l) candidates.push(l); } catch {}
+  for (const c of candidates) { const m = matchAppLanguage(c); if (m) return m; }
+  return "en" as SupportedLanguage;
+}
+
 /** Switch the app's language, loading it first (so nothing flashes untranslated keys). */
 export async function setAppLanguage(lng: string) {
   await loadLocale(lng);

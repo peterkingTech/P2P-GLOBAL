@@ -18,6 +18,7 @@ import {
   compareCommentaries, crossReferences, interlinear, languageName, peoplePlaces,
   type CompareResult, type CrossRefs, type Interlinear, type InterlinearWord, type PeoplePlaces,
 } from "@/lib/deepStudyApi";
+import { IntroVideoGate } from "@/components/introVideo/useIntroVideo";
 
 // DEEP STUDY — one passage, studied from every side without losing it: the original-language words
 // (tap a word → its lexicon entry), commentaries side by side, cross references, and the people, places
@@ -62,6 +63,8 @@ export default function DeepStudyScreen() {
     router.push({ pathname: "/deep-study", params: { book: next.book, chapter: String(next.chapter), ...(next.v ? { v: String(next.v), ve: String(next.ve ?? next.v) } : {}), ...(translation ? { t: translation } : {}), tab } } as any);
 
   return (
+    <>
+    <IntroVideoGate id="06" context="deep_study" />
     <View style={[s.screen, { paddingTop: insets.top + 4 }]}>
       <View style={s.header}>
         <IconButton icon="chevron-back" accessibilityLabel={t("deepStudy.back", { defaultValue: "Back" })} onPress={() => router.back()} color={c.textDark} />
@@ -95,6 +98,7 @@ export default function DeepStudyScreen() {
       </ScrollView>
       <ListenPlayer owner={LISTEN_OWNER} bottomInset={insets.bottom} />
     </View>
+    </>
   );
 }
 

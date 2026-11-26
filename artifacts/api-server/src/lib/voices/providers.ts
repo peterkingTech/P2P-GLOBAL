@@ -7,6 +7,7 @@
 //   Spitch (Igbo…)      SPITCH_API_KEY + VOICES_SPITCH_VERIFIED=true     specialist; off until verified by the owner
 //   9jaLingo            NAIJALINGO_API_KEY                                Igbo, Hausa, Pidgin, Yoruba — LIVE ONLY (no copies)
 //   Naija Speech        P2P_Global_Igbo_Voice + VOICES_NAIJASPEECH_LICENCE=confirmed   Igbo, Hausa, Yoruba — LIVE ONLY
+//   Giggy               GIGGY_API_TTS_KEY (VOICES_GIGGY=off to switch off)               Naija Pidgin, Igbo, Twi
 import { characteristicsFrom, describeLocale, fetchWithTimeout, isChildVoice, ProviderError, type ProviderPolicy, type Voice, type VoiceProvider } from "./types";
 
 const now = () => new Date().toISOString();
@@ -271,7 +272,67 @@ export const naijaspeech: VoiceProvider = {
   },
 };
 
-export const PROVIDERS: VoiceProvider[] = [azure, google, elevenlabs, spitch, naijalingo, naijaspeech];
+// ── Giggy (giggy.ai) — Naija Pidgin, Igbo, Twi (owner added GIGGY_API_TTS_KEY 2026-11-26: "add Naija Pidgin to the
+// general P2P voices"). API https://api.giggy.ai/v1, header xi-api-key; GET /v1/integrations/voices (language, gender);
+// POST /v1/text-to-speech { text, voice_id, mode:"batch", output_format:"mp3_24000_160" } → MP3; ≤ 20,000 characters.
+// TERMS (giggy.ai/terms §7, AUP §8, TTS FAQ — read 2026-11-26): "you may use generated output for personal or commercial
+// purposes", incl. monetized video, podcasts and audiobooks; no attribution; disclose synthetic media where expected
+// (privacy policy). Giggy itself deletes batch audio after 7 days — P2P keeps its own copy, so caching and offline are
+// allowed. Tested 2026-11-26: read back with Naija Speech's Igbo recogniser, Giggy's Igbo was clearly more accurate.
+// Giggy's Twi is listed as Akan ("ak"); P2P's language code for it is "tw".
+const GG_BASE = "https://api.giggy.ai/v1";
+const ggKey = () => process.env.GIGGY_API_TTS_KEY || "";
+// Owner 2026-11-26: Giggy is THE provider for these five (catalogue.ts GIGGY_ONLY_LANGUAGES) — not Naija Speech.
+const GG_LANG: Record<string, string> = { pcm: "pcm", ig: "ig", ak: "tw", ha: "ha", yo: "yo" };
+export const giggy: VoiceProvider = {
+  id: "giggy", name: "Giggy (Igbo, Twi, Hausa, Yoruba, Naija Pidgin)", role: "Igbo, Twi, Hausa, Yoruba and Naija Pidgin",
+  policy: { cacheAllowed: true, offlineAllowed: true, retentionDays: null,
+    note: "Giggy's terms allow commercial use of generated audio (including audiobooks and video), with no attribution. AI voices are disclosed in the privacy policy." },
+  status() {
+    if (!ggKey()) return { enabled: false, reason: "Not connected: no Giggy key on the server." };
+    if (process.env.VOICES_GIGGY === "off") return { enabled: false, reason: "Switched off (VOICES_GIGGY=off)." };
+    return { enabled: true, reason: null };
+  },
+  async listVoices(signal) {
+    const at = now();
+    const out: Voice[] = [];
+    type Page = { voices?: { voice_id?: string; name?: string; language?: string; gender?: string; accent?: string }[]; has_more?: boolean };
+    const fetchPage = async (offset: number): Promise<Page> => {
+      const r = await fetchWithTimeout(`${GG_BASE}/integrations/voices?limit=100&offset=${offset}`, { provider: "giggy", signal, headers: { "xi-api-key": ggKey(), Accept: "application/json" }, timeoutMs: 20_000 });
+      return (await r.json()) as Page;
+    };
+    // the public catalogue (~25,000 voices), 100 per page, ten pages at a time (well under Giggy's 600 reads/minute);
+    // only our languages are kept
+    const pages: Page[] = [];
+    for (let batch = 0; batch < 40; batch++) {
+      const got = await Promise.all(Array.from({ length: 10 }, (_, i) => fetchPage((batch * 10 + i) * 100)));
+      pages.push(...got);
+      if (got.some((p) => !p.has_more || !(p.voices ?? []).length)) break;
+    }
+    for (const j of pages) {
+      for (const v of j.voices ?? []) {
+        const lang = GG_LANG[String(v.language)];
+        if (!lang || !v.voice_id || !/^[0-9a-f-]{36}$/i.test(v.voice_id) || !v.name) continue;
+        const presentation = v.gender === "female" || v.gender === "male" ? v.gender : null;
+        out.push({ id: `giggy:${v.voice_id}`, provider: "giggy", providerVoiceId: v.voice_id, name: v.name, ...describeLocale(lang), presentation,
+          characteristics: [], model: "giggyspeech", preview: { kind: "generate" }, canSynthesize: true, status: "available",
+          source: "Giggy voice catalogue", refreshedAt: at });
+      }
+    }
+    return [...new Map(out.map((v) => [v.id, v])).values()];
+  },
+  async synthesize(text, voice, signal) {
+    if (text.length > 20_000) throw new ProviderError("giggy", "bad_response", "That passage is longer than Giggy reads at once.");
+    const r = await fetchWithTimeout(`${GG_BASE}/text-to-speech`, { provider: "giggy", signal, method: "POST", timeoutMs: 60_000,
+      headers: { "xi-api-key": ggKey(), "Content-Type": "application/json", Accept: "audio/mpeg" },
+      body: JSON.stringify({ text, voice_id: voice.providerVoiceId, mode: "batch", output_format: "mp3_24000_160" }) });
+    const audio = Buffer.from(await r.arrayBuffer());
+    if (audio.length < 100 || audio.subarray(0, 1).toString() === "{") throw new ProviderError("giggy", "bad_response", "Giggy returned no audio.");
+    return { audio, contentType: "audio/mpeg", characters: text.length };
+  },
+};
+
+export const PROVIDERS: VoiceProvider[] = [azure, google, elevenlabs, spitch, naijalingo, naijaspeech, giggy];
 /** Advertised candidates that have NO adapter yet (not shown to anyone but admins). */
 export const CANDIDATES = [
   { id: "orinode", name: "Orinode", languages: ["ig"], advertisedVoices: ["Chiamaka (female)", "Obi (male)"],

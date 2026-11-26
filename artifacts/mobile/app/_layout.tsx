@@ -58,7 +58,7 @@ import { DataProvider, useData } from "@/contexts/DataContext";
 import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
 import { PageFrame } from "@/components/PageFrame";
 import { getStageFromPoints, stageByName } from "@/constants/stages";
-import i18n, { SUPPORTED_LANGUAGES, loadLocale, setAppLanguage } from "@/lib/i18n";
+import i18n, { SUPPORTED_LANGUAGES, deviceLanguage, loadLocale, setAppLanguage } from "@/lib/i18n";
 import { usePresenceHeartbeat } from "@/lib/presence";
 import "@/lib/offline/handlers"; // queued offline changes are sent whichever screen is open
 
@@ -726,13 +726,13 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
-  // Restore saved app language from AsyncStorage on every launch
+  // Restore saved app language from AsyncStorage on every launch. With no saved choice yet (first opening), start in
+  // the DEVICE's language — not saved, so it follows the device until the person picks a language themselves.
   useEffect(() => {
     AsyncStorage.getItem("@p2p/appLanguage").then((saved) => {
-      if (saved && SUPPORTED_LANGUAGES.includes(saved as any) && i18n.language !== saved) {
-        void setAppLanguage(saved);
-      }
-    }).catch(() => {});
+      const lng = saved && SUPPORTED_LANGUAGES.includes(saved as any) ? saved : deviceLanguage();
+      if (i18n.language !== lng) void setAppLanguage(lng);
+    }).catch(() => { const d = deviceLanguage(); if (i18n.language !== d) void setAppLanguage(d); });
   }, []);
 
   if (!fontsLoaded && !fontError) return null;

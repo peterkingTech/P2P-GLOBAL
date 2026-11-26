@@ -17,6 +17,7 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useAuth, supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
+import { IntroVideoGate } from "@/components/introVideo/useIntroVideo";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -191,6 +192,8 @@ export default function IntakeScreen() {
   const topPad = insets.top + (Platform.OS === "web" ? 40 : 20);
 
   return (
+    <>
+    <IntroVideoGate id="02" context="registration" />
     <KeyboardAwareScrollView
       style={styles.container}
       contentContainerStyle={[styles.content, { paddingTop: topPad, paddingBottom: insets.bottom + 48 }]}
@@ -252,6 +255,7 @@ export default function IntakeScreen() {
 
       <AppButton label="Skip for now" onPress={() => router.replace("/(auth)/profile-setup")} variant="tertiary" palette="fixedLight" />
     </KeyboardAwareScrollView>
+    </>
   );
 }
 

@@ -37,6 +37,7 @@ import { AppButton } from "@/components/ui";
 import ContentImage from "@/components/media/ContentImage";
 import { currentModule as currentModuleOf } from "@/lib/learningHome";
 import StudyTogetherLink from "@/components/learning/StudyTogetherLink";
+import { IntroVideoGate } from "@/components/introVideo/useIntroVideo";
 
 const LOGO = require("@/assets/images/logo.png");
 const SPLASH_SEEN_KEY_PREFIX = "kingdomSchoolSplashSeen:";
@@ -457,6 +458,8 @@ export default function KingdomSchoolScreen() {
   }
 
   return (
+    <>
+    <IntroVideoGate id="10" context="kingdom_school" />
     <View style={[styles.container, { paddingTop: topPad }]}>
       <View style={[{ flex: 1 }, centeredMaxWidth(contentMaxWidth)]}>
         <Stack.Screen options={{ headerShown: false }} />
@@ -572,5 +575,6 @@ export default function KingdomSchoolScreen() {
         />
       )}
     </View>
+    </>
   );
 }

@@ -22,6 +22,7 @@ import ReadableText from "@/components/ReadableText";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
 import { Avatar } from "@/components/Avatar";
+import { IntroVideoGate } from "@/components/introVideo/useIntroVideo";
 
 // The Integration and Onboarding Journey — 5 mandatory steps every new user
 // goes through after registration/profile-setup, before Module 1. Anchored
@@ -290,6 +291,8 @@ export default function JourneyScreen() {
   }
 
   return (
+    <>
+    <IntroVideoGate id="04" context="peer_guide" enabled={step === 1} />
     <View style={[styles.root, { paddingTop: topPad }]}>
       <View style={styles.progressRow}>
         {Array.from({ length: totalSteps }, (_, idx) => idx + 1).map((i) => (
@@ -526,6 +529,7 @@ export default function JourneyScreen() {
         )}
       </ScrollView>
     </View>
+    </>
   );
 }
 

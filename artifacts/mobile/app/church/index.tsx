@@ -9,6 +9,7 @@ import { churchRoleLabel } from "@/constants/churchRoles";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
 import { showAlert } from "@/lib/alerts";
+import { IntroVideoGate } from "@/components/introVideo/useIntroVideo";
 
 export default function ChurchHomeScreen() {
   const insets = useSafeAreaInsets();
@@ -90,6 +91,8 @@ export default function ChurchHomeScreen() {
   }
 
   return (
+    <>
+    <IntroVideoGate id="05" context="church" />
     <ScrollView style={styles.container} contentContainerStyle={{ paddingTop: insets.top + 24, paddingBottom: 40, paddingHorizontal: 20 }}>
       <View style={styles.churchHeader}>
         {userChurch.logoUrl ? (
@@ -246,6 +249,7 @@ export default function ChurchHomeScreen() {
         </>
       )}
     </ScrollView>
+    </>
   );
 }
 

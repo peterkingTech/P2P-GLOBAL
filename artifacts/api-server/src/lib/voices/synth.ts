@@ -44,6 +44,8 @@ export const PREVIEW_SAMPLES: Record<string, string> = {
   ha: "Salama a gare ka. Haka muryata take idan ina karanta maka a cikin P2P Global.",
   pcm: "Peace be unto you. Na so my voice dey sound when I dey read for you for P2P Global.",
   yo: "Àlàáfíà fún ọ. Báyìí ni ohùn mi ṣe rí nígbà tí mo bá ń kà fún ọ ní P2P Global.",
+  // Twi sample (2026-11-26, Giggy): written by P2P — native-speaker review welcome.
+  tw: "Asomdwoeɛ nka wo. Saa na me nne te sɛ, sɛ mekenkan ma wo wɔ P2P Global mu.",
   de: "Friede sei mit dir. So klinge ich, wenn ich dir in P2P Global vorlese.",
   fr: "Que la paix soit avec toi. Voici ma voix quand je te lis un texte dans P2P Global.",
   es: "La paz sea contigo. Así sueno cuando te leo en P2P Global.",

@@ -11,6 +11,7 @@ import { GET_STARTED_STEPS, GUIDE_VERSION, loadIntroSeen, markIntroSeen, whatsNe
 import { useGetStartedProgress } from "@/hooks/useGetStartedProgress";
 import { AppButton } from "@/components/ui";
 import { getEvaluationStatus, type EvaluationStatus } from "@/lib/peerEvaluationApi";
+import { IntroVideoGate } from "@/components/introVideo/useIntroVideo";
 
 // "How to use P2P". Reachable any time from Home and Profile — not a
 // first-launch-only tutorial. 2026-11-18: shown as the introduction right after onboarding (?intro=1,
@@ -77,6 +78,8 @@ export default function GetStartedScreen() {
   }
 
   return (
+    <>
+    <IntroVideoGate id="03" context="getting_started" />
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
@@ -184,6 +187,7 @@ export default function GetStartedScreen() {
         ) : null}
       </ScrollView>
     </View>
+    </>
   );
 }
 

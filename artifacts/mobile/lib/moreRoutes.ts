@@ -3,6 +3,8 @@
 // old links (home-screen widgets, notifications from older builds) to these.
 export const PRAYER_ROUTE = "/(tabs)/more?section=prayer";
 export const DISCOVER_ROUTE = "/(tabs)/more?section=discover";
+/** About P2P — the 11 introduction films, a full screen in More beside Prayer and Discover (2026-11-26). */
+export const ABOUT_ROUTE = "/(tabs)/more?section=about";
 
 /** Old tab paths → their place in More (deep links arrive without the "(tabs)" group too). */
 export function rewriteLegacyTabPath(path: string): string {

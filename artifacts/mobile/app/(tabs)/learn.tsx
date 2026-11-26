@@ -22,6 +22,7 @@ import { loadCached, peekCached, qk } from "@/lib/query";
 import { usePerfVisit } from "@/lib/perf";
 import { BIBLE_COVER, BIBLE_COVER_BG } from "@/constants/artwork";
 import { withScreenBoundary } from "@/components/ScreenErrorBoundary";
+import { IntroVideoGate } from "@/components/introVideo/useIntroVideo";
 
 // The Learning tab. One clean starting point:
 //   a personal header (your name, what's under way);
@@ -112,6 +113,8 @@ function LearnTab() {
   };
 
   return (
+    <>
+    <IntroVideoGate id="07" context="learning" />
     <View style={[s.screen, { paddingTop: topPad }]}>
       <ScrollView ref={scrollRef} contentContainerStyle={[s.scroll, wide && { paddingHorizontal: isLargeTablet ? 32 : 24 }, { paddingBottom: insets.bottom + 100 }, centeredMaxWidth(contentMaxWidth)]} showsVerticalScrollIndicator={false}>
         {/* Header — personal, compact, so the learning content gets the space */}
@@ -145,6 +148,7 @@ function LearnTab() {
         <LearningHub colors={colors} details={hub} columns={wide ? 4 : 2} />
       </ScrollView>
     </View>
+    </>
   );
 }
 

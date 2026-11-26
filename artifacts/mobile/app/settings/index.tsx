@@ -30,6 +30,7 @@ const CATEGORIES: Category[] = [
   { emoji: "📖", title: "Kingdom School", subtitle: "Learning preferences, Session format", route: "/settings/kingdom-school" },
   { emoji: "🙏", title: "Prayer", subtitle: "Morning confession reminder, Prayer notification", route: "/settings/prayer" },
   { emoji: "📱", title: "Widgets & Offline", subtitle: "Home-screen widgets, privacy, journal reminder, what works offline", route: "/settings/widgets" },
+  { emoji: "🎬", title: "About P2P", subtitle: "Our story, our vision and how P2P works — 11 films", route: "/(tabs)/more?section=about" },
   { emoji: "ℹ️", title: "About", subtitle: "App version, Terms, Privacy Policy, Contact", route: "/settings/about" },
 ];
 

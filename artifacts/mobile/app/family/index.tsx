@@ -11,6 +11,7 @@ import {
 } from "@/lib/familyApi";
 import { AppButton } from "@/components/ui";
 import { showAlert } from "@/lib/alerts";
+import { IntroVideoGate } from "@/components/introVideo/useIntroVideo";
 
 
 const ROLE_LABEL = FAMILY_ROLE_LABELS;
@@ -103,6 +104,8 @@ export default function MyFamiliesScreen() {
   const pendingInvitations = data?.pendingInvitations ?? [];
 
   return (
+    <>
+    <IntroVideoGate id="08" context="family_circle" />
     <View style={styles.screen}>
       <Stack.Screen options={{ title: "Family Circles" }} />
       <ScrollView
@@ -191,6 +194,7 @@ export default function MyFamiliesScreen() {
         )}
       </ScrollView>
     </View>
+    </>
   );
 }
 

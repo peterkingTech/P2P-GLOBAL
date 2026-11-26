@@ -23,6 +23,7 @@ import { SUPPORTED_LANGUAGES, LANGUAGE_DISPLAY, setAppLanguage } from "@/lib/i18
 import ReadableText from "@/components/ReadableText";
 import { READABLE_WIDTH } from "@/lib/typography";
 import { AppButton } from "@/components/ui";
+import FirstLaunchFilm from "@/components/introVideo/FirstLaunchFilm";
 
 
 const LOGO = require("@/assets/images/logo.png");
@@ -56,9 +57,11 @@ export default function OnboardingScreen() {
   const { t } = useTranslation();
   const [current, setCurrent] = useState(0);
   const [langPickerOpen, setLangPickerOpen] = useState(false);
-  const [selectedLang, setSelectedLang] = useState(
-    LANGUAGES.find((l) => l.code === (i18next.language?.slice(0, 2) ?? "en")) ?? LANGUAGES[0]
-  );
+  // Until the person picks one, the language shown is the app's current one — the device's language on a first
+  // opening (set at start-up), so it updates once that language has loaded.
+  const [pickedLang, setSelectedLang] = useState<(typeof LANGUAGES)[number] | null>(null);
+  const current_ = i18next.language ?? "en";
+  const selectedLang = pickedLang ?? LANGUAGES.find((l) => l.code === current_) ?? LANGUAGES.find((l) => l.code === current_.slice(0, 2)) ?? LANGUAGES[0];
   const isLast = current === 3;
 
   const SLIDES = [
@@ -110,7 +113,62 @@ export default function OnboardingScreen() {
     }
   }
 
+  const picker = (
+    <>
+      {/* Language picker sheet */}
+      <Modal
+        visible={langPickerOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setLangPickerOpen(false)}
+      >
+        <TouchableOpacity accessibilityRole="button"
+          style={styles.overlay}
+          activeOpacity={1}
+          onPress={() => setLangPickerOpen(false)}
+        >
+          <View
+            style={[styles.sheet, sheetWidth, { paddingBottom: insets.bottom + 24 }]}
+            onStartShouldSetResponder={() => true}
+          >
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>{t("onboarding.selectLanguage")}</Text>
+              <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => setLangPickerOpen(false)} style={styles.closeBtn}>
+                <Ionicons name="close" size={20} color={colors.textMutedLight} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {LANGUAGES.map((lang) => (
+                <TouchableOpacity accessibilityRole="button"
+                  key={lang.code}
+                  style={[
+                    styles.langOption,
+                    selectedLang.code === lang.code && styles.langOptionActive,
+                  ]}
+                  onPress={() => selectLanguage(lang)}
+                  activeOpacity={0.8}
+                >
+                  <LanguageFlag language={lang.code} size={22} style={styles.langOptionFlag} />
+                  <Text style={[
+                    styles.langOptionLabel,
+                    selectedLang.code === lang.code && styles.langOptionLabelActive,
+                  ]}>
+                    {lang.label}
+                  </Text>
+                  {selectedLang.code === lang.code && (
+                    <Ionicons name="checkmark" size={18} color={colors.accentGreen} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </>
+  );
+
   return (
+    <FirstLaunchFilm onLanguagePress={() => setLangPickerOpen(true)} onSignIn={() => router.replace("/(auth)/login")} picker={picker}>
     <View
       style={[
         styles.container,
@@ -201,56 +259,9 @@ export default function OnboardingScreen() {
         )}
       </View>
 
-      {/* Language picker sheet */}
-      <Modal
-        visible={langPickerOpen}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setLangPickerOpen(false)}
-      >
-        <TouchableOpacity accessibilityRole="button"
-          style={styles.overlay}
-          activeOpacity={1}
-          onPress={() => setLangPickerOpen(false)}
-        >
-          <View
-            style={[styles.sheet, sheetWidth, { paddingBottom: insets.bottom + 24 }]}
-            onStartShouldSetResponder={() => true}
-          >
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>{t("onboarding.selectLanguage")}</Text>
-              <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => setLangPickerOpen(false)} style={styles.closeBtn}>
-                <Ionicons name="close" size={20} color={colors.textMutedLight} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {LANGUAGES.map((lang) => (
-                <TouchableOpacity accessibilityRole="button"
-                  key={lang.code}
-                  style={[
-                    styles.langOption,
-                    selectedLang.code === lang.code && styles.langOptionActive,
-                  ]}
-                  onPress={() => selectLanguage(lang)}
-                  activeOpacity={0.8}
-                >
-                  <LanguageFlag language={lang.code} size={22} style={styles.langOptionFlag} />
-                  <Text style={[
-                    styles.langOptionLabel,
-                    selectedLang.code === lang.code && styles.langOptionLabelActive,
-                  ]}>
-                    {lang.label}
-                  </Text>
-                  {selectedLang.code === lang.code && (
-                    <Ionicons name="checkmark" size={18} color={colors.accentGreen} />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+      {picker}
     </View>
+    </FirstLaunchFilm>
   );
 }
 

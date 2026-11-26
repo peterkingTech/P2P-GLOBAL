@@ -16,6 +16,9 @@ function ensureWebFlagFont() {
   const link = document.createElement("link");
   link.rel = "stylesheet";
   link.href = "https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&display=swap";
+  // Google serves the font in pieces (unicode ranges); ask for the piece with the flags at once, otherwise the first
+  // flags can be drawn with Windows' own emoji font (no flags: two letters) until that piece happens to load.
+  link.onload = () => { try { (document as any).fonts?.load?.("20px 'Noto Color Emoji'", "\u{1F1E9}\u{1F1EA}\u{1F1F3}\u{1F1EC}"); } catch {} };
   document.head.appendChild(link);
 }
 const WEB_FONT = Platform.OS === "web" ? { fontFamily: "'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif" } : null;

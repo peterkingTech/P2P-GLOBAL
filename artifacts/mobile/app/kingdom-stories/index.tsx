@@ -16,6 +16,7 @@ import { CoverArt, DiscoverRow, StoryPosterCard, progressOf, storyAction } from 
 import { AppButton, IconButton } from "@/components/ui";
 import { useFullScreenPhotoHeight } from "@/hooks/useLayout";
 import StudyTogetherLink from "@/components/learning/StudyTogetherLink";
+import { IntroVideoGate } from "@/components/introVideo/useIntroVideo";
 
 // Kingdom Stories — a learning library with a cinematic browse, in the
 // reader's light/dark theme. Everything shown is real:
@@ -119,6 +120,8 @@ export default function KingdomStoriesDiscoverScreen() {
   const heroH = useFullScreenPhotoHeight();
   const barIcon = hero ? ART_TEXT.text : T.textPrimary;
   return (
+    <>
+    <IntroVideoGate id="09" context="kingdom_stories" />
     <View style={styles.screen}>
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled"
@@ -297,6 +300,7 @@ export default function KingdomStoriesDiscoverScreen() {
           ) : null}
       </ScrollView>
     </View>
+    </>
   );
 }
 
