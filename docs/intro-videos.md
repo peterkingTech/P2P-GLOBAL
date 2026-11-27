@@ -61,6 +61,25 @@ text are drawn by the app; the logo and the network's name are never translated.
 | Igbo | ✓ | Giggy Chidi / Chiamaka | Giggy Nnamdi / Ngozi |
 | Twi | ✓ | Giggy Yaw | Giggy Kofi (Giggy has men's Twi voices only) |
 | Naija Pidgin (film language, not an app language) | ✓ | Giggy Gbenga / Nkem | the other of the two |
+| Spanish, Portuguese, Swahili, Hausa, Yoruba, Hindi, Chinese (Simplified + Traditional), Persian (2026-11-26/27) | ✓ | Giggy, the film narrator's gender | Giggy, the other gender |
+| Indonesian, Italian, Dutch, Polish, Russian, Ukrainian, Turkish, Hebrew, Bengali, Urdu, Tamil, Telugu, Japanese, Korean, Thai, Vietnamese, Malay, Tagalog, Romanian, Greek, Zulu (2026-11-27) | ✓ | Giggy, the film narrator's gender | — (owner 2026-11-27: one voice to save credits; `record_langs.sh` adds `-2` later if `i18n/one_voice` is removed — nothing recorded twice) |
+
+**Total 2026-11-27:** 37 film languages, 52 voice keys, 572 voice tracks (52 × 11 films).
+
+**Scripture per new language** (word for word, whole verses; passages a Bible lacks stay in English): es R09 ·
+pt BLJ · sw BIB · ha BIB · yo BIB · hi IRV · zh CU1 · zh-TW CUV · fa OPCB · id TSI · it RIV · nl Dutch Bible 1917 · pl UBG · ru SYN ·
+uk PAN · tr YTC · he MOD · bn IRV · ur OUCV · ta IRV · te IRV · ja 口語訳 · ko OLD · th TNCV · vi 1934 · ms KSZ (NT
+only → OT in English) · tl ASD · ro LSB (NT only → OT in English) · **el, zu: no openly licensed Bible found → all
+quotations in English**. Sources/licences per language: `lang/<code>.json` → `scriptureSources`.
+
+**Fitting long voices (2026-11-27):** after the faster Giggy take, a section may run up to `DRIFT_MAX` (3 s) past its
+slot and later sections follow on; a film's **last** section may run into the outro only with `LAST_DRIFT` set
+(`record_langs.sh` does a mix-only pass `MAX_TEMPO=1.25 LAST_DRIFT=3.2` when a film still fails — no new recording).
+Used for: 04 pt-2, 08 sw-2, zh, zh-TW, fa, fa-2, th, tl (ending 1.5–2.8 s into the outro), 01 ro (act7).
+**Joshua 24:15 (film 08 ending):** the closing clause is cut at `;`/`:`; where a Bible has neither, the whole verse
+came through. id/ur/ko could not fit and use the verse's last sentence (`TAIL_BY_SENTENCE` in `i18n_build.py`); pl, fa,
+he, ta, te, ja, th, tl, sw, ha, yo fit and still speak the whole verse — shortening each later ≈ 300 characters.
+`narrate_giggy.mjs` writes `i18n/credits_out` on HTTP 402 and the queue stops before the next language.
 
 - **Voice keys:** `de` (first voice), `de-2` (second). Stream: one picture, an audio track per voice key (`NAME="de-2"`,
   `LANGUAGE="de"`); the web, which cannot switch HLS audio, plays `web-<key>.mp4` (picture copied, not re-encoded).
