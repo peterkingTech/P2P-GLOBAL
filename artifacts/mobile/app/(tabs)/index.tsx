@@ -76,10 +76,11 @@ function HomeHero({ dayPart, greetingLine, firstName, verse, photoUrl, onPressAv
         </TouchableOpacity>
         <Ionicons name={HERO_ICON[dayPart]} size={26} color="rgba(242,201,120,0.9)" />
       </View>
+      {/* One line (owner 2026-11-27): "Good morning, Peter 👋" — the name stays bold */}
       <Text style={styles.heroGreeting} accessibilityRole="header">
-        {greetingLine}{firstName ? "," : ""}
+        {greetingLine}{firstName ? ", " : ""}
+        {!!firstName && <Text style={styles.heroName}>{firstName}{" "}👋</Text>}
       </Text>
-      {!!firstName && <Text style={styles.heroName}>{firstName} 👋</Text>}
       {verse && (
         <TouchableOpacity style={styles.heroVerseWrap} onPress={onPressVerse} accessibilityRole="button"
           accessibilityLabel={`Daily Word, ${verse.ref}`} accessibilityHint="Opens the verse in your translation with Today's Instruction">
@@ -228,8 +229,8 @@ function makeStyles(c: AppColors) {
     // regardless of the user's light/dark theme.
     hero: { borderRadius: 24, padding: 20, paddingBottom: 22, marginBottom: 16, overflow: "hidden" },
     heroTopRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
-    heroGreeting: { fontSize: 22, color: "rgba(255,255,255,0.9)", fontFamily: "Inter_500Medium" },
-    heroName: { fontSize: 30, color: "#fff", fontFamily: "Inter_700Bold", marginTop: 2 },
+    heroGreeting: { fontSize: 22, lineHeight: 30, color: "rgba(255,255,255,0.9)", fontFamily: "Inter_500Medium" },
+    heroName: { fontSize: 22, color: "#fff", fontFamily: "Inter_700Bold" },
     heroVerseWrap: { marginTop: 14, borderLeftWidth: 2, borderLeftColor: "rgba(242,201,120,0.6)", paddingLeft: 12 },
     heroVerseText: { fontSize: 15, lineHeight: 23, color: "rgba(255,255,255,0.92)", fontFamily: "Inter_400Regular" },
     heroDwLabel: { fontSize: 11, letterSpacing: 0.8, color: "rgba(242,201,120,0.95)", fontFamily: "Inter_700Bold", marginBottom: 6 },
