@@ -565,10 +565,16 @@ function PushNotificationHost() {
   }, [isAuthenticated, profile?.id]);
   // Daily prayer / journal reminders follow the Prayer settings on the profile
   // (and the Discipleship Journal reminder on this phone); signing out clears them.
+  // The Daily Word (owner 2026-11-27) is scheduled day by day, so it is also refreshed whenever the app comes back
+  // to the front — the next 14 days always carry their own verses.
+  const dailyProfileRef = useRef(profile); dailyProfileRef.current = profile;
   useEffect(() => {
     const uid = isAuthenticated ? profile?.id ?? null : null;
     void syncDailyReminders(uid, uid ? profile : null);
-  }, [isAuthenticated, profile?.id, profile?.morningConfessionEnabled, profile?.morningConfessionTime, profile?.prayerJournalReminderEnabled]);
+    const sub = AppState.addEventListener("change", (st) => { if (st === "active") void syncDailyReminders(uid, uid ? dailyProfileRef.current : null); });
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, profile?.id, profile?.morningConfessionEnabled, profile?.morningConfessionTime, profile?.prayerJournalReminderEnabled, profile?.notificationsEnabled]);
 
   useEffect(() => {
     if (!isAuthenticated || !profile?.id) return;

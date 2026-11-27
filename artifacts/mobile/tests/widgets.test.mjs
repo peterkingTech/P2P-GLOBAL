@@ -22,7 +22,7 @@ const MOCKS = {
   "react-native": { Platform: { OS: "ios" } },
   "@react-native-async-storage/async-storage": { __esModule: true, default: { getItem: async () => null, setItem: async () => {}, multiSet: async () => {}, multiRemove: async () => {} } },
   "expo-notifications": {
-    SchedulableTriggerInputTypes: { DAILY: "daily" },
+    SchedulableTriggerInputTypes: { DAILY: "daily", DATE: "date" },
     getAllScheduledNotificationsAsync: async () => [{ identifier: "p2p-daily-old" }, { identifier: "p2p-study-1" }],
     cancelScheduledNotificationAsync: async (id) => { scheduled.push(["cancel", id]); },
     getPermissionsAsync: async () => ({ status: "granted" }),
@@ -110,6 +110,24 @@ ok("apply: cancels only its own old reminders, then schedules daily ones", res.s
   && scheduled.some(([k, id]) => k === "cancel" && id === "p2p-daily-old") && !scheduled.some(([k, id]) => k === "cancel" && id === "p2p-study-1")
   && scheduled.some(([k, r]) => k === "schedule" && r.trigger.type === "daily" && r.content.data.notificationType === "daily_reminder"));
 ok("signed out clears them", (await R.applyDailyReminders(null)).status === "off");
+
+// Daily Word notification (owner 2026-11-27): each day its own verse, the same one Home shows that day
+const DV = load("constants/dailyVerses.ts");
+const morning = new Date(2026, 10, 27, 6, 0);   // before 07:00 → today included
+const words = R.plannedDailyWord({ enabled: true, time: "07:00" }, morning);
+ok("Daily Word: 14 days ahead, one per day at the chosen time", words.length === R.DAILY_WORD_DAYS && words.every((w, i) => w.date.getDate() === new Date(2026, 10, 27 + i).getDate() && w.date.getHours() === 7 && w.date.getMinutes() === 0));
+ok("Daily Word: each day's verse = Home's verse for that day", words.every((w) => { const v = W.verseForDay(DV.DAILY_VERSES, w.date); return w.body.includes(v.ref) && w.body.includes(v.text.slice(0, 20)); }));
+ok("Daily Word: different verses on different days; unique ids", new Set(words.map((w) => w.body)).size === words.length && new Set(words.map((w) => w.identifier)).size === words.length && words.every((w) => w.identifier.startsWith("p2p-daily-")));
+const evening = R.plannedDailyWord({ enabled: true, time: "07:00" }, new Date(2026, 10, 27, 9, 0));
+ok("Daily Word: today's time already passed → starts tomorrow", evening[0].date.getDate() === 28 && evening.length === R.DAILY_WORD_DAYS);
+ok("Daily Word: off → none; opens only /daily-word", R.plannedDailyWord({ enabled: false, time: "07:00" }, morning).length === 0 && words.every((w) => w.route === "/daily-word") && push.includes('"/daily-word"'));
+ok("Daily Word: on by default for every account", R.DEFAULT_DAILY_WORD_REMINDER.enabled === true && R.DEFAULT_DAILY_WORD_REMINDER.time === "07:00");
+scheduled.length = 0;
+await R.applyDailyReminders({ confession: { enabled: false, time: "07:00" }, prayerJournal: { enabled: false }, journal: { enabled: false, time: "21:00" }, dailyWord: { enabled: true, time: "08:00" } });
+const dated = scheduled.filter(([k, r]) => k === "schedule" && r.trigger.type === "date");
+ok("Daily Word: scheduled as dated notifications with the verse", dated.length >= R.DAILY_WORD_DAYS - 1 && dated.every(([, r]) => r.content.title.startsWith("Daily Word") && /— .+ \(BSB\)$/.test(r.content.body) && r.content.data.route === "/daily-word"));
+ok("Daily Word: master switch off silences it; refreshed when the app returns", /notificationsEnabled !== false/.test(read("lib/dailyReminders.ts")) && /st === "active"\) void syncDailyReminders/.test(read("app/_layout.tsx")));
+console.log("sample:", words[0].title, "|", words[0].body);
 ok("Prayer settings switches now schedule (and ask permission on enable)", (read("app/settings/prayer.tsx").match(/syncDailyReminders\(profile\.id, \{ \.\.\.profile, \w+: true \}, true\)/g) ?? []).length === 2 && /syncDailyReminders\(uid, uid \? profile : null\)/.test(read("app/_layout.tsx")));
 
 // ── 3. Native widgets follow the same contract and rules ────────────────────

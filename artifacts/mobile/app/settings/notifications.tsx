@@ -7,6 +7,9 @@ import { AppColors } from "@/constants/themes";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
 import { loadPreviewSetting, savePreviewSetting, PREVIEW_LEVELS, type PreviewLevel, type PreviewSettingState } from "@/lib/messagePreviewSetting";
 import { loadAdminOverdueSetting, saveAdminOverdueSetting, type AdminOverdueState } from "@/lib/adminOverdueSetting";
+import { DAILY_WORD_TIMES, DEFAULT_DAILY_WORD_REMINDER, loadDailyWordReminder, saveDailyWordReminder, syncDailyReminders } from "@/lib/dailyReminders";
+import { FilterChip } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 // Phone alerts by category. The server (api-server lib/notificationCategories.ts)
 // is what honours these: off = no push for that category; the notification
@@ -33,6 +36,19 @@ export default function NotificationsSettingsScreen() {
   const [adminOverdue, setAdminOverdue] = useState<AdminOverdueState>({ available: false });
   const isSuperAdmin = profile?.role === "super_admin";
   const masterOn = profile?.notificationsEnabled ?? true;
+
+  // Daily Word notification (owner 2026-11-27): this phone only, on by default at 07:00
+  const [word, setWord] = useState(DEFAULT_DAILY_WORD_REMINDER);
+  useEffect(() => { if (profile?.id) void loadDailyWordReminder(profile.id).then(setWord); }, [profile?.id]);
+  async function updateWord(next: { enabled: boolean; time: string }) {
+    setWord(next);
+    if (!profile?.id) return;
+    await saveDailyWordReminder(profile.id, next);
+    const r = await syncDailyReminders(profile.id, profile, next.enabled);
+    if (next.enabled && r.status === "permission_denied") {
+      showAlert("Notifications are off", "Allow notifications for P2P Global in your phone's Settings to get the Daily Word.");
+    }
+  }
 
   useEffect(() => {
     if (!profile?.id) return;
@@ -77,6 +93,31 @@ export default function NotificationsSettingsScreen() {
               accessibilityLabel="Phone notifications"
             />
           </View>
+        </View>
+
+        <View style={[styles.card, { marginBottom: 16 }, !masterOn && styles.cardDimmed]} accessibilityState={{ disabled: !masterOn }}>
+          <View style={[styles.row, styles.rowLast, { paddingTop: 0 }]}>
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <Text style={styles.label}>Daily Word</Text>
+              <Text style={styles.desc}>Today's verse every day — the same one as on Home. Tap it to read it in your Bible translation.</Text>
+            </View>
+            <Switch
+              value={word.enabled}
+              onValueChange={(v) => { void updateWord({ ...word, enabled: v }); }}
+              disabled={!masterOn}
+              trackColor={{ false: colors.borderBeige, true: colors.accentGreen }}
+              thumbColor="#fff"
+              accessibilityLabel="Daily Word notification"
+            />
+          </View>
+          {word.enabled ? (
+            <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Daily Word time">
+              {DAILY_WORD_TIMES.map((tm) => (
+                <FilterChip key={tm} label={tm} selection="single" selected={word.time === tm} disabled={!masterOn}
+                  onPress={() => { void updateWord({ ...word, time: tm }); }} />
+              ))}
+            </View>
+          ) : null}
         </View>
 
         <View style={[styles.card, !masterOn && styles.cardDimmed]} accessibilityState={{ disabled: !masterOn }}>
@@ -165,5 +206,6 @@ function makeStyles(c: AppColors) {
     footnote: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", lineHeight: 17, marginTop: 10, paddingHorizontal: 4 },
     radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: c.borderBeige, alignItems: "center", justifyContent: "center" },
     radioDot: { width: 10, height: 10, borderRadius: 5 },
+    chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
   });
 }
