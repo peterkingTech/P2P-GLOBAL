@@ -620,6 +620,9 @@
     "mansVoice": "পুরুষ কণ্ঠ",
     "original": "মূল",
     "man": "পুরুষ",
-    "woman": "নারী"
+    "woman": "নারী",
+    "playbackSpeed": "প্লেব্যাকের গতি",
+    "normal": "স্বাভাবিক",
+    "speedUnsupported": "এই গতি এই ডিভাইসে উপলব্ধ নয়।"
   }
 }

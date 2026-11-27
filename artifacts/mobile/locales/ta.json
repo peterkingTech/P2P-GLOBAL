@@ -597,6 +597,9 @@
     "mansVoice": "ஆண் குரல்",
     "original": "அசல்",
     "man": "ஆண்",
-    "woman": "பெண்"
+    "woman": "பெண்",
+    "playbackSpeed": "இயக்க வேகம்",
+    "normal": "இயல்பு",
+    "speedUnsupported": "இந்த வேகம் இந்தச் சாதனத்தில் கிடைக்கவில்லை."
   }
 }

@@ -629,6 +629,9 @@
     "mansVoice": "Mannenstem",
     "original": "Origineel",
     "man": "Man",
-    "woman": "Vrouw"
+    "woman": "Vrouw",
+    "playbackSpeed": "Afspeelsnelheid",
+    "normal": "Normaal",
+    "speedUnsupported": "Deze snelheid is niet beschikbaar op dit apparaat."
   }
 }

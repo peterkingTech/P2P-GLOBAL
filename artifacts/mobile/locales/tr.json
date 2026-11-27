@@ -620,6 +620,9 @@
     "mansVoice": "Erkek sesi",
     "original": "Özgün",
     "man": "Erkek",
-    "woman": "Kadın"
+    "woman": "Kadın",
+    "playbackSpeed": "Oynatma hızı",
+    "normal": "Normal",
+    "speedUnsupported": "Bu hız bu cihazda kullanılamıyor."
   }
 }

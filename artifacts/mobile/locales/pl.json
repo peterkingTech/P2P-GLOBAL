@@ -620,6 +620,9 @@
     "mansVoice": "Głos męski",
     "original": "Oryginał",
     "man": "Mężczyzna",
-    "woman": "Kobieta"
+    "woman": "Kobieta",
+    "playbackSpeed": "Szybkość odtwarzania",
+    "normal": "Normalna",
+    "speedUnsupported": "Ta szybkość nie jest dostępna na tym urządzeniu."
   }
 }

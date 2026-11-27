@@ -806,6 +806,9 @@
     "mansVoice": "صوت رجل",
     "original": "الأصلي",
     "man": "رجل",
-    "woman": "امرأة"
+    "woman": "امرأة",
+    "playbackSpeed": "سرعة التشغيل",
+    "normal": "عادية",
+    "speedUnsupported": "هذه السرعة غير متاحة على هذا الجهاز."
   }
 }

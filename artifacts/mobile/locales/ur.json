@@ -620,6 +620,9 @@
     "mansVoice": "مرد کی آواز",
     "original": "اصل",
     "man": "مرد",
-    "woman": "خاتون"
+    "woman": "خاتون",
+    "playbackSpeed": "چلانے کی رفتار",
+    "normal": "معمول",
+    "speedUnsupported": "یہ رفتار اس ڈیوائس پر دستیاب نہیں ہے۔"
   }
 }

@@ -597,6 +597,9 @@
     "mansVoice": "muryar namiji",
     "original": "asali",
     "man": "namiji",
-    "woman": "mace"
+    "woman": "mace",
+    "playbackSpeed": "Saurin kunnawa",
+    "normal": "Na al'ada",
+    "speedUnsupported": "Wannan saurin ba ya samuwa a wannan na'ura."
   }
 }

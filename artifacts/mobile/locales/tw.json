@@ -595,6 +595,9 @@
     "mansVoice": "ɔbarima nne",
     "original": "deɛ edi kan",
     "man": "ɔbarima",
-    "woman": "ɔbaa"
+    "woman": "ɔbaa",
+    "playbackSpeed": "Ahoɔhare a ɛde bɔ",
+    "normal": "Daa deɛ",
+    "speedUnsupported": "Ahoɔhare yi nni saa mfiri yi so."
   }
 }

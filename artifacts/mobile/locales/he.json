@@ -620,6 +620,9 @@
     "mansVoice": "קול גבר",
     "original": "מקורי",
     "man": "גבר",
-    "woman": "אישה"
+    "woman": "אישה",
+    "playbackSpeed": "מהירות הפעלה",
+    "normal": "רגילה",
+    "speedUnsupported": "מהירות זו אינה זמינה במכשיר זה."
   }
 }

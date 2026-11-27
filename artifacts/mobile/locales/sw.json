@@ -815,6 +815,9 @@
     "mansVoice": "sauti ya mwanamume",
     "original": "asili",
     "man": "mwanamume",
-    "woman": "mwanamke"
+    "woman": "mwanamke",
+    "playbackSpeed": "Kasi ya kucheza",
+    "normal": "Kawaida",
+    "speedUnsupported": "Kasi hii haipatikani kwenye kifaa hiki."
   }
 }

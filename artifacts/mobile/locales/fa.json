@@ -620,6 +620,9 @@
     "mansVoice": "صدای مرد",
     "original": "اصلی",
     "man": "مرد",
-    "woman": "زن"
+    "woman": "زن",
+    "playbackSpeed": "سرعت پخش",
+    "normal": "عادی",
+    "speedUnsupported": "این سرعت در این دستگاه در دسترس نیست."
   }
 }

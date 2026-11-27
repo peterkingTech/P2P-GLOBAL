@@ -51,6 +51,16 @@ const SERIF = Platform.select({ ios: "Georgia", android: "serif", default: "Geor
 // v2 (2026-11-26): v1 also stored "sound: English" whenever only subtitles were chosen — those saved choices are ignored
 const PREF_KEY = "introVideos:langPrefs:v2";
 
+// ── playback speed (owner brief 2026-11-27) ──
+// The native player's own rate (expo-video playbackRate: AVPlayer / ExoPlayer / HTML video) — picture, voice-over and
+// the app-drawn subtitles and on-screen text all follow the player's clock, so they stay together at every speed.
+// Pitch correction is switched on explicitly: expo-video's Android player starts with it OFF despite the docs.
+export const INTRO_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] as const;
+export const speedLabel = (r: number) => `${Number.isInteger(r * 10) ? r.toFixed(1) : r.toFixed(2)}x`;   // 0.5x 0.75x 1.0x … 2.0x
+// The chosen speed carries on from film to film while the app is open; the next app session starts at 1.0x again.
+// No saved setting (brief §6: no unnecessary settings).
+let sessionSpeed = 1;
+
 export default function IntroVideoPlayer(props: IntroVideoPlayerProps) {
   if (!props.visible || !props.video) return null;
   return <PlayerModal {...props} video={props.video} />;
@@ -103,10 +113,34 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
   const src = introSource(video, audioLang);
   const [attempt, setAttempt] = useState(0);
   const player = useVideoPlayer(src ? { uri: src, metadata: { title: video.title, artist: "P2P Global" } } : null, (p) => {
-    p.timeUpdateEventInterval = 0.25;
+    p.timeUpdateEventInterval = 0.25 / Math.max(1, sessionSpeed);
     p.loop = false;
     p.staysActiveInBackground = false;
+    p.preservesPitch = true;
+    p.playbackRate = sessionSpeed;   // a new player (web: another voice's file) starts at the chosen speed
   });
+  const [speed, setSpeed] = useState(sessionSpeed);
+  const speedRef = useRef(speed); speedRef.current = speed;
+  const [speedNotice, setSpeedNotice] = useState(false);
+  /** Set the rate on the player without restarting it or moving the position. */
+  const applySpeed = useCallback((r: number) => {
+    try {
+      const wasPlaying = player.playing;
+      player.preservesPitch = true;
+      player.playbackRate = r;
+      // subtitles and on-screen text follow the player's clock: tick faster at higher speeds so they stay within
+      // a quarter of a second of the film (at 2x a 0.25 s tick would be half a second of film)
+      player.timeUpdateEventInterval = 0.25 / Math.max(1, r);
+      // iOS: setting AVPlayer's rate also starts playback — a paused film stays paused
+      if (!wasPlaying && Platform.OS === "ios") player.pause();
+      return true;
+    } catch { return false; }
+  }, [player]);
+  /** play() at the chosen speed (older iOS resumes at 1.0 otherwise). */
+  const playAtSpeed = useCallback(() => {
+    player.play();
+    if (speedRef.current !== 1) { try { player.playbackRate = speedRef.current; } catch {} }
+  }, [player]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">(src ? "loading" : "error");
   const [playing, setPlaying] = useState(false);
   const [now, setNow] = useState(0);
@@ -121,12 +155,20 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
     if (s === "readyToPlay") {
       setStatus("ready");
       if (player.duration > 0) setDuration(player.duration);
+      applySpeed(speedRef.current);   // web: loading another file resets the element's rate
       if (resumeAt.current) { player.currentTime = resumeAt.current; resumeAt.current = 0; }
-      if (resumePlay.current) { resumePlay.current = false; player.play(); }
-      if (!startedLogged.current) { startedLogged.current = true; player.play(); logIntroEvent(video.id, mode === "replay" ? "replayed" : "play_started", { context, language: audioLang }); }
+      if (resumePlay.current) { resumePlay.current = false; playAtSpeed(); }
+      if (!startedLogged.current) { startedLogged.current = true; playAtSpeed(); logIntroEvent(video.id, mode === "replay" ? "replayed" : "play_started", { context, language: audioLang }); }
     } else if (s === "error") setStatus("error");
   });
   useEventListener(player, "playingChange", ({ isPlaying }) => setPlaying(isPlaying));
+  // The player reports the rate it really uses: if a device refuses or clamps a speed, the button shows the truth.
+  useEventListener(player, "playbackRateChange", ({ playbackRate }) => {
+    if (playbackRate > 0 && Math.abs(playbackRate - speedRef.current) > 0.01) {
+      const near = INTRO_SPEEDS.reduce((a, b) => (Math.abs(b - playbackRate) < Math.abs(a - playbackRate) ? b : a), 1);
+      setSpeed(near); sessionSpeed = near;
+    }
+  });
   useEventListener(player, "timeUpdate", ({ currentTime }) => {
     setNow(currentTime);
     // Watched = continuous playback, not a jump: only advance when within a second of what was already watched.
@@ -173,14 +215,26 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
     hideTimer.current = setTimeout(() => setControls(false), 3500);
   }, []);
   useEffect(() => { if (playing) poke(); else setControls(true); }, [playing, poke]);
-  const toggle = () => { if (ended) return; if (player.playing) player.pause(); else player.play(); poke(); };
+  const toggle = () => { if (ended) return; if (player.playing) player.pause(); else playAtSpeed(); poke(); };
   const seekTo = (sec: number) => {
     const limit = required ? maxWatched.current : duration;
     player.currentTime = Math.max(0, Math.min(sec, limit, duration - 0.2)); poke();
   };
-  const replay = () => { setEnded(false); player.currentTime = 0; player.play(); logIntroEvent(video.id, "replayed", { context }); };
+  const replay = () => { setEnded(false); player.currentTime = 0; playAtSpeed(); logIntroEvent(video.id, "replayed", { context }); };
 
   const [menu, setMenu] = useState(false);
+  const [speedMenu, setSpeedMenu] = useState(false);
+  const speedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (speedTimer.current) clearTimeout(speedTimer.current); }, []);
+  const chooseSpeed = (r: number) => {
+    setSpeedMenu(false); poke();
+    if (r === speed) return;
+    if (applySpeed(r)) { setSpeed(r); sessionSpeed = r; return; }
+    applySpeed(speed);   // not supported here: stay at the speed that works and say so
+    setSpeedNotice(true);
+    if (speedTimer.current) clearTimeout(speedTimer.current);
+    speedTimer.current = setTimeout(() => setSpeedNotice(false), 3500);
+  };
   const [full, setFull] = useState(false);
   const [autoOff, setAutoOff] = useState(false);
   // remember only what the person actually changed (choosing subtitles must not also pin the sound to English)
@@ -231,7 +285,7 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
 
   return (
     <Modal visible animationType="fade" presentationStyle="fullScreen" supportedOrientations={["portrait", "landscape"]} statusBarTranslucent
-      onRequestClose={() => { if (menu) setMenu(false); else if (full) setFull(false); else close(!ended); }}>
+      onRequestClose={() => { if (speedMenu) setSpeedMenu(false); else if (menu) setMenu(false); else if (full) setFull(false); else close(!ended); }}>
       <StatusBar hidden={immersive} style="light" />
       <View style={styles.root}>
         <View style={stageStyle}>
@@ -281,6 +335,7 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
                     : subsMissing ? t("introVideos.allMissing", "This video is not yet available in {{lang}} — original English audio and subtitles.", { lang: LANGUAGE_DISPLAY[appLang]?.native ?? appLang }) : ""}
                 </Text>
               ) : null}
+              {speedNotice ? <Text style={styles.notice}>{t("introVideos.speedUnsupported", "This speed is not available on this device.")}</Text> : null}
               <View style={styles.row}>
                 <Pressable onPress={toggle} accessibilityRole="button" accessibilityLabel={playing ? t("introVideos.pause", "Pause") : t("introVideos.play", "Play")} style={styles.play}>
                   <Ionicons name={playing ? "pause" : "play"} size={22} color="#0B0F0C" />
@@ -289,6 +344,12 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
                 <Text style={styles.time}>{formatIntroDuration(now)} / {formatIntroDuration(duration)}</Text>
                 <IconBtn icon={subsOn ? "chatbox-ellipses" : "chatbox-ellipses-outline"} label={subsOn ? t("introVideos.subsOff", "Turn subtitles off") : t("introVideos.subsOn", "Turn subtitles on")}
                   onPress={() => chooseSub(subsOn ? "off" : (langInfo(appLang)?.subtitles ? appLang : "en"))} />
+                <Pressable onPress={() => { setSpeedMenu(true); poke(); }} hitSlop={6} accessibilityRole="button"
+                  accessibilityLabel={`${t("introVideos.playbackSpeed", "Playback speed")}: ${speedLabel(speed)}`}
+                  style={[styles.speedBtn, speed !== 1 && styles.speedBtnOn]}>
+                  <Ionicons name="speedometer-outline" size={15} color={speed !== 1 ? GOLD : CREAM} />
+                  <Text style={[styles.speedBtnText, speed !== 1 && { color: GOLD }]}>{speedLabel(speed)}</Text>
+                </Pressable>
               </View>
               {required ? <Text style={styles.hint}>{t("introVideos.requiredHint", "Please watch this introduction to the end. You can pause at any time.")}</Text> : null}
             </View>
@@ -316,6 +377,7 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
           {menu ? (
             <LanguageMenu video={video} audioLang={audioLang} subLang={subLang} onAudio={chooseAudio} onSub={chooseSub} onClose={() => setMenu(false)} />
           ) : null}
+          {speedMenu ? <SpeedMenu speed={speed} onChoose={chooseSpeed} onClose={() => setSpeedMenu(false)} /> : null}
         </View>
       </View>
     </Modal>
@@ -445,6 +507,24 @@ function LanguageMenu({ video, audioLang, subLang, onAudio, onSub, onClose }: { 
     </View>
   );
 }
+/** Playback speed: the seven speeds, the current one highlighted; choosing one applies it at once and closes. */
+function SpeedMenu({ speed, onChoose, onClose }: { speed: number; onChoose: (r: number) => void; onClose: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.menuShade}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t("introVideos.close", "Close")} />
+      <View style={[styles.menu, styles.speedMenu]}>
+        <ScrollView>
+          <View style={styles.menuHeadRow}><Ionicons name="speedometer-outline" size={16} color={GOLD} /><Text style={styles.menuHead}>{t("introVideos.playbackSpeed", "Playback speed")}</Text></View>
+          {INTRO_SPEEDS.map((r) => (
+            <Choice key={r} label={speedLabel(r)} detail={r === 1 ? t("introVideos.normal", "Normal") : undefined} on={speed === r} onPress={() => onChoose(r)} />
+          ))}
+        </ScrollView>
+      </View>
+    </View>
+  );
+}
+
 function Choice({ code, label, detail, on, onPress }: { code?: string; label: string; detail?: string; on: boolean; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={[styles.choice, on && styles.choiceOn]} accessibilityRole="radio" accessibilityState={{ selected: on }}
@@ -509,5 +589,10 @@ const styles = StyleSheet.create({
   pillSide: { flexDirection: "row", alignItems: "center", gap: 1 },
   pillCenter: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(232,197,122,0.16)", marginHorizontal: 2 },
   pillBadge: { marginLeft: -2, opacity: 0.85 },
+  speedBtn: { flexDirection: "row", alignItems: "center", gap: 4, height: 40, paddingHorizontal: 10, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1, borderColor: "transparent" },
+  speedBtnOn: { borderColor: "rgba(232,197,122,0.55)", backgroundColor: "rgba(232,197,122,0.12)" },
+  speedBtnText: { color: CREAM, fontFamily: "Inter_600SemiBold", fontSize: 13, minWidth: 34, textAlign: "center", fontVariant: ["tabular-nums"] },
+  speedMenu: { alignSelf: "center", width: "100%", maxWidth: 440, maxHeight: "85%" },
   pillCc: { color: CREAM, fontFamily: "Inter_700Bold", fontSize: 8, opacity: 0.85, marginLeft: 1 },
 });

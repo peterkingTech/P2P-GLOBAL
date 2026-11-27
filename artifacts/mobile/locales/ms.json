@@ -620,6 +620,9 @@
     "mansVoice": "Suara lelaki",
     "original": "Asal",
     "man": "Lelaki",
-    "woman": "Wanita"
+    "woman": "Wanita",
+    "playbackSpeed": "Kelajuan main balik",
+    "normal": "Biasa",
+    "speedUnsupported": "Kelajuan ini tidak tersedia pada peranti ini."
   }
 }

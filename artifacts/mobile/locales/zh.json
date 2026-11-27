@@ -620,6 +620,9 @@
     "mansVoice": "男声",
     "original": "原版",
     "man": "男",
-    "woman": "女"
+    "woman": "女",
+    "playbackSpeed": "播放速度",
+    "normal": "正常",
+    "speedUnsupported": "此设备不支持该速度。"
   }
 }

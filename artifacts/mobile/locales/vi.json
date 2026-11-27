@@ -620,6 +620,9 @@
     "mansVoice": "Giọng nam",
     "original": "Bản gốc",
     "man": "Nam",
-    "woman": "Nữ"
+    "woman": "Nữ",
+    "playbackSpeed": "Tốc độ phát",
+    "normal": "Bình thường",
+    "speedUnsupported": "Tốc độ này không khả dụng trên thiết bị này."
   }
 }

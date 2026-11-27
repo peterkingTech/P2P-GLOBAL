@@ -89,6 +89,13 @@ he, ta, te, ja, th, tl, sw, ha, yo fit and still speak the whole verse — short
   menu has **Voice** (every voice with its flag, language, narrator, man's/woman's voice) and **Subtitles**. The player
   starts in the app language; only a choice made in the menu overrides it (saved choices v2 — v1 also pinned the sound
   to English when only subtitles were chosen). Changing the voice carries on from the same moment.
+- **Playback speed (2026-11-27):** a "1.0x" button in the bottom bar (also in full screen) opens *Playback speed*
+  (0.5x 0.75x 1.0x Normal 1.25x 1.5x 1.75x 2.0x). Native rate (`player.playbackRate`), no restart, same position; pitch
+  correction set explicitly (`preservesPitch = true` — expo-video's Android player starts with it OFF); a paused film stays
+  paused (iOS AVPlayer would otherwise start when its rate is set). Subtitles/on-screen text follow the player clock;
+  `timeUpdateEventInterval` = 0.25 s ÷ speed so they stay within ¼ s of the film. The speed carries on from film to
+  film while the app is open and resets to 1.0x on the next app start — no saved setting. A rate the device refuses
+  keeps the last working speed and says "This speed is not available on this device."
 - **Never the wrong language silently:** a language appears only when **Published** (`INTRO_VIDEOS_PREVIEW_ALL=1`
   on localhost only shows everything for review; refused in production).
 - **Scripture on screen** is never our own translation: Luther 1912 (de), Segond 1910 (fr), Van Dyck (ar), Igbo

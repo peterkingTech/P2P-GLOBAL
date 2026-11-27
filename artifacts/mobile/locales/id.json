@@ -620,6 +620,9 @@
     "mansVoice": "Suara laki-laki",
     "original": "Asli",
     "man": "Laki-laki",
-    "woman": "Perempuan"
+    "woman": "Perempuan",
+    "playbackSpeed": "Kecepatan putar",
+    "normal": "Normal",
+    "speedUnsupported": "Kecepatan ini tidak tersedia di perangkat ini."
   }
 }

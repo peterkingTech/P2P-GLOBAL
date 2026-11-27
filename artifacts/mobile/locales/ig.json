@@ -597,6 +597,9 @@
     "mansVoice": "olu nwoke",
     "original": "nke mbụ",
     "man": "nwoke",
-    "woman": "nwanyị"
+    "woman": "nwanyị",
+    "playbackSpeed": "Ọsọ ịkpọ vidiyo",
+    "normal": "Nkịtị",
+    "speedUnsupported": "Ọsọ a adịghị na ngwaọrụ a."
   }
 }

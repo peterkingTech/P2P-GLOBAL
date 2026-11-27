@@ -597,6 +597,9 @@
     "mansVoice": "Izwi lowesilisa",
     "original": "Okokuqala",
     "man": "Owesilisa",
-    "woman": "Owesifazane"
+    "woman": "Owesifazane",
+    "playbackSpeed": "Isivinini sokudlala",
+    "normal": "Okujwayelekile",
+    "speedUnsupported": "Lesi sivinini asitholakali kule divayisi."
   }
 }

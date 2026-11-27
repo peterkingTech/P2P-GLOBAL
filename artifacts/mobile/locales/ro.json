@@ -620,6 +620,9 @@
     "mansVoice": "Voce masculină",
     "original": "Original",
     "man": "Bărbat",
-    "woman": "Femeie"
+    "woman": "Femeie",
+    "playbackSpeed": "Viteza de redare",
+    "normal": "Normală",
+    "speedUnsupported": "Această viteză nu este disponibilă pe acest dispozitiv."
   }
 }

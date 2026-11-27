@@ -620,6 +620,9 @@
     "mansVoice": "Boses ng lalaki",
     "original": "Orihinal",
     "man": "Lalaki",
-    "woman": "Babae"
+    "woman": "Babae",
+    "playbackSpeed": "Bilis ng pag-play",
+    "normal": "Normal",
+    "speedUnsupported": "Hindi available ang bilis na ito sa device na ito."
   }
 }

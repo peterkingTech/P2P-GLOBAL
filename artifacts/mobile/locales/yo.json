@@ -597,6 +597,9 @@
     "mansVoice": "ohùn ọkùnrin",
     "original": "àtilẹ̀wá",
     "man": "ọkùnrin",
-    "woman": "obìnrin"
+    "woman": "obìnrin",
+    "playbackSpeed": "Ìyára ìṣeré",
+    "normal": "Déédéé",
+    "speedUnsupported": "Ìyára yìí kò sí lórí ẹ̀rọ yìí."
   }
 }

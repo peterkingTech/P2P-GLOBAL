@@ -620,6 +620,9 @@
     "mansVoice": "男性の声",
     "original": "オリジナル",
     "man": "男性",
-    "woman": "女性"
+    "woman": "女性",
+    "playbackSpeed": "再生速度",
+    "normal": "標準",
+    "speedUnsupported": "この速度はこのデバイスでは利用できません。"
   }
 }

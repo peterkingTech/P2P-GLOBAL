@@ -806,6 +806,9 @@
     "mansVoice": "पुरुष की आवाज़",
     "original": "मूल",
     "man": "पुरुष",
-    "woman": "महिला"
+    "woman": "महिला",
+    "playbackSpeed": "प्लेबैक गति",
+    "normal": "सामान्य",
+    "speedUnsupported": "यह गति इस डिवाइस पर उपलब्ध नहीं है।"
   }
 }
