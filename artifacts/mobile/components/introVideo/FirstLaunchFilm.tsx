@@ -54,7 +54,7 @@ export default function FirstLaunchFilm({ onLanguagePress, onSignIn, picker, chi
       <Image source={LOGO} style={styles.logo} resizeMode="contain" accessibilityIgnoresInvertColors />
       <Text style={styles.kicker}>{t("introVideos.welcomeKicker", "Welcome to P2P Global")}</Text>
       <Text style={styles.title}>{t("introVideos.welcomeTitle", "Before you begin, watch our story")}</Text>
-      <Text style={styles.body}>{t("introVideos.welcomeBody", "The Movement Film: As the Waters Cover the Sea. It shows why P2P exists and what God is doing through people who learn from someone and help someone grow.")}</Text>
+      <Text style={styles.body}>{t("introVideos.welcomeBody", "The Habakkuk 2:14 Movement. It shows why P2P exists and what God is doing through people who learn from someone and help someone grow.")}</Text>
 
       <Text style={styles.label}>{t("introVideos.chooseLanguage", "Choose your language first")}</Text>
       <Pressable style={styles.lang} onPress={onLanguagePress} accessibilityRole="button" accessibilityLabel={t("introVideos.chooseLanguage", "Choose your language first")}>
