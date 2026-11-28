@@ -4,7 +4,7 @@
 /** The front cover (owner 2026-11-28): the book itself, cut out of its white background (transparent WebP, 900 × 1304). */
 export const BIBLE_COVER = require("@/assets/images/bible-cover.webp");
 /** The same book on its own navy, square and solid — for the lock screen and square thumbnails. */
-export const BIBLE_ARTWORK = require("@/assets/images/bible-cover.jpg");
+export const BIBLE_ARTWORK = require("@/assets/images/bible-artwork.jpg");   // own name: Android resources ignore the extension (bible-cover.webp would clash)
 /** The cover's own navy, behind it so any spare space blends in. */
 export const BIBLE_COVER_BG = "#1B2439";   // the cover's own navy leather (cover replaced 2026-11-28)
 /** The front cover's own shape (portrait). */
