@@ -1,13 +1,20 @@
 // Shared app artwork, so every screen that shows a feature uses the same image.
 
 /** Bible Study and the Bible reader ("Holy Bible — multi language, multi version"). */
-export const BIBLE_COVER = require("@/assets/images/bible-cover.jpg");
+/** The front cover (owner 2026-11-28): the book itself, cut out of its white background (transparent WebP, 900 × 1304). */
+export const BIBLE_COVER = require("@/assets/images/bible-cover.webp");
+/** The same book on its own navy, square and solid — for the lock screen and square thumbnails. */
+export const BIBLE_ARTWORK = require("@/assets/images/bible-cover.jpg");
 /** The cover's own navy, behind it so any spare space blends in. */
 export const BIBLE_COVER_BG = "#1B2439";   // the cover's own navy leather (cover replaced 2026-11-28)
-/** The cover is the book itself, cut to its edges (owner 2026-11-28: "fit the full background"): portrait, 900 × 1110. */
-export const BIBLE_COVER_RATIO = 900 / 1110;
+/** The front cover's own shape (portrait). */
+export const BIBLE_COVER_RATIO = 900 / 1304;
+/** Where each book's body ends above its ribbon (fraction of the picture's height): front 87.3 %, back 95 %. Used to
+ *  show the two books at the same size side by side. */
+export const BIBLE_COVER_BODY = 0.873;
+export const BIBLE_BACK_BODY = 0.95;
 /** The back cover (owner 2026-11-28): the features, Read · Listen · Study · Apply · Grow. Cut out of its white
- *  background (transparent WebP, 900 × 1164). Shown beside the front on wide screens; each row is a button. */
+ *  background (transparent WebP, 900 × 1164), "Greek" corrected, navy and gold matched to the front. Shown beside the front on wide screens; each row is a button. */
 export const BIBLE_BACK = require("@/assets/images/bible-back.webp");
 export const BIBLE_BACK_RATIO = 900 / 1164;
 /** Where each row sits on the back cover image (fractions of its width and height). */

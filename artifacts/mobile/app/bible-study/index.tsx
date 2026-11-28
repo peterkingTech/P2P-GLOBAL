@@ -9,7 +9,7 @@ import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import { loadPosition, type ReadingPosition } from "@/lib/bibleReadingPrefs";
 import { bookByCode } from "@/lib/bibleReaderApi";
 import { AppButton, IconButton } from "@/components/ui";
-import { BIBLE_COVER, BIBLE_COVER_BG, BIBLE_COVER_LABEL, BIBLE_COVER_RATIO, BIBLE_BACK, BIBLE_BACK_RATIO, BIBLE_BACK_ROWS, BIBLE_BACK_ROW_LEFT, BIBLE_BACK_ROW_RIGHT, ARTWORK_FILL } from "@/constants/artwork";
+import { BIBLE_COVER, BIBLE_COVER_BG, BIBLE_COVER_LABEL, BIBLE_COVER_RATIO, BIBLE_BACK, BIBLE_BACK_RATIO, BIBLE_COVER_BODY, BIBLE_BACK_BODY, BIBLE_BACK_ROWS, BIBLE_BACK_ROW_LEFT, BIBLE_BACK_ROW_RIGHT, ARTWORK_FILL } from "@/constants/artwork";
 import { useScrollToTopOnTabReselect, useTabCapsuleTopInset } from "@/components/IPadTabCapsule";
 import { useTranslation } from "react-i18next";
 
@@ -46,7 +46,10 @@ export function BibleStudyHome({ asTab = false }: { asTab?: boolean }) {
   const { width: winW } = useWindowDimensions();
   const usableW = Math.min(winW, contentMaxWidth || winW) - 40;
   const wideCovers = usableW >= 680;
-  const coverH = wideCovers ? Math.min(620, (usableW - 20) / (BIBLE_COVER_RATIO + BIBLE_BACK_RATIO)) : 0;
+  // the two books at the same size: the front picture is taller (its ribbon hangs lower), so it is scaled by the
+  // ratio of the two book bodies; coverH is the back cover's picture height
+  const frontScale = BIBLE_BACK_BODY / BIBLE_COVER_BODY;
+  const coverH = wideCovers ? Math.min(600, (usableW - 20) / (BIBLE_COVER_RATIO * frontScale + BIBLE_BACK_RATIO)) : 0;
   const [pos, setPos] = useState<ReadingPosition | null>(null);
   const [query, setQuery] = useState("");
 
@@ -84,8 +87,8 @@ export function BibleStudyHome({ asTab = false }: { asTab?: boolean }) {
         {wideCovers ? (
           <View style={s.coverRow}>
             <TouchableOpacity onPress={() => router.push("/bible" as any)} activeOpacity={0.92} accessibilityRole="button" accessibilityLabel={`${BIBLE_COVER_LABEL}. Open the Bible`}>
-              <View style={[s.cover, { width: coverH * BIBLE_COVER_RATIO, height: coverH, maxWidth: undefined, aspectRatio: undefined, marginBottom: 0 }]}>
-                <Image source={BIBLE_COVER} style={ARTWORK_FILL} resizeMode="cover" />
+              <View style={{ width: coverH * frontScale * BIBLE_COVER_RATIO, height: coverH * frontScale }}>
+                <Image source={BIBLE_COVER} style={ARTWORK_FILL} resizeMode="contain" />
               </View>
             </TouchableOpacity>
             <View style={{ width: coverH * BIBLE_BACK_RATIO, height: coverH }} accessibilityRole="menu" accessibilityLabel="Back cover: Read, Listen, Study, Apply, Grow">
@@ -102,7 +105,7 @@ export function BibleStudyHome({ asTab = false }: { asTab?: boolean }) {
         ) : (
           <TouchableOpacity onPress={() => router.push("/bible" as any)} activeOpacity={0.92} accessibilityRole="button" accessibilityLabel={`${BIBLE_COVER_LABEL}. Open the Bible`}>
             <View style={s.cover}>
-              <Image source={BIBLE_COVER} style={ARTWORK_FILL} resizeMode="cover" />
+              <Image source={BIBLE_COVER} style={ARTWORK_FILL} resizeMode="contain" />
             </View>
           </TouchableOpacity>
         )}
@@ -179,11 +182,12 @@ function makeStyles(c: AppColors) {
     title: { fontSize: 24, lineHeight: 30, color: c.textDark, fontFamily: "Inter_700Bold" },
     meta: { fontSize: 12, lineHeight: 17, color: c.textMuted, fontFamily: "Inter_400Regular" },
     // A fixed square frame (the artwork is square) with the whole picture inside.
-    coverRow: { flexDirection: "row", justifyContent: "center", alignItems: "flex-end", gap: 20, marginBottom: 16 },
+    coverRow: { flexDirection: "row", justifyContent: "center", alignItems: "flex-start", gap: 20, marginBottom: 16 },
     backRow: { position: "absolute", borderRadius: 6 },
     backRowOn: { backgroundColor: "rgba(233,194,122,0.14)" },
     // the book fills its frame edge to edge (portrait, the cover's own shape); not too tall on tablets
-    cover: { width: "100%", maxWidth: 400, alignSelf: "center", aspectRatio: BIBLE_COVER_RATIO, borderRadius: 14, overflow: "hidden", marginBottom: 14, backgroundColor: BIBLE_COVER_BG },
+    // the book itself (transparent cut-out) standing on the screen's own background — no frame, no box
+    cover: { width: "100%", maxWidth: 330, alignSelf: "center", aspectRatio: BIBLE_COVER_RATIO, marginBottom: 14 },
     continueArt: { width: 52, height: 52, borderRadius: 10, backgroundColor: BIBLE_COVER_BG },
     continue: { flexDirection: "row", alignItems: "center", gap: 14, padding: 18, borderRadius: 18, backgroundColor: c.primaryGreen, minHeight: 88 },
     continueKicker: { fontSize: 11, color: "rgba(255,255,255,0.85)", fontFamily: "Inter_700Bold", letterSpacing: 0.5, textTransform: "uppercase" },

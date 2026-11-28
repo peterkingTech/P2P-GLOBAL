@@ -5,7 +5,7 @@
 // once even when several passages come from it. A passage that can't be
 // loaded is never dropped silently: it is reported back (`unavailable`) so the
 // player can say so and offer to try again.
-import { BIBLE_COVER } from "@/constants/artwork";
+import { BIBLE_ARTWORK } from "@/constants/artwork";
 import { getChapter, type BibleChapter, type NewRef } from "@/lib/bibleReaderApi";
 import type { ListenContent, ListenSection } from "@/lib/listen";
 import { bibleAnnouncement, passageRecording } from "@/lib/listen/bibleContent";
@@ -61,7 +61,7 @@ export async function playlistContent(meta: PlaylistMeta, entries: QueueEntry[],
       subtitle: meta.kind === "playlist" ? "Scripture playlist" : meta.kind === "collection" ? "Scripture collection" : "Listening queue",
       language,
       highlight: "part",
-      artwork: BIBLE_COVER,
+      artwork: BIBLE_ARTWORK,
       sections,
       route: meta.id ? { pathname: "/scripture-collections/[id]", params: { id: meta.id } } : { pathname: "/library" },
     },

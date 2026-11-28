@@ -4,7 +4,7 @@
 // Bible for another part of P2P Global. Text is the licensed chapter already
 // fetched for reading (getChapter); nothing is stored.
 import { router } from "expo-router";
-import { BIBLE_COVER } from "@/constants/artwork";
+import { BIBLE_ARTWORK } from "@/constants/artwork";
 import { bibleRoute, bookByCode, formatRef, getChapter, getChapterAudio, getTranslations, type BibleChapter } from "@/lib/bibleReaderApi";
 import { estimatedNarration, recordingDuration, sliceNarration } from "./chapterAudio";
 import type { RecordedNarration } from "./narration";
@@ -131,7 +131,7 @@ export function bibleListenContent(d: BibleChapter, language: string, part?: { s
     title: formatRef(b, d.chapter, part?.start, part?.end),
     subtitle: d.translation.name,
     language,
-    artwork: BIBLE_COVER,
+    artwork: BIBLE_ARTWORK,
     route,
     // First, where we are; then the verses, one part each — no verse numbers spoken.
     sections: [
