@@ -238,7 +238,10 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
   const replay = () => { setEnded(false); player.currentTime = 0; playAtSpeed(); logIntroEvent(video.id, "replayed", { context }); };
 
   const [menu, setMenu] = useState(false);
+  const [barH, setBarH] = useState(110);   // height of the bottom controls: the drop-down panels open just above them
   const [speedMenu, setSpeedMenu] = useState(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (menu || speedMenu) { if (hideTimer.current) clearTimeout(hideTimer.current); setControls(true); } else if (playing) poke(); }, [menu, speedMenu]);   // a panel keeps the controls up
   const speedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (speedTimer.current) clearTimeout(speedTimer.current); }, []);
   const chooseSpeed = (r: number) => {
@@ -293,6 +296,8 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
   // When the film's own text already says exactly what is being spoken, the subtitle would only repeat it.
   const cue = cue0 && text?.language === overlayText?.overlaysLanguage && overlays.some((o) => norm(o.text).includes(norm(cue0.text))) ? undefined : cue0;
 
+  // the drop-down panels: below the top bar, above the controls; their lists scroll inside
+  const popMax = Math.max(200, Math.min(520, stageH - barH - (turned ? 70 : insets.top + 80)));
   const stageStyle = turned
     ? { position: "absolute" as const, width: stageW, height: stageH, left: (win.width - stageW) / 2, top: (win.height - stageH) / 2, transform: [{ rotate: "90deg" }] }
     : { flex: 1 };
@@ -335,15 +340,15 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
                 <Text style={styles.kicker}>{t("introVideos.aboutP2P", "About P2P")}</Text>
                 <Text style={styles.title} numberOfLines={1}>{video.title}</Text>
               </View>
-              <LanguagePill audioLang={audioLang} subLang={subLang} label={t("introVideos.languages", "Audio and subtitles")} onPress={() => { setMenu(true); poke(); }} />
               {landscape ? null : <IconBtn icon={full ? "contract-outline" : "expand-outline"} label={full ? t("introVideos.exitFull", "Exit full screen") : t("introVideos.full", "Full screen")} onPress={() => { setFull((f) => !f); poke(); }} />}
               {!required || ended ? <IconBtn icon="close" label={t("introVideos.close", "Close")} onPress={() => close(!ended)} /> : null}
             </View>
           ) : null}
 
           {/* Bottom bar */}
-          {(controls || !playing) && status === "ready" && !ended ? (
-            <View style={[styles.bottom, { paddingBottom: turned ? 12 : (immersive ? 10 : insets.bottom + 12), paddingLeft: 14 + (turned ? 0 : insets.left), paddingRight: 14 + (turned ? 0 : insets.right) }]}>
+          {(controls || !playing || menu || speedMenu) && status === "ready" && !ended ? (
+            <View onLayout={(e) => setBarH(e.nativeEvent.layout.height)}
+              style={[styles.bottom, { paddingBottom: turned ? 12 : (immersive ? 10 : insets.bottom + 12), paddingLeft: 14 + (turned ? 0 : insets.left), paddingRight: 14 + (turned ? 0 : insets.right) }]}>
               {(audioMissing || subsMissing) && !immersive ? (
                 <Text style={styles.notice}>
                   {audioMissing && !subsMissing ? t("introVideos.audioMissing", "Voice-over in {{lang}} is not available yet — original audio with {{lang}} subtitles.", { lang: LANGUAGE_DISPLAY[appLang]?.native ?? appLang })
@@ -351,18 +356,29 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
                 </Text>
               ) : null}
               {speedNotice ? <Text style={styles.notice}>{t("introVideos.speedUnsupported", "This speed is not available on this device.")}</Text> : null}
+              {/* Compact controls like the website (owner 2026-11-28): the progress bar on its own line, then
+                  play · time · [flag EN ⌄] · CC · 1.0x — the language and speed choices open small drop-down panels. */}
+              <Scrubber now={now} duration={duration} watched={required ? maxWatched.current : duration} onSeek={seekTo} label={t("introVideos.position", "Playback position")} />
               <View style={styles.row}>
                 <Pressable onPress={toggle} accessibilityRole="button" accessibilityLabel={playing ? t("introVideos.pause", "Pause") : t("introVideos.play", "Play")} style={styles.play}>
                   <Ionicons name={playing ? "pause" : "play"} size={22} color="#0B0F0C" />
                 </Pressable>
-                <Scrubber now={now} duration={duration} watched={required ? maxWatched.current : duration} onSeek={seekTo} label={t("introVideos.position", "Playback position")} />
                 <Text style={styles.time}>{formatIntroDuration(now)} / {formatIntroDuration(duration)}</Text>
-                <IconBtn icon={subsOn ? "chatbox-ellipses" : "chatbox-ellipses-outline"} label={subsOn ? t("introVideos.subsOff", "Turn subtitles off") : t("introVideos.subsOn", "Turn subtitles on")}
-                  onPress={() => chooseSub(subsOn ? "off" : (langInfo(appLang)?.subtitles ? appLang : "en"))} />
-                <Pressable onPress={() => { setSpeedMenu(true); poke(); }} hitSlop={6} accessibilityRole="button"
-                  accessibilityLabel={`${t("introVideos.playbackSpeed", "Playback speed")}: ${speedLabel(speed)}`}
-                  style={[styles.speedBtn, speed !== 1 && styles.speedBtnOn]}>
-                  <Ionicons name="speedometer-outline" size={15} color={speed !== 1 ? GOLD : CREAM} />
+                <View style={{ flex: 1 }} />
+                <Pressable onPress={() => { setSpeedMenu(false); setMenu((m) => !m); poke(); }} hitSlop={6} accessibilityRole="button"
+                  accessibilityLabel={`${t("introVideos.languages", "Audio and subtitles")}: ${langName(voiceLanguage(audioLang))} / ${subsOn ? langName(subLang) : t("introVideos.off", "Off")}`}
+                  accessibilityState={{ expanded: menu }} style={[styles.pillBtn, menu && styles.pillBtnOn]}>
+                  <LanguageFlag language={voiceLanguage(audioLang)} size={16} style={{ color: CREAM }} />
+                  <Text style={styles.pillBtnText}>{voiceLanguage(audioLang).split("-")[0].toUpperCase()}</Text>
+                  <Ionicons name={menu ? "chevron-up" : "chevron-down"} size={13} color={CREAM} />
+                </Pressable>
+                <Pressable onPress={() => { chooseSub(subsOn ? "off" : (langInfo(appLang)?.subtitles ? appLang : "en")); poke(); }} hitSlop={6} accessibilityRole="switch"
+                  accessibilityState={{ checked: subsOn }} accessibilityLabel={subsOn ? t("introVideos.subsOff", "Turn subtitles off") : t("introVideos.subsOn", "Turn subtitles on")} style={styles.ccBtn}>
+                  <Text style={[styles.ccText, !subsOn && styles.ccOff]}>CC</Text>
+                </Pressable>
+                <Pressable onPress={() => { setMenu(false); setSpeedMenu((s) => !s); poke(); }} hitSlop={6} accessibilityRole="button"
+                  accessibilityLabel={`${t("introVideos.playbackSpeed", "Playback speed")}: ${speedLabel(speed)}`} accessibilityState={{ expanded: speedMenu }}
+                  style={[styles.pillBtn, (speed !== 1 || speedMenu) && styles.pillBtnOn]}>
                   <Text style={[styles.speedBtnText, speed !== 1 && { color: GOLD }]}>{speedLabel(speed)}</Text>
                 </Pressable>
               </View>
@@ -389,10 +405,19 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
             </View>
           ) : null}
 
-          {menu ? (
-            <LanguageMenu video={video} audioLang={audioLang} subLang={subLang} onAudio={chooseAudio} onSub={chooseSub} onClose={() => setMenu(false)} />
+          {menu || speedMenu ? (
+            <View style={StyleSheet.absoluteFill}>
+              <Pressable style={StyleSheet.absoluteFill} onPress={() => { setMenu(false); setSpeedMenu(false); }} accessibilityLabel={t("introVideos.close", "Close")} />
+              <View style={[styles.pop, { right: 14 + (turned ? 0 : insets.right), bottom: barH + 6, width: Math.min(stageW - 28, 380), maxHeight: popMax }]}>
+                {menu ? (
+                  <LanguagePanel listMax={popMax - 60} video={video} audioLang={audioLang} subLang={subLang} credits={(subsOn ? text : overlayText)?.scriptureSources ?? []}
+                    onAudio={(c) => { chooseAudio(c); poke(); }} onSub={(c) => { chooseSub(c); poke(); }} />
+                ) : (
+                  <SpeedPanel listMax={popMax - 50} speed={speed} onChoose={chooseSpeed} />
+                )}
+              </View>
+            </View>
           ) : null}
-          {speedMenu ? <SpeedMenu speed={speed} onChoose={chooseSpeed} onClose={() => setSpeedMenu(false)} /> : null}
         </View>
       </View>
     </Modal>
@@ -453,103 +478,91 @@ function OverlayText({ o, w, h, now, rtl }: { o: IntroOverlay; w: number; h: num
 // app languages first; others (e.g. Nigerian Pidgin, a film language but not an app language) from the language registry
 const langName = (c: string) => LANGUAGE_DISPLAY[c as SupportedLanguage]?.native ?? (languageNativeName(c) || c);
 
-/** Top-bar language button: the voice's flag, the translate sign, the subtitles' flag — plainly "change languages". */
-function LanguagePill({ audioLang, subLang, label, onPress }: { audioLang: string; subLang: string; label: string; onPress: () => void }) {
-  const subsOff = subLang === "off";
-  return (
-    <Pressable onPress={onPress} hitSlop={6} style={styles.langPill} accessibilityRole="button"
-      accessibilityLabel={`${label}: ${langName(voiceLanguage(audioLang))} / ${subsOff ? "—" : langName(subLang)}`}>
-      <View style={styles.pillSide}>
-        <LanguageFlag language={voiceLanguage(audioLang)} size={17} style={{ color: CREAM }} />
-        <Ionicons name="volume-medium" size={12} color={CREAM} style={styles.pillBadge} />
-      </View>
-      <View style={styles.pillCenter}><Ionicons name="language" size={18} color={GOLD} /></View>
-      <View style={styles.pillSide}>
-        {subsOff ? <Ionicons name="close-circle-outline" size={17} color={MUTED} /> : <LanguageFlag language={subLang} size={17} style={{ color: CREAM }} />}
-        <Text style={styles.pillCc}>CC</Text>
-      </View>
-    </Pressable>
-  );
-}
-
-function LanguageMenu({ video, audioLang, subLang, onAudio, onSub, onClose }: { video: IntroVideoInfo; audioLang: string; subLang: string; onAudio: (c: string) => void; onSub: (c: string) => void; onClose: () => void }) {
+// ── Compact drop-down panels (owner 2026-11-28: "like the website — keep it clean and save space") ──
+type VoiceOpt = { key: string; label: string; gender?: "male" | "female" };
+/** Voice and subtitles: two drop-downs and the Scripture credit, in a small panel above the controls. */
+function LanguagePanel({ listMax, video, audioLang, subLang, credits, onAudio, onSub }: {
+  listMax: number; video: IntroVideoInfo; audioLang: string; subLang: string; credits: { credit: string }[]; onAudio: (c: string) => void; onSub: (c: string) => void;
+}) {
   const { t } = useTranslation();
-  const audio = video.languages.filter((l) => l.audio);
-  const subs = video.languages.filter((l) => l.subtitles);
-  const voiceLine = (l: IntroVideoInfo["languages"][number], x: { key: string; name: string; gender: "male" | "female" }) => x.name
-    ? `${x.name} · ${x.gender === "female" ? t("introVideos.womansVoice", "woman's voice") : t("introVideos.mansVoice", "man's voice")}${x.key === "en" ? ` · ${t("introVideos.original", "original")}` : ""}`
-    : undefined;
-  return (
-    <View style={styles.menuShade}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t("introVideos.close", "Close")} />
-      <View style={styles.menu}>
-        <ScrollView>
-          <View style={styles.menuHeadRow}><Ionicons name="mic-outline" size={16} color={GOLD} /><Text style={styles.menuHead}>{t("introVideos.voice", "Voice")}</Text></View>
-          <Text style={styles.menuNote}>{t("introVideos.voiceLead", "Choose the voice you want to listen to.")}</Text>
-          {/* One row per language; its voices as buttons with a man / woman icon and the narrator's name
-              (owner 2026-11-26: the choice of a man's or a woman's voice must be obvious). */}
-          {audio.map((l) => {
-            const vs = l.voices?.length ? l.voices : [{ key: l.code, ...(l.voice ?? { name: "", gender: "male" as const }) }];
-            const langOn = vs.some((x) => x.key === audioLang);
-            return (
-              <View key={`a${l.code}`} style={[styles.voiceRow, langOn && styles.choiceOn]}>
-                <LanguageFlag language={l.code} size={20} style={{ color: CREAM }} />
-                <Text style={[styles.choiceText, styles.voiceLang]} numberOfLines={1}>{langName(l.code)}</Text>
-                <View style={styles.voiceBtns}>
-                  {vs.map((x) => {
-                    const on = audioLang === x.key;
-                    return (
-                      <Pressable key={x.key} onPress={() => onAudio(x.key)} accessibilityRole="radio" accessibilityState={{ selected: on }}
-                        accessibilityLabel={`${langName(l.code)}, ${voiceLine(l, x) ?? x.name}`} style={[styles.voiceBtn, on && styles.voiceBtnOn]}>
-                        <Ionicons name={x.gender === "female" ? "woman" : "man"} size={15} color={on ? "#0B0F0C" : CREAM} />
-                        <Text style={[styles.voiceBtnText, on && { color: "#0B0F0C" }]} numberOfLines={1}>{x.name || langName(l.code)}</Text>
-                        <Text style={[styles.voiceBtnSub, on && { color: "#0B0F0C" }]} numberOfLines={1}>{x.gender === "female" ? t("introVideos.woman", "woman") : t("introVideos.man", "man")}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
-            );
-          })}
+  const [open, setOpen] = useState<"voice" | "sub" | null>(null);
+  const gender = (g?: string) => (g === "female" ? t("introVideos.woman", "woman") : t("introVideos.man", "man"));
+  // one group per language with its voices ("Deutsch · Jon (man)"), English first as the original
+  const groups = video.languages.filter((l) => l.audio).map((l) => {
+    const vs = l.voices?.length ? l.voices : [{ key: l.code, ...(l.voice ?? { name: "", gender: "male" as const }) }];
+    return { code: l.code, head: l.code === "en" ? `${langName("en")} · ${t("introVideos.original", "original")}` : langName(l.code),
+      items: vs.map((x): VoiceOpt => ({ key: x.key, gender: x.gender, label: x.name ? `${langName(l.code)} · ${x.name} (${gender(x.gender)})` : langName(l.code) })) };
+  }).sort((a, b) => (a.code === "en" ? -1 : b.code === "en" ? 1 : 0));
+  const currentVoice = groups.flatMap((g) => g.items).find((x) => x.key === audioLang)?.label ?? langName(voiceLanguage(audioLang));
+  const subs = [{ code: "off", label: t("introVideos.off", "Off") }, ...video.languages.filter((l) => l.subtitles).map((l) => ({ code: l.code, label: langName(l.code) }))];
+  const currentSub = subs.find((s) => s.code === subLang)?.label ?? langName(subLang);
 
-          {audio.length <= 1 ? <Text style={styles.menuNote}>{t("introVideos.moreVoices", "Voice-overs in more languages are being prepared.")}</Text> : null}
-          <View style={[styles.menuHeadRow, { marginTop: 16 }]}><Ionicons name="text-outline" size={16} color={GOLD} /><Text style={styles.menuHead}>{t("introVideos.subtitles", "Subtitles")}</Text></View>
-          <Choice label={t("introVideos.off", "Off")} on={subLang === "off"} onPress={() => onSub("off")} />
-          {subs.map((l) => <Choice key={`s${l.code}`} code={l.code} label={langName(l.code)} on={subLang === l.code} onPress={() => onSub(l.code)} />)}
-        </ScrollView>
-        <Pressable style={[styles.btn, { alignSelf: "stretch", marginTop: 10 }]} onPress={onClose}><Text style={styles.btnText}>{t("introVideos.done", "Done")}</Text></Pressable>
-      </View>
-    </View>
-  );
-}
-/** Playback speed: the seven speeds, the current one highlighted; choosing one applies it at once and closes. */
-function SpeedMenu({ speed, onChoose, onClose }: { speed: number; onChoose: (r: number) => void; onClose: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <View style={styles.menuShade}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t("introVideos.close", "Close")} />
-      <View style={[styles.menu, styles.speedMenu]}>
-        <ScrollView>
-          <View style={styles.menuHeadRow}><Ionicons name="speedometer-outline" size={16} color={GOLD} /><Text style={styles.menuHead}>{t("introVideos.playbackSpeed", "Playback speed")}</Text></View>
-          {INTRO_SPEEDS.map((r) => (
-            <Choice key={r} label={speedLabel(r)} detail={r === 1 ? t("introVideos.normal", "Normal") : undefined} on={speed === r} onPress={() => onChoose(r)} />
+  if (open) {
+    return (
+      <View>
+        <Pressable onPress={() => setOpen(null)} style={styles.popBack} accessibilityRole="button" accessibilityLabel={t("introVideos.back", "Back")}>
+          <Ionicons name="chevron-back" size={16} color={GOLD} />
+          <Text style={styles.popLabel}>{open === "voice" ? t("introVideos.voice", "Voice") : t("introVideos.subtitles", "Subtitles")}</Text>
+        </Pressable>
+        <ScrollView style={{ flexGrow: 0, maxHeight: listMax }} keyboardShouldPersistTaps="handled">
+          {open === "voice" ? groups.map((g) => (
+            <View key={g.code}>
+              <Text style={styles.popGroup}>{g.head}</Text>
+              {g.items.map((x) => (
+                <PopRow key={x.key} label={x.label} on={x.key === audioLang} indent onPress={() => { onAudio(x.key); setOpen(null); }} />
+              ))}
+            </View>
+          )) : subs.map((s) => (
+            <PopRow key={s.code} label={s.label} on={s.code === subLang} code={s.code === "off" ? undefined : s.code} onPress={() => { onSub(s.code); setOpen(null); }} />
           ))}
         </ScrollView>
       </View>
+    );
+  }
+  return (
+    <View style={{ gap: 6 }}>
+      <Text style={styles.popLabel}>{t("introVideos.voice", "Voice")}</Text>
+      <View style={styles.popSelectRow}>
+        <LanguageFlag language={voiceLanguage(audioLang)} size={20} style={{ color: CREAM }} />
+        <Pressable onPress={() => setOpen("voice")} style={styles.popSelect} accessibilityRole="button" accessibilityLabel={`${t("introVideos.voice", "Voice")}: ${currentVoice}`}>
+          <Text style={styles.popSelectText} numberOfLines={1}>{currentVoice}</Text>
+          <Ionicons name="chevron-down" size={15} color={CREAM} />
+        </Pressable>
+      </View>
+      <Text style={[styles.popLabel, { marginTop: 6 }]}>{t("introVideos.subtitles", "Subtitles")}</Text>
+      <View style={styles.popSelectRow}>
+        {subLang === "off" ? <Ionicons name="close-circle-outline" size={20} color={MUTED} /> : <LanguageFlag language={subLang} size={20} style={{ color: CREAM }} />}
+        <Pressable onPress={() => setOpen("sub")} style={styles.popSelect} accessibilityRole="button" accessibilityLabel={`${t("introVideos.subtitles", "Subtitles")}: ${currentSub}`}>
+          <Text style={styles.popSelectText} numberOfLines={1}>{currentSub}</Text>
+          <Ionicons name="chevron-down" size={15} color={CREAM} />
+        </Pressable>
+      </View>
+      {credits.length ? <Text style={styles.popCredit}>{credits.map((c) => c.credit).join(" · ")}</Text> : null}
     </View>
   );
 }
 
-function Choice({ code, label, detail, on, onPress }: { code?: string; label: string; detail?: string; on: boolean; onPress: () => void }) {
+/** Playback speed: the seven speeds in the same compact panel; choosing one applies it at once and closes. */
+function SpeedPanel({ listMax, speed, onChoose }: { listMax: number; speed: number; onChoose: (r: number) => void }) {
+  const { t } = useTranslation();
   return (
-    <Pressable onPress={onPress} style={[styles.choice, on && styles.choiceOn]} accessibilityRole="radio" accessibilityState={{ selected: on }}
-      accessibilityLabel={detail ? `${label}, ${detail}` : label}>
-      <Ionicons name={on ? "radio-button-on" : "radio-button-off"} size={18} color={on ? GOLD : MUTED} />
-      {code ? <LanguageFlag language={code} size={20} style={{ color: CREAM }} /> : <View style={{ width: 25 }} />}
-      <View style={{ flex: 1 }}>
-        <Text style={styles.choiceText}>{label}</Text>
-        {detail ? <Text style={styles.choiceDetail}>{detail}</Text> : null}
-      </View>
+    <View>
+      <Text style={[styles.popLabel, { marginBottom: 4 }]}>{t("introVideos.playbackSpeed", "Playback speed")}</Text>
+      <ScrollView style={{ flexGrow: 0, maxHeight: listMax }}>
+        {INTRO_SPEEDS.map((r) => (
+          <PopRow key={r} label={r === 1 ? `${speedLabel(r)} · ${t("introVideos.normal", "Normal")}` : speedLabel(r)} on={speed === r} onPress={() => onChoose(r)} />
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+function PopRow({ label, on, onPress, code, indent }: { label: string; on: boolean; onPress: () => void; code?: string; indent?: boolean }) {
+  return (
+    <Pressable onPress={onPress} style={[styles.popRow, indent && { paddingLeft: 18 }, on && styles.popRowOn]} accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityLabel={label}>
+      {code ? <LanguageFlag language={code} size={16} style={{ color: CREAM }} /> : null}
+      <Text style={[styles.popRowText, on && { color: "#0B0F0C", fontFamily: "Inter_600SemiBold" }]} numberOfLines={1}>{label}</Text>
+      {on ? <Ionicons name="checkmark" size={15} color="#0B0F0C" /> : null}
     </Pressable>
   );
 }
@@ -566,7 +579,7 @@ const styles = StyleSheet.create({
   bottom: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 14, paddingTop: 10, gap: 8, backgroundColor: "rgba(0,0,0,0.5)" },
   row: { flexDirection: "row", alignItems: "center", gap: 10 },
   play: { width: 44, height: 44, borderRadius: 22, backgroundColor: GOLD, alignItems: "center", justifyContent: "center" },
-  scrub: { flex: 1, height: 32, justifyContent: "center" },
+  scrub: { alignSelf: "stretch", height: 28, justifyContent: "center" },
   track: { position: "absolute", left: 0, right: 0, height: 4, borderRadius: 2, backgroundColor: "rgba(246,241,231,0.18)" },
   knob: { position: "absolute", width: 14, height: 14, borderRadius: 7, marginLeft: -7, backgroundColor: CREAM },
   time: { color: CREAM, fontFamily: "Inter_500Medium", fontSize: 12, minWidth: 84, textAlign: "center" },
@@ -609,5 +622,23 @@ const styles = StyleSheet.create({
   speedBtnOn: { borderColor: "rgba(232,197,122,0.55)", backgroundColor: "rgba(232,197,122,0.12)" },
   speedBtnText: { color: CREAM, fontFamily: "Inter_600SemiBold", fontSize: 13, minWidth: 34, textAlign: "center", fontVariant: ["tabular-nums"] },
   speedMenu: { alignSelf: "center", width: "100%", maxWidth: 440, maxHeight: "85%" },
+  pillBtn: { flexDirection: "row", alignItems: "center", gap: 5, height: 36, paddingHorizontal: 12, borderRadius: 18, borderWidth: 1, borderColor: "rgba(246,241,231,0.28)" },
+  pillBtnOn: { borderColor: GOLD },
+  pillBtnText: { color: CREAM, fontFamily: "Inter_700Bold", fontSize: 13 },
+  ccBtn: { height: 36, minWidth: 40, alignItems: "center", justifyContent: "center", paddingHorizontal: 6 },
+  ccText: { color: CREAM, fontFamily: "Inter_700Bold", fontSize: 14, letterSpacing: 0.5 },
+  ccOff: { color: MUTED, textDecorationLine: "line-through", opacity: 0.8 },
+  pop: { position: "absolute", backgroundColor: "rgba(18,24,19,0.97)", borderRadius: 16, borderWidth: 1, borderColor: "rgba(246,241,231,0.12)", padding: 14, gap: 4,
+    shadowColor: "#000", shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 12 },
+  popLabel: { color: GOLD, fontFamily: "Inter_700Bold", fontSize: 12, letterSpacing: 1.4, textTransform: "uppercase" },
+  popBack: { flexDirection: "row", alignItems: "center", gap: 4, paddingBottom: 6 },
+  popSelectRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  popSelect: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, height: 42, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: "rgba(246,241,231,0.18)", backgroundColor: "rgba(0,0,0,0.35)" },
+  popSelectText: { flex: 1, color: CREAM, fontFamily: "Inter_600SemiBold", fontSize: 14, textAlign: "left", writingDirection: "ltr" },
+  popCredit: { color: MUTED, fontFamily: "Inter_400Regular", fontSize: 11, lineHeight: 15, marginTop: 8 },
+  popGroup: { color: CREAM, fontFamily: "Inter_700Bold", fontSize: 13, marginTop: 8, marginBottom: 2, textAlign: "left", writingDirection: "ltr" },
+  popRow: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 38, paddingHorizontal: 10, borderRadius: 8 },
+  popRowOn: { backgroundColor: GOLD },
+  popRowText: { flex: 1, color: CREAM, fontFamily: "Inter_500Medium", fontSize: 14, textAlign: "left", writingDirection: "ltr" },
   pillCc: { color: CREAM, fontFamily: "Inter_700Bold", fontSize: 8, opacity: 0.85, marginLeft: 1 },
 });
