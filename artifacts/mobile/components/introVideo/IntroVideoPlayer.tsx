@@ -520,9 +520,12 @@ function LanguagePanel({ listMax, video, audioLang, subLang, credits, onAudio, o
         <ScrollView style={{ flexGrow: 0, maxHeight: listMax }} keyboardShouldPersistTaps="handled">
           {open === "voice" ? groups.map((g) => (
             <View key={g.code}>
-              <Text style={styles.popGroup}>{g.head}</Text>
+              <View style={styles.popGroupRow}>
+                <LanguageFlag language={g.code} size={16} style={{ color: CREAM }} />
+                <Text style={styles.popGroup}>{g.head}</Text>
+              </View>
               {g.items.map((x) => (
-                <PopRow key={x.key} label={x.label} on={x.key === audioLang} indent onPress={() => { onAudio(x.key); setOpen(null); }} />
+                <PopRow key={x.key} label={x.label} on={x.key === audioLang} code={g.code} indent onPress={() => { onAudio(x.key); setOpen(null); }} />
               ))}
             </View>
           )) : subs.map((s) => (
@@ -649,7 +652,8 @@ const styles = StyleSheet.create({
   popSelect: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, height: 42, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: "rgba(246,241,231,0.18)", backgroundColor: "rgba(0,0,0,0.35)" },
   popSelectText: { flex: 1, color: CREAM, fontFamily: "Inter_600SemiBold", fontSize: 14, textAlign: "left", writingDirection: "ltr" },
   popCredit: { color: MUTED, fontFamily: "Inter_400Regular", fontSize: 11, lineHeight: 15, marginTop: 8 },
-  popGroup: { color: CREAM, fontFamily: "Inter_700Bold", fontSize: 13, marginTop: 8, marginBottom: 2, textAlign: "left", writingDirection: "ltr" },
+  popGroupRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10, marginBottom: 2 },
+  popGroup: { color: CREAM, fontFamily: "Inter_700Bold", fontSize: 13, textAlign: "left", writingDirection: "ltr" },
   popRow: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 38, paddingHorizontal: 10, borderRadius: 8 },
   popRowOn: { backgroundColor: GOLD },
   popRowText: { flex: 1, color: CREAM, fontFamily: "Inter_500Medium", fontSize: 14, textAlign: "left", writingDirection: "ltr" },
