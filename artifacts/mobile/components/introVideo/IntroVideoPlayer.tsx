@@ -137,6 +137,8 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
   const [speed, setSpeed] = useState(sessionSpeed);
   const speedRef = useRef(speed); speedRef.current = speed;
   const [speedNotice, setSpeedNotice] = useState(false);
+  const webVoiceFallback = useRef(false);
+  const [voiceNotice, setVoiceNotice] = useState(false);
   /** Set the rate on the player without restarting it or moving the position. */
   const applySpeed = useCallback((r: number) => {
     try {
@@ -174,7 +176,17 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
       if (resumeAt.current) { player.currentTime = resumeAt.current; resumeAt.current = 0; }
       if (resumePlay.current) { resumePlay.current = false; playAtSpeed(); }
       if (!startedLogged.current) { startedLogged.current = true; playAtSpeed(); logIntroEvent(video.id, mode === "replay" ? "replayed" : "play_started", { context, language: audioLang }); }
-    } else if (s === "error") setStatus("error");
+    } else if (s === "error") {
+      // Browser only (2026-11-28): each voice has its own web copy; if that copy is not online, carry on with the
+      // original sound from the same moment instead of failing (phones use the stream, which has every voice).
+      if (Platform.OS === "web" && audioLang !== "en" && !webVoiceFallback.current) {
+        webVoiceFallback.current = true;
+        resumeAt.current = player.currentTime || now; resumePlay.current = true;
+        setVoiceNotice(true); setAudioLang("en");
+        return;
+      }
+      setStatus("error");
+    }
   });
   useEventListener(player, "playingChange", ({ isPlaying }) => setPlaying(isPlaying));
   // The player reports the rate it really uses: if a device refuses or clamps a speed, the button shows the truth.
@@ -355,6 +367,7 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
                     : subsMissing ? t("introVideos.allMissing", "This video is not yet available in {{lang}} — original English audio and subtitles.", { lang: LANGUAGE_DISPLAY[appLang]?.native ?? appLang }) : ""}
                 </Text>
               ) : null}
+              {voiceNotice ? <Text style={styles.notice}>{t("introVideos.voiceWebMissing", "This voice is not available in the browser yet — playing the original sound. It works in the P2P app.")}</Text> : null}
               {speedNotice ? <Text style={styles.notice}>{t("introVideos.speedUnsupported", "This speed is not available on this device.")}</Text> : null}
               {/* Compact controls like the website (owner 2026-11-28): the progress bar on its own line, then
                   play · time · [flag EN ⌄] · CC · 1.0x — the language and speed choices open small drop-down panels. */}
