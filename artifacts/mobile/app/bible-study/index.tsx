@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, Platform, TextInput } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, Platform, TextInput, Pressable, useWindowDimensions } from "react-native";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,7 +9,7 @@ import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import { loadPosition, type ReadingPosition } from "@/lib/bibleReadingPrefs";
 import { bookByCode } from "@/lib/bibleReaderApi";
 import { AppButton, IconButton } from "@/components/ui";
-import { BIBLE_COVER, BIBLE_COVER_BG, BIBLE_COVER_LABEL, ARTWORK_FILL } from "@/constants/artwork";
+import { BIBLE_COVER, BIBLE_COVER_BG, BIBLE_COVER_LABEL, BIBLE_COVER_RATIO, BIBLE_BACK, BIBLE_BACK_RATIO, BIBLE_BACK_ROWS, BIBLE_BACK_ROW_LEFT, BIBLE_BACK_ROW_RIGHT, ARTWORK_FILL } from "@/constants/artwork";
 import { useScrollToTopOnTabReselect, useTabCapsuleTopInset } from "@/components/IPadTabCapsule";
 import { useTranslation } from "react-i18next";
 
@@ -42,6 +42,11 @@ export function BibleStudyHome({ asTab = false }: { asTab?: boolean }) {
   const { t } = useTranslation();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const { contentMaxWidth } = useLayout();
+  // Wide screens (tablet, laptop, phone sideways): front and back cover side by side, the same height (owner 2026-11-28)
+  const { width: winW } = useWindowDimensions();
+  const usableW = Math.min(winW, contentMaxWidth || winW) - 40;
+  const wideCovers = usableW >= 680;
+  const coverH = wideCovers ? Math.min(620, (usableW - 20) / (BIBLE_COVER_RATIO + BIBLE_BACK_RATIO)) : 0;
   const [pos, setPos] = useState<ReadingPosition | null>(null);
   const [query, setQuery] = useState("");
 
@@ -74,12 +79,33 @@ export function BibleStudyHome({ asTab = false }: { asTab?: boolean }) {
           </View>
         </View>
 
-        {/* The Bible cover — shown whole (it is square, so nothing is cut off); opens the Bible. */}
-        <TouchableOpacity onPress={() => router.push("/bible" as any)} activeOpacity={0.92} accessibilityRole="button" accessibilityLabel={`${BIBLE_COVER_LABEL}. Open the Bible`}>
-          <View style={s.cover}>
-            <Image source={BIBLE_COVER} style={ARTWORK_FILL} resizeMode="contain" />
+        {/* The Bible cover — the book fills its frame; opens the Bible. On wide screens the back cover stands beside it,
+            and each of its five rows (Read · Listen · Study · Apply · Grow) opens that part of the app. */}
+        {wideCovers ? (
+          <View style={s.coverRow}>
+            <TouchableOpacity onPress={() => router.push("/bible" as any)} activeOpacity={0.92} accessibilityRole="button" accessibilityLabel={`${BIBLE_COVER_LABEL}. Open the Bible`}>
+              <View style={[s.cover, { width: coverH * BIBLE_COVER_RATIO, height: coverH, maxWidth: undefined, aspectRatio: undefined, marginBottom: 0 }]}>
+                <Image source={BIBLE_COVER} style={ARTWORK_FILL} resizeMode="cover" />
+              </View>
+            </TouchableOpacity>
+            <View style={{ width: coverH * BIBLE_BACK_RATIO, height: coverH }} accessibilityRole="menu" accessibilityLabel="Back cover: Read, Listen, Study, Apply, Grow">
+              <Image source={BIBLE_BACK} style={ARTWORK_FILL} resizeMode="contain" accessibilityElementsHidden importantForAccessibility="no" />
+              {BIBLE_BACK_ROWS.map((r) => (
+                <Pressable key={r.key} onPress={() => router.push(r.route as any)} accessibilityRole="button" accessibilityLabel={r.label}
+                  style={({ pressed, hovered }: any) => [s.backRow, {
+                    top: r.top * coverH, height: r.height * coverH,
+                    left: BIBLE_BACK_ROW_LEFT * coverH * BIBLE_BACK_RATIO, width: (BIBLE_BACK_ROW_RIGHT - BIBLE_BACK_ROW_LEFT) * coverH * BIBLE_BACK_RATIO,
+                  }, (pressed || hovered) && s.backRowOn]} />
+              ))}
+            </View>
           </View>
-        </TouchableOpacity>
+        ) : (
+          <TouchableOpacity onPress={() => router.push("/bible" as any)} activeOpacity={0.92} accessibilityRole="button" accessibilityLabel={`${BIBLE_COVER_LABEL}. Open the Bible`}>
+            <View style={s.cover}>
+              <Image source={BIBLE_COVER} style={ARTWORK_FILL} resizeMode="cover" />
+            </View>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity style={s.continue} onPress={() => router.push("/bible" as any)} activeOpacity={0.88} accessibilityRole="button"
           accessibilityLabel={pos ? `Continue reading ${book} ${pos.chapter}, ${pos.translation}` : "Start reading the Bible"}>
@@ -153,7 +179,11 @@ function makeStyles(c: AppColors) {
     title: { fontSize: 24, lineHeight: 30, color: c.textDark, fontFamily: "Inter_700Bold" },
     meta: { fontSize: 12, lineHeight: 17, color: c.textMuted, fontFamily: "Inter_400Regular" },
     // A fixed square frame (the artwork is square) with the whole picture inside.
-    cover: { width: "100%", maxWidth: 560, alignSelf: "center", aspectRatio: 1, borderRadius: 18, overflow: "hidden", marginBottom: 14, backgroundColor: BIBLE_COVER_BG },
+    coverRow: { flexDirection: "row", justifyContent: "center", alignItems: "flex-end", gap: 20, marginBottom: 16 },
+    backRow: { position: "absolute", borderRadius: 6 },
+    backRowOn: { backgroundColor: "rgba(233,194,122,0.14)" },
+    // the book fills its frame edge to edge (portrait, the cover's own shape); not too tall on tablets
+    cover: { width: "100%", maxWidth: 400, alignSelf: "center", aspectRatio: BIBLE_COVER_RATIO, borderRadius: 14, overflow: "hidden", marginBottom: 14, backgroundColor: BIBLE_COVER_BG },
     continueArt: { width: 52, height: 52, borderRadius: 10, backgroundColor: BIBLE_COVER_BG },
     continue: { flexDirection: "row", alignItems: "center", gap: 14, padding: 18, borderRadius: 18, backgroundColor: c.primaryGreen, minHeight: 88 },
     continueKicker: { fontSize: 11, color: "rgba(255,255,255,0.85)", fontFamily: "Inter_700Bold", letterSpacing: 0.5, textTransform: "uppercase" },
