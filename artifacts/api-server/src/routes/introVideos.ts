@@ -37,8 +37,14 @@ let overrides: { at: number; map: Map<string, AssetStatus> | null } = { at: 0, m
 async function statusOverrides(): Promise<Map<string, AssetStatus>> {
   if (overrides.map && Date.now() - overrides.at < 60_000) return overrides.map;
   const map = new Map<string, AssetStatus>();
-  const { data, error } = await db.from("p2p_intro_video_assets").select("video_id,language,kind,status");
-  if (!error) for (const r of (data ?? []) as any[]) map.set(`${r.video_id}|${r.language}|${r.kind}`, r.status);
+  // in pages: Supabase returns at most 1,000 rows per request, and 36 languages × 11 films × 3 parts is 1,188
+  for (let from = 0; from < 20_000; from += 1000) {
+    const { data, error } = await db.from("p2p_intro_video_assets").select("video_id,language,kind,status")
+      .order("video_id").order("language").order("kind").range(from, from + 999);
+    if (error) break;
+    for (const r of (data ?? []) as any[]) map.set(`${r.video_id}|${r.language}|${r.kind}`, r.status);
+    if (!data || data.length < 1000) break;
+  }
   overrides = { at: Date.now(), map };
   return map;
 }
