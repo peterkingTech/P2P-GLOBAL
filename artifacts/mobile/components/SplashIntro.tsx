@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, Animated, AppState, Platform, StyleSheet, Text } from "react-native";
+import { AccessibilityInfo, Animated, AppState, Platform, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useEventListener } from "expo";
@@ -134,10 +134,11 @@ function IntroLayer({ skip, onDone }: { skip: boolean; onDone: () => void }) {
           useExoShutter={false}
           onFirstFrameRender={firstFrame}
         />
-        <Text style={[styles.tagline, { bottom: insets.bottom + 28 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}
-          accessibilityElementsHidden importantForAccessibility="no">
-          P2P GLOBAL
-        </Text>
+        <View style={[styles.taglineWrap, { bottom: insets.bottom + 22 }]} accessibilityElementsHidden importantForAccessibility="no">
+          <Text style={styles.tagline} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>P2P GLOBAL</Text>
+          {/* owner 2026-11-28: the ministry behind P2P, just under the name — same font, smaller and softer */}
+          <Text style={styles.poweredBy} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>POWERED BY AMEN KINGDOM TECH MINISTRY</Text>
+        </View>
       </Animated.View>
     </Animated.View>
   );
@@ -150,8 +151,14 @@ const styles = StyleSheet.create({
   // Explicit size: on web a <video> ignores insets and keeps its own 1280×720 size.
   video: { width: "100%", height: "100%", backgroundColor: VIDEO_BG },
   // Bottom centre at every width: one line, slightly smaller on very narrow screens.
+  taglineWrap: { position: "absolute", left: 24, right: 24, alignItems: "center", gap: 5 },
   tagline: {
-    position: "absolute", left: 24, right: 24, textAlign: "center",
+    alignSelf: "stretch", textAlign: "center",
     color: "rgba(255,255,255,0.78)", fontSize: 11, letterSpacing: 2, fontFamily: "Inter_600SemiBold",
+  },
+  // A step smaller and softer than "P2P GLOBAL", same font and spacing style, centred under it.
+  poweredBy: {
+    alignSelf: "stretch", textAlign: "center",
+    color: "rgba(255,255,255,0.5)", fontSize: 8.5, letterSpacing: 1.6, fontFamily: "Inter_500Medium",
   },
 });
