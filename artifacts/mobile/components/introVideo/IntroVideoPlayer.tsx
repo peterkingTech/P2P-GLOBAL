@@ -134,6 +134,11 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
       if (sessionSpeed !== 1) p.playbackRate = sessionSpeed;   // a new player (web: another voice's file) starts at the chosen speed
     } catch { /* speed is a comfort; the film must still play */ }
   });
+  // 2026-11-28 (iPhone): after the film closes, the native player is released; any later read ("get") throws and,
+  // escaping from a save/cleanup, broke the screen behind the film. Every read and command goes through these.
+  const pTime = () => { try { return player.currentTime || 0; } catch { return 0; } };
+  const pPlaying = () => { try { return !!player.playing; } catch { return false; } };
+  const pPause = () => { try { player.pause(); } catch { /* released */ } };
   const [speed, setSpeed] = useState(sessionSpeed);
   const speedRef = useRef(speed); speedRef.current = speed;
   const [speedNotice, setSpeedNotice] = useState(false);
@@ -155,7 +160,7 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
   }, [player]);
   /** play() at the chosen speed (older iOS resumes at 1.0 otherwise). */
   const playAtSpeed = useCallback(() => {
-    player.play();
+    try { player.play(); } catch { return; }
     if (speedRef.current !== 1) { try { player.playbackRate = speedRef.current; } catch {} }
   }, [player]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">(src ? "loading" : "error");
@@ -171,9 +176,9 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
   useEventListener(player, "statusChange", ({ status: s }) => {
     if (s === "readyToPlay") {
       setStatus("ready");
-      if (player.duration > 0) setDuration(player.duration);
+      try { if (player.duration > 0) setDuration(player.duration); } catch { /* released */ }
       applySpeed(speedRef.current);   // web: loading another file resets the element's rate
-      if (resumeAt.current) { player.currentTime = resumeAt.current; resumeAt.current = 0; }
+      if (resumeAt.current) { try { player.currentTime = resumeAt.current; } catch { /* released */ } resumeAt.current = 0; }
       if (resumePlay.current) { resumePlay.current = false; playAtSpeed(); }
       if (!startedLogged.current) { startedLogged.current = true; playAtSpeed(); logIntroEvent(video.id, mode === "replay" ? "replayed" : "play_started", { context, language: audioLang }); }
     } else if (s === "error") {
@@ -181,7 +186,7 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
       // original sound from the same moment instead of failing (phones use the stream, which has every voice).
       if (Platform.OS === "web" && audioLang !== "en" && !webVoiceFallback.current) {
         webVoiceFallback.current = true;
-        resumeAt.current = player.currentTime || now; resumePlay.current = true;
+        resumeAt.current = pTime() || now; resumePlay.current = true;
         setVoiceNotice(true); setAudioLang("en");
         return;
       }
@@ -210,11 +215,12 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
 
   // Voice-over: pick the stream's audio track for the chosen language (phones; the web plays the original).
   const pickAudio = useCallback(() => {
-    const tracks = player.availableAudioTracks ?? [];
+    let tracks: any[] = [];
+    try { tracks = player.availableAudioTracks ?? []; } catch { return; }
     // the stream names each track by its voice key ("de", "de-2"); older streams only by language
     const match = tracks.find((tr) => tr.label === audioLang)
       ?? tracks.find((tr) => tr.language?.toLowerCase().startsWith(voiceLanguage(audioLang).toLowerCase())) ?? tracks.find((tr) => tr.language?.startsWith("en"));
-    if (match && player.audioTrack?.language !== match.language) player.audioTrack = match;
+    try { if (match && player.audioTrack?.language !== match.language) player.audioTrack = match; } catch { /* released */ }
   }, [player, audioLang]);
   useEventListener(player, "availableAudioTracksChange", pickAudio);
   useEffect(() => { pickAudio(); }, [pickAudio]);
@@ -222,13 +228,13 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
   // ── save progress: every few seconds, when the app goes to the background, and on close ──
   const save = useCallback(() => {
     if (ended) return;
-    void saveIntroView(userId, video.id, { position: player.currentTime || now, maxWatched: maxWatched.current, audioLanguage: audioLang, subtitleLanguage: subLang });
+    void saveIntroView(userId, video.id, { position: pTime() || now, maxWatched: maxWatched.current, audioLanguage: audioLang, subtitleLanguage: subLang });
   }, [ended, userId, video.id, player, now, audioLang, subLang]);
   const saveRef = useRef(save); saveRef.current = save;
   useEffect(() => {
     const iv = setInterval(() => saveRef.current(), 5000);
     const sub = AppState.addEventListener("change", (s) => {
-      if (s !== "active") { saveRef.current(); try { player.pause(); } catch {} logIntroEvent(video.id, "interrupted", { context, position: player.currentTime }); }
+      if (s !== "active") { saveRef.current(); pPause(); logIntroEvent(video.id, "interrupted", { context, position: pTime() }); }
     });
     return () => { clearInterval(iv); sub.remove(); saveRef.current(); };
   }, [player, video.id, context]);
@@ -242,12 +248,12 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
     hideTimer.current = setTimeout(() => setControls(false), 3500);
   }, []);
   useEffect(() => { if (playing) poke(); else setControls(true); }, [playing, poke]);
-  const toggle = () => { if (ended) return; if (player.playing) player.pause(); else playAtSpeed(); poke(); };
+  const toggle = () => { if (ended) return; if (pPlaying()) pPause(); else playAtSpeed(); poke(); };
   const seekTo = (sec: number) => {
     const limit = required ? maxWatched.current : duration;
-    player.currentTime = Math.max(0, Math.min(sec, limit, duration - 0.2)); poke();
+    try { player.currentTime = Math.max(0, Math.min(sec, limit, duration - 0.2)); } catch { /* released */ } poke();
   };
-  const replay = () => { setEnded(false); player.currentTime = 0; playAtSpeed(); logIntroEvent(video.id, "replayed", { context }); };
+  const replay = () => { setEnded(false); try { player.currentTime = 0; } catch { /* released */ } playAtSpeed(); logIntroEvent(video.id, "replayed", { context }); };
 
   const [menu, setMenu] = useState(false);
   const [barH, setBarH] = useState(110);   // height of the bottom controls: the drop-down panels open just above them
@@ -277,14 +283,14 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
     }).catch(() => {});
   };
   const chooseAudio = (code: string) => {
-    if (code !== audioLang && introSource(video, code) !== src) { resumeAt.current = player.currentTime || now; resumePlay.current = player.playing; }
+    if (code !== audioLang && introSource(video, code) !== src) { resumeAt.current = pTime() || now; resumePlay.current = pPlaying(); }
     setAudioLang(code); rememberLangs({ audio: code }); logIntroEvent(video.id, "language_selected", { context, language: code }); };
   const chooseSub = (code: string) => { setSubLang(code); rememberLangs({ sub: code }); if (code !== "off") logIntroEvent(video.id, "language_selected", { context, language: code }); };
 
   const close = (skipped: boolean) => {
     if (required && !ended) return;
-    if (!ended) { save(); if (skipped) { logIntroEvent(video.id, "skipped", { context, position: player.currentTime }); void saveIntroView(userId, video.id, { skippedAt: new Date().toISOString() }, { skipped: true }); } }
-    try { player.pause(); } catch {}
+    if (!ended) { save(); if (skipped) { logIntroEvent(video.id, "skipped", { context, position: pTime() }); void saveIntroView(userId, video.id, { skippedAt: new Date().toISOString() }, { skipped: true }); } }
+    pPause();
     if (autoOff) void saveIntroView(userId, video.id, { autoIntroOff: true });
     onFinished({ completed: ended, skipped, autoIntroOff: autoOff });
   };
@@ -340,7 +346,7 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
               <Ionicons name="cloud-offline-outline" size={36} color={MUTED} />
               <Text style={styles.errTitle}>{src ? t("introVideos.errorTitle", "The video could not be played") : t("introVideos.notUploaded", "This video is not available yet")}</Text>
               <Text style={styles.dim}>{src ? t("introVideos.errorBody", "Check your connection and try again. Your place is saved.") : t("introVideos.notUploadedBody", "It will appear here as soon as it has been published.")}</Text>
-              {src ? <Pressable style={styles.btn} onPress={() => { setStatus("loading"); startedLogged.current = false; resumeAt.current = player.currentTime || resumeAt.current; player.replace({ uri: src }); setAttempt((a) => a + 1); }}><Text style={styles.btnText}>{t("introVideos.retry", "Try again")}</Text></Pressable> : null}
+              {src ? <Pressable style={styles.btn} onPress={() => { setStatus("loading"); startedLogged.current = false; resumeAt.current = pTime() || resumeAt.current; try { player.replace({ uri: src }); } catch { /* released */ } setAttempt((a) => a + 1); }}><Text style={styles.btnText}>{t("introVideos.retry", "Try again")}</Text></Pressable> : null}
               {(!required || !src) ? <Pressable style={styles.btnGhost} onPress={() => onFinished({ completed: false, skipped: false })}><Text style={styles.btnGhostText}>{t("introVideos.close", "Close")}</Text></Pressable> : null}
             </View>
           ) : null}
