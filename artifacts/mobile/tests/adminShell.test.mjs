@@ -100,12 +100,12 @@ const src = readFileSync(path.join(root, "app/admin/_layout.tsx"), "utf8");
 // Learning · Content · Platform · Help & Support); each area keeps the original order.
 const EXPECTED = {
   // "Kingdom Wins" review: Wins moderators + the admin_content P2P Impact reviewer (migration 189).
-  super_admin: ["Dashboard", "Registrations", "Moderation", "Kingdom Wins", "Usernames", "Verification", "Discipleship & Growth", "Peer Evaluations", "Content", "Kingdom Stories", "Story Narration", "Bible Licences", "Publishing Studio", "Translations", "Recycle Bin", "Access & Audit", "Team", "Help Requests", "P2P Official Mail"],
-  admin_content: ["Dashboard", "Kingdom Wins", "Content", "Kingdom Stories", "Publishing Studio", "Recycle Bin"],
+  super_admin: ["Dashboard", "Registrations", "Moderation", "Kingdom Wins", "Usernames", "Verification", "Discipleship & Growth", "Peer Evaluations", "Content", "Kingdom Stories", "Story Narration", "About P2P Videos", "Bible Licences", "Publishing Studio", "Translations", "Recycle Bin", "Access & Audit", "Team", "Help Requests", "P2P Official Mail"],
+  admin_content: ["Dashboard", "Kingdom Wins", "Content", "Kingdom Stories", "About P2P Videos", "Publishing Studio", "Recycle Bin"],
   admin_moderation: ["Dashboard", "Moderation", "Kingdom Wins", "Publishing Studio"],
   moderator: ["Dashboard", "Moderation", "Kingdom Wins", "Usernames", "Verification", "Publishing Studio", "Help Requests"],
   admin_supervisor: ["Dashboard", "Kingdom Wins", "Discipleship & Growth", "Peer Evaluations", "Publishing Studio", "Access & Audit", "Team"],
-  admin_translation: ["Dashboard", "Publishing Studio", "Translations"],
+  admin_translation: ["Dashboard", "About P2P Videos", "Publishing Studio", "Translations"],   // About P2P Videos: film language review (2026-11-26)
   admin_marketing: ["Dashboard", "Publishing Studio", "P2P Official Mail"],
   admin_help: ["Dashboard", "Help Requests", "P2P Official Mail"],
   peer_guide: ["Dashboard", "Content", "Translations", "Recycle Bin", "Help Requests"],

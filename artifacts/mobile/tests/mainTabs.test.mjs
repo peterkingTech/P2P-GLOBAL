@@ -42,7 +42,7 @@ ok("tabs: Messages keeps its unread badge; More shows the prayer badge", layout.
 
 // ── More ──
 const more = src("app/(tabs)/more.tsx");
-ok("more: Prayer / Discover switch, Prayer first", /options=\{\[\{ value: "prayer"[^\]]*\{ value: "discover"/.test(more));
+ok("more: Prayer / Discover switch, Prayer first", /options=\{\[\s*\{ value: "prayer"[^\]]*\{ value: "discover"/.test(more)   /* the switch is multi-line since About P2P was added */);
 ok("more: opens on Prayer, honours ?section=", more.includes('let lastSection: MoreSection = "prayer"') && more.includes('params.section === "prayer" || params.section === "discover"'));
 ok("more: showing Prayer clears the badge", more.includes('if (section === "prayer") markPrayerSeen(profile?.id)'));
 ok("more: the full Prayer and Discover screens, with the switch at their top", more.includes("<PrayerHome") && more.includes("<DiscoverHome") && more.includes("topSlot={toggle}"));

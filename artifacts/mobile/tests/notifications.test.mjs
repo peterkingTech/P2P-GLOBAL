@@ -211,7 +211,7 @@ ok("settings: Messages / Community / Prayer switches added to the existing six",
 ok("settings: says calls + safety always come through and muted items stay in Notifications", /Calls, missed calls and account or safety alerts always come through/.test(settings) && /it still appears in Notifications/.test(settings));
 ok("the three switches save through updateProfile to their existing columns", /dbUpdates\.notify_messages = updates\.notifyMessages/.test(auth) && /dbUpdates\.notify_groups = updates\.notifyGroups/.test(auth) && /dbUpdates\.notify_prayer = updates\.notifyPrayer/.test(auth));
 ok("master switch: saved as notifications_enabled, greys out + disables every category", /onValueChange=\{\(v\) => \{ updateProfile\(\{ notificationsEnabled: v \}\); \}\}/.test(settings)
-  && /dbUpdates\.notifications_enabled = updates\.notificationsEnabled/.test(auth) && /!masterOn && styles\.cardDimmed/.test(settings) && (settings.match(/disabled=\{!masterOn\}/g) ?? []).length === 2);
+  && /dbUpdates\.notifications_enabled = updates\.notificationsEnabled/.test(auth) && /!masterOn && styles\.cardDimmed/.test(settings) && (settings.match(/disabled=\{!masterOn\}/g) ?? []).length === 4);   // categories, overdue, Daily Word switch + its time chips (2026-11-27)
 const overdueLib = readFileSync(path.join(root, "lib/adminOverdueSetting.ts"), "utf8");
 ok("overdue reminders switch: super admins only, hidden without migration 196", /const isSuperAdmin = profile\?\.role === "super_admin";/.test(settings) && /\{isSuperAdmin && adminOverdue\.available \? \(/.test(settings)
   && /if \(error \|\| !data\) return \{ available: false \};/.test(overdueLib));

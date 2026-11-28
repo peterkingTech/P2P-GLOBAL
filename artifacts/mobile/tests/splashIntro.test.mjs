@@ -36,8 +36,10 @@ ok("playback: video fades in on its first frame past the start point (native eve
 ok("playback: start point (0 — the clip is already 0:08–end of the original, owner 2026-11-10), set before load and again when ready; a skipped opening never flashes", intro.includes("export const SPLASH_START_SECONDS = 0;") && intro.includes("p.currentTime = SPLASH_START_SECONDS;") && intro.includes("player.currentTime = SPLASH_START_SECONDS;") && intro.includes("if (currentTime > SPLASH_START_SECONDS) showVideo();") && intro.includes("if (player.currentTime >= SPLASH_START_SECONDS - 0.05) showVideo();"));
 ok("playback: Android uses a TextureView without the ExoPlayer shutter", intro.includes('surfaceType="textureView"') && intro.includes("useExoShutter={false}"));
 
-ok("tagline: a small 'P2P GLOBAL' at the bottom centre, above the home indicator, one line", /\n\s+P2P GLOBAL\r?\n/.test(intro) && intro.includes("bottom: insets.bottom + 28")
-  && intro.includes('textAlign: "center"') && intro.includes("numberOfLines={1} adjustsFontSizeToFit") && /tagline: \{\s*position: "absolute", left: 24, right: 24/.test(intro));
+ok("tagline: a small 'P2P GLOBAL' at the bottom centre, above the home indicator, one line", />P2P GLOBAL<\/Text>/.test(intro) && intro.includes("bottom: insets.bottom + 22")
+  && intro.includes('textAlign: "center"') && intro.includes("numberOfLines={1} adjustsFontSizeToFit") && /taglineWrap: \{ position: "absolute", left: 24, right: 24/.test(intro));
+ok("tagline: 'POWERED BY AMEN KINGDOM TECH MINISTRY' just under it, one line, softer (owner 2026-11-28)", />POWERED BY AMEN KINGDOM TECH MINISTRY<\/Text>/.test(intro)
+  && /poweredBy: \{[^}]*textAlign: "center"/.test(intro) && intro.indexOf(">P2P GLOBAL<") < intro.indexOf(">POWERED BY AMEN"));
 
 // Never stuck
 ok("safety: ends on playToEnd, on error, at a start timeout and at an overall cap", intro.includes('"playToEnd", () => finish()') && intro.includes('if (status === "error") finish();')
