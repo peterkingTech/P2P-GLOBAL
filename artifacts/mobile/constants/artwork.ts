@@ -3,8 +3,8 @@
 /** Bible Study and the Bible reader ("Holy Bible — multi language, multi version"). */
 export const BIBLE_COVER = require("@/assets/images/bible-cover.jpg");
 /** The cover's own navy, behind it so any spare space blends in. */
-export const BIBLE_COVER_BG = "#0A1324";
-export const BIBLE_COVER_LABEL = "Holy Bible — multi language, multi version";
+export const BIBLE_COVER_BG = "#111522";   // the cover's own dark leather (cover replaced 2026-11-28)
+export const BIBLE_COVER_LABEL = "Holy Bible — multi-language, multi-version edition: read, listen, study, apply, grow";
 
 /**
  * Makes a bundled image fill its frame exactly. On web an image bundled with the
