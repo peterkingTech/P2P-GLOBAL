@@ -1,5 +1,5 @@
 -- 261 — P2P Voices: let the voice catalogue remember the Nigerian-language providers too (2026-11-26).
--- PROPOSED — NOT APPLIED. Needs the owner's approval (guarded apply + backup, as usual).
+-- APPLIED to production 2026-11-28 (guarded apply + backup, all checks PASS).
 --
 -- Why: 254 created p2p_voice_catalogue with a check that only allows the first four providers. 9jaLingo, Naija Speech
 -- and now Giggy (owner 2026-11-26: Naija Pidgin, Igbo and Twi in the general P2P Voices) therefore cannot be saved,

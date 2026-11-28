@@ -1,4 +1,4 @@
--- 259: fruit awarded to the right person again (PROPOSED — owner approval required before applying).
+-- 259: fruit awarded to the right person again (APPLIED to production 2026-11-28, guarded apply, all checks PASS).
 --
 -- Problem (found 2026-11-20 while seeding demo activity): since migration 097,
 -- p2p_award_fruit refuses any p_user_id other than auth.uid(). That guard was
