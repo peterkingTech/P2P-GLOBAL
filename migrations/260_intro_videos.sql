@@ -1,5 +1,5 @@
 -- 260 — About P2P introduction videos (owner brief 2026-11-26): per-account viewing status, language asset review
--- workflow and privacy-light analytics. PROPOSED — NOT APPLIED. Additive only: three new tables, nothing existing changes.
+-- workflow and privacy-light analytics. APPLIED to production 2026-11-28 (guarded apply, all checks PASS). Additive only: three new tables, nothing existing changes.
 --
 -- Until this is applied the API answers `stored: false` and the app keeps viewing status on the phone only
 -- (AsyncStorage), and the language review screen is read-only (statuses come from the content files in the repo).
