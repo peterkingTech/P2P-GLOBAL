@@ -29,6 +29,7 @@ import studyWorkspaceRouter from "./studyWorkspace";
 import voicesRouter from "./voices";
 import narrationsAdminRouter from "./narrationsAdmin";
 import introVideosRouter from "./introVideos";
+import clientErrorsRouter from "./clientErrors";
 import adminNotificationsRouter from "./adminNotifications";
 import scriptureCollectionsRouter from "./scriptureCollections";
 import scriptureLibraryRouter from "./scriptureLibrary";
@@ -102,6 +103,7 @@ router.use("/room-invitations", roomInvitationsRouter); // P2P Rooms — shareab
 router.use("/sessions", sessionsRouter);
 router.use("/discipleship", discipleshipRouter);
 router.use("/notifications", notificationsRouter);
+router.use("/client-errors", clientErrorsRouter); // app error reports (2026-11-28): screen/player render errors → server log only
 router.use("/intro-videos", introVideosRouter); // About P2P introduction videos (2026-11-26): manifest, timed text per language, viewing status, review workflow (migration 260)
 router.use("/voices", voicesRouter); // P2P Voices (2026-11-18): catalogue, on-demand speech for eligible content, preferences — never Bible text, never ElevenLabs generation
 router.use("/admin/notifications", adminNotificationsRouter); // Admin Centre notifications (2026-11-18): every module, role-routed, deduplicated (migration 255); before /admin

@@ -9,6 +9,8 @@ import { useTranslation } from "react-i18next";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LANGUAGE_DISPLAY, type SupportedLanguage } from "@/lib/i18n";
 import LanguageFlag from "@/components/language/LanguageFlag";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { reportClientError } from "@/lib/clientErrors";
 import { languageNativeName } from "@/lib/languageRegistry";
 import {
   fetchIntroText, formatIntroDuration, introSource, logIntroEvent, saveIntroView, voiceKeys, voiceLanguage,
@@ -63,7 +65,18 @@ let sessionSpeed = 1;
 
 export default function IntroVideoPlayer(props: IntroVideoPlayerProps) {
   if (!props.visible || !props.video) return null;
-  return <PlayerModal {...props} video={props.video} />;
+  // 2026-11-28: a failure inside the player closes the player — it must never take down the screen it opened on
+  // (the screen behind it, e.g. Learning, keeps working). The error is reported so it can be fixed.
+  return (
+    <ErrorBoundary FallbackComponent={() => <ClosePlayer onFinished={props.onFinished} />}
+      onError={(e, stack) => reportClientError(`intro-player-${props.video?.id ?? "?"}`, e, stack)}>
+      <PlayerModal {...props} video={props.video} />
+    </ErrorBoundary>
+  );
+}
+function ClosePlayer({ onFinished }: { onFinished: IntroVideoPlayerProps["onFinished"] }) {
+  useEffect(() => { onFinished({ completed: false, skipped: false }); }, [onFinished]);
+  return null;
 }
 
 function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview, onFinished }: IntroVideoPlayerProps & { video: IntroVideoInfo }) {
@@ -116,8 +129,10 @@ function PlayerModal({ video, mode, context, userId, view, offerAutoOff, preview
     p.timeUpdateEventInterval = 0.25 / Math.max(1, sessionSpeed);
     p.loop = false;
     p.staysActiveInBackground = false;
-    p.preservesPitch = true;
-    p.playbackRate = sessionSpeed;   // a new player (web: another voice's file) starts at the chosen speed
+    try {
+      p.preservesPitch = true;
+      if (sessionSpeed !== 1) p.playbackRate = sessionSpeed;   // a new player (web: another voice's file) starts at the chosen speed
+    } catch { /* speed is a comfort; the film must still play */ }
   });
   const [speed, setSpeed] = useState(sessionSpeed);
   const speedRef = useRef(speed); speedRef.current = speed;

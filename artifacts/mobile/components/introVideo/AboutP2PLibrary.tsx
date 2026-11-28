@@ -40,12 +40,14 @@ export default function AboutP2PLibrary({ topSlot, embedded = false, preview = f
     try {
       const [m, v] = await Promise.all([fetchIntroManifest(i18n.language || "en", preview), loadIntroViews(profile?.id)]);
       setManifest(m); setViews(v.views); setError(false);
-      if (play) { const p = m.videos.find((x) => x.id === play); if (p) setPlaying(p); }
+      if (play) { const p = m.videos.find((x) => x.id === play); if (p?.media) setPlaying(p); }
     } catch { setError(true); }
   }, [i18n.language, profile?.id, preview, play]);
   useEffect(() => { void load(); }, [load]);
 
   const byId = (id: IntroVideoId) => manifest?.videos.find((v) => v.id === id);
+  // 2026-11-28: a film that is not online yet does not open the player (the notice above already says so)
+  const open = (v: IntroVideoInfo) => { if (v.media) setPlaying(v); };
   const featured = byId("01");
   // Laptops and tablets: the featured film beside its text, the films in a 2–3 column grid that fills the width
   const wide = width >= 720;
@@ -79,7 +81,7 @@ export default function AboutP2PLibrary({ topSlot, embedded = false, preview = f
         ) : null}
 
         {featured ? (
-          <Pressable onPress={() => setPlaying(featured)} accessibilityRole="button" accessibilityLabel={`${featured.title}, ${formatIntroDuration(featured.duration)}`} style={[styles.featured, wide && styles.featuredWide]}>
+          <Pressable onPress={() => open(featured)} accessibilityRole="button" accessibilityLabel={`${featured.title}, ${formatIntroDuration(featured.duration)}`} style={[styles.featured, wide && styles.featuredWide]}>
             <View style={wide ? { width: "58%" } : undefined}><Thumb v={featured} styles={styles} big /></View>
             <View style={[styles.featuredText, wide && styles.featuredTextWide]}>
               <Text style={styles.featuredKicker}>{t("introVideos.featured", "Featured film")}</Text>
@@ -97,7 +99,7 @@ export default function AboutP2PLibrary({ topSlot, embedded = false, preview = f
               <Text style={styles.groupTitle}>{t(g.titleKey, g.title)}</Text>
               <View style={[styles.grid, wide && { flexDirection: "row", flexWrap: "wrap" }]}>
                 {list.map((v) => (
-                  <Pressable key={v.id} onPress={() => setPlaying(v)} style={[styles.card, { width: cardW }]} accessibilityRole="button"
+                  <Pressable key={v.id} onPress={() => open(v)} style={[styles.card, { width: cardW }]} accessibilityRole="button"
                     accessibilityLabel={`${v.title}, ${formatIntroDuration(v.duration)}${views[v.id]?.completedAt ? `, ${t("introVideos.watched", "Watched")}` : ""}`}>
                     <Thumb v={v} styles={styles} />
                     <View style={styles.cardBody}>

@@ -6,6 +6,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppButton } from "@/components/ui";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import type { ErrorFallbackProps } from "@/components/ErrorFallback";
+import { reportClientError } from "@/lib/clientErrors";
 
 // One screen's error stays in that screen. Every Stack screen is wrapped (components/PageFrame.tsx), so
 // if a screen fails to render, people see a calm message on THAT screen with "Try again" and "Go back" —
@@ -27,7 +28,8 @@ function ScreenFallback({ error, resetError }: ErrorFallbackProps) {
         <AppButton label="Try again" icon="refresh" onPress={resetError} />
         <AppButton label="Go back" variant="secondary" icon="arrow-back" onPress={back} />
       </View>
-      {__DEV__ ? <Text style={[styles.dev, { color: c.textMuted }]} selectable>{error.message}</Text> : null}
+      {/* the error's own words, small, so a screenshot tells us what failed (2026-11-28) */}
+      <Text style={[styles.dev, { color: c.textMuted }]} selectable numberOfLines={3}>{String(error?.message ?? "").slice(0, 200)}</Text>
     </View>
   );
 }
@@ -36,7 +38,7 @@ export function ScreenErrorBoundary({ routeName, children }: { routeName: string
   return (
     <ErrorBoundary
       FallbackComponent={ScreenFallback}
-      onError={(error, stack) => console.error(`[ScreenErrorBoundary] ${routeName}:`, error, "\nComponent stack:", stack)}
+      onError={(error, stack) => { console.error(`[ScreenErrorBoundary] ${routeName}:`, error, "\nComponent stack:", stack); reportClientError(routeName, error, stack); }}
     >
       {children}
     </ErrorBoundary>

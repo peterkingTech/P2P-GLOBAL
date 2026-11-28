@@ -36,7 +36,8 @@ export function useIntroVideo(id: IntroVideoId, context: string, opts: { enabled
         const v = manifest.videos.find((x) => x.id === id) ?? null;
         const d = shouldAutoShow(id, views, { reliable, accountCreatedAt: profile.createdAt });
         if (off) return;
-        if (!v || !d.show) { setSettled(true); onDone.current?.(false); return; }
+        // 2026-11-28: never open by itself while the film is not online (media null) — it could only say "not available"
+        if (!v || !v.media || !d.show) { setSettled(true); onDone.current?.(false); return; }
         setVideo(v); setView(views[id]); setMode(d.mustComplete ? "required" : "optional"); setActive(true);
         logIntroEvent(id, "intro_shown", { context, language: i18n.language });
       } catch {
