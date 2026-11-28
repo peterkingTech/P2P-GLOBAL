@@ -9,7 +9,7 @@ import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import { loadPosition, type ReadingPosition } from "@/lib/bibleReadingPrefs";
 import { bookByCode } from "@/lib/bibleReaderApi";
 import { AppButton, IconButton } from "@/components/ui";
-import { BIBLE_COVER, BIBLE_COVER_BG, BIBLE_COVER_LABEL, BIBLE_COVER_RATIO, BIBLE_BACK, BIBLE_BACK_RATIO, BIBLE_COVER_BODY, BIBLE_BACK_BODY, BIBLE_BACK_ROWS, BIBLE_BACK_ROW_LEFT, BIBLE_BACK_ROW_RIGHT, ARTWORK_FILL } from "@/constants/artwork";
+import { BIBLE_COVER, BIBLE_COVER_LABEL, BIBLE_COVER_RATIO, BIBLE_BACK, BIBLE_BACK_RATIO, BIBLE_COVER_BODY, BIBLE_BACK_BODY, BIBLE_BACK_ROWS, BIBLE_BACK_ROW_LEFT, BIBLE_BACK_ROW_RIGHT, ARTWORK_FILL } from "@/constants/artwork";
 import { useScrollToTopOnTabReselect, useTabCapsuleTopInset } from "@/components/IPadTabCapsule";
 import { useTranslation } from "react-i18next";
 
@@ -188,7 +188,7 @@ function makeStyles(c: AppColors) {
     // the book fills its frame edge to edge (portrait, the cover's own shape); not too tall on tablets
     // the book itself (transparent cut-out) standing on the screen's own background — no frame, no box
     cover: { width: "100%", maxWidth: 330, alignSelf: "center", aspectRatio: BIBLE_COVER_RATIO, marginBottom: 14 },
-    continueArt: { width: 52, height: 52, borderRadius: 10, backgroundColor: BIBLE_COVER_BG },
+    continueArt: { width: 52, height: 52 },   // the book itself, no square behind it
     continue: { flexDirection: "row", alignItems: "center", gap: 14, padding: 18, borderRadius: 18, backgroundColor: c.primaryGreen, minHeight: 88 },
     continueKicker: { fontSize: 11, color: "rgba(255,255,255,0.85)", fontFamily: "Inter_700Bold", letterSpacing: 0.5, textTransform: "uppercase" },
     continueTitle: { fontSize: 20, lineHeight: 26, color: "#fff", fontFamily: "Inter_700Bold" },

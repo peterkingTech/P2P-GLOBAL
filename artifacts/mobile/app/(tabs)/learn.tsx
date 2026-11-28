@@ -20,7 +20,7 @@ import { continueItems, isStoryInProgress, type ContinueItem } from "@/lib/learn
 import { COMPREHENSIVE_CHECKS } from "@/lib/terminology";
 import { loadCached, peekCached, qk } from "@/lib/query";
 import { usePerfVisit } from "@/lib/perf";
-import { BIBLE_COVER, BIBLE_COVER_BG, BIBLE_COVER_RATIO } from "@/constants/artwork";
+import { BIBLE_COVER, BIBLE_COVER_RATIO } from "@/constants/artwork";
 import { withScreenBoundary } from "@/components/ScreenErrorBoundary";
 import { IntroVideoGate } from "@/components/introVideo/useIntroVideo";
 
@@ -164,7 +164,7 @@ function SectionHeading({ s, title, action }: { s: ReturnType<typeof makeStyles>
 // A Continue Learning item as card content: its own picture — a story cover,
 // a Kingdom School module photo, or the Bible cover (shown whole) — or its icon.
 function featured(item: ContinueItem): FeaturedLearning {
-  const art = item.kind === "bible" ? { bundled: BIBLE_COVER, background: BIBLE_COVER_BG, ratio: BIBLE_COVER_RATIO }
+  const art = item.kind === "bible" ? { bundled: BIBLE_COVER, background: "transparent", ratio: BIBLE_COVER_RATIO }   // the book itself, no square behind it
     : item.imagePath ? { path: item.imagePath } : { url: item.imageUrl ?? null };
   return { typeLabel: item.typeLabel, title: item.title, detail: item.detail, progress: item.progress, icon: item.icon, art };
 }

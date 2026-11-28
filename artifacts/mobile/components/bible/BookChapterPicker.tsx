@@ -6,7 +6,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { CANON, type CanonBook } from "@/lib/bibleReaderApi";
 import { IconButton } from "@/components/ui";
-import { BIBLE_COVER, BIBLE_COVER_BG } from "@/constants/artwork";
+import { BIBLE_COVER } from "@/constants/artwork";
 
 // Book → chapter selection for the Bible reader. Books come from the canon
 // list (structure only), in Bible order, split Old/New Testament, with a
@@ -108,7 +108,7 @@ function makeStyles(c: AppColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.lightCream },
     header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingBottom: 8 },
-    coverThumb: { width: 40, height: 40, borderRadius: 8, marginRight: 10, backgroundColor: BIBLE_COVER_BG },
+    coverThumb: { width: 40, height: 40, marginRight: 10 },   // the book itself, no square behind it
     title: { flex: 1, fontSize: 20, color: c.textDark, fontFamily: "Inter_700Bold" },
     search: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 16, paddingHorizontal: 12, minHeight: 44, borderRadius: 12, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige },
     searchInput: { flex: 1, color: c.textDark, fontSize: 15, fontFamily: "Inter_400Regular", paddingVertical: 8 },

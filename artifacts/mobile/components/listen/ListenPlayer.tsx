@@ -11,7 +11,7 @@ import { listen, listenUi, useListenAppState, useListenState, useListenUi, RATES
 import { baseLanguage } from "@/lib/listen/voices";
 import { getLanguageName } from "@/lib/languageNames";
 import { withAlpha } from "@/lib/colorUtils";
-import { ARTWORK_FILL } from "@/constants/artwork";
+import { ARTWORK_FILL, BIBLE_ARTWORK, BIBLE_COVER } from "@/constants/artwork";
 import { LARGE_TABLET_BREAKPOINT, TABLET_BREAKPOINT } from "@/hooks/useLayout";
 import ReadAlongText from "./ReadAlongText";
 import LanguageFlag from "@/components/language/LanguageFlag";
@@ -178,7 +178,8 @@ function ListenScreen({ st, c, s, dark }: { st: ListenState; c: AppColors; s: St
   const tablet = !wide && width >= TABLET_BREAKPOINT;
   const sidePanel = wide ? Math.min(420, Math.max(300, width * 0.36)) : 0;
   const watermark = Math.min(width, height) * 0.95;
-  const artwork = content.artwork ?? null;
+  // the lock screen needs the solid square Bible artwork; inside the app the book itself is shown (cut out, no square)
+  const artwork = content.artwork === BIBLE_ARTWORK ? BIBLE_COVER : (content.artwork ?? null);
 
   // ── Pieces ────────────────────────────────────────────────────────────────
   const bigPlay = st.status === "loading"
@@ -328,7 +329,7 @@ function ListenScreen({ st, c, s, dark }: { st: ListenState; c: AppColors; s: St
   const ART = 96;
   const artBlock = (bigTitle: boolean) => (
     <View style={s.artBlock}>
-      <View style={[s.artFrame, { width: ART, height: ART, borderRadius: ART * 0.12 }]}>
+      <View style={[s.artFrame, { width: ART, height: ART, borderRadius: ART * 0.12 }, artwork === BIBLE_COVER && s.artFrameBook]}>
         {artwork
           ? <Image source={artwork as any} style={[ARTWORK_FILL, { borderRadius: ART * 0.12 }]} resizeMode="contain" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" />
           : <AppArtwork size={ART} radius={ART * 0.12} />}
@@ -498,6 +499,7 @@ const makeStyles = (c: AppColors, dark: boolean) => StyleSheet.create({
     overflow: "hidden", backgroundColor: c.card, alignItems: "center", justifyContent: "center", marginBottom: 6,
     shadowColor: "#000", shadowOpacity: dark ? 0.5 : 0.18, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 10,
   },
+  artFrameBook: { backgroundColor: "transparent", shadowOpacity: 0, elevation: 0, overflow: "visible" },   // the Bible book stands on its own
   fullTitle: { fontSize: 22, color: c.textDark, fontFamily: "Inter_700Bold", textAlign: "center" },
   fullSub: { fontSize: 14, color: c.textMid, fontFamily: "Inter_500Medium", textAlign: "center" },
   where: { fontSize: 14, color: c.textMid, fontFamily: "Inter_500Medium", textAlign: "center" },
