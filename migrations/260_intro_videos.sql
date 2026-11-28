@@ -24,6 +24,9 @@ alter table public.p2p_intro_video_views enable row level security;
 -- The API uses the service role; members may read their own rows directly (nothing else).
 drop policy if exists "own intro video views" on public.p2p_intro_video_views;
 create policy "own intro video views" on public.p2p_intro_video_views for select using (auth.uid() = user_id);
+-- This project's default privileges give anon/authenticated ALL on every new public table (TRUNCATE is not covered
+-- by RLS), so each new table first takes them away and then grants exactly what is intended (found 2026-11-28).
+revoke all on public.p2p_intro_video_views from anon, authenticated;
 grant select on public.p2p_intro_video_views to authenticated;
 grant all on public.p2p_intro_video_views to service_role;
 
@@ -41,6 +44,7 @@ create table if not exists public.p2p_intro_video_assets (
   primary key (video_id, language, kind)
 );
 alter table public.p2p_intro_video_assets enable row level security;   -- service role only (Admin Centre via the API)
+revoke all on public.p2p_intro_video_assets from anon, authenticated;
 grant all on public.p2p_intro_video_assets to service_role;
 
 -- Append-only history of every review action (who, what, when).
@@ -56,6 +60,7 @@ create table if not exists public.p2p_intro_video_asset_events (
   created_at  timestamptz not null default now()
 );
 alter table public.p2p_intro_video_asset_events enable row level security;
+revoke all on public.p2p_intro_video_asset_events from anon, authenticated;
 grant all on public.p2p_intro_video_asset_events to service_role;
 
 -- 3. Analytics: events only, no free text, no device identifiers. user_id is kept so a person's own repeat views are
@@ -72,4 +77,5 @@ create table if not exists public.p2p_intro_video_events (
 );
 create index if not exists p2p_intro_video_events_video_idx on public.p2p_intro_video_events (video_id, event, created_at);
 alter table public.p2p_intro_video_events enable row level security;   -- service role only
+revoke all on public.p2p_intro_video_events from anon, authenticated;
 grant all on public.p2p_intro_video_events to service_role;
